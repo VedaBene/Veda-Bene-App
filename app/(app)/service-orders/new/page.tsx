@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import { ServiceOrderForm } from '@/components/service-orders/ServiceOrderForm'
+import { PageHeader } from '@/components/ui/PageHeader'
 import type { Profile, Property, Role } from '@/lib/types/database'
 
 export default async function NewServiceOrderPage() {
@@ -30,8 +31,8 @@ export default async function NewServiceOrderPage() {
   ])
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Nova Ordem de Serviço</h1>
+    <div className="animate-fade-in-up">
+      <PageHeader title="Nova Ordem de Serviço" />
       <ServiceOrderForm
         properties={(properties ?? []) as Pick<Property, 'id' | 'name' | 'avg_cleaning_hours' | 'min_guests' | 'max_guests'>[]}
         staff={(staffData ?? []) as Pick<Profile, 'id' | 'full_name'>[]}

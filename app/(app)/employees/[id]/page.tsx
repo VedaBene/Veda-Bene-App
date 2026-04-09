@@ -1,6 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import { EmployeeForm } from '@/components/employees/EmployeeForm'
+import { PageHeader } from '@/components/ui/PageHeader'
 import { deleteEmployee } from '../actions'
 import type { Profile, Role } from '@/lib/types/database'
 
@@ -32,8 +33,8 @@ export default async function EmployeeDetailPage({
   if (!employee) notFound()
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">{employee.full_name}</h1>
+    <div className="animate-fade-in-up">
+      <PageHeader title={employee.full_name} />
       <EmployeeForm
         employee={employee as Profile}
         viewerRole={role}

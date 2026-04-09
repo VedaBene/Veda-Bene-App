@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import { ServiceOrderForm } from '@/components/service-orders/ServiceOrderForm'
+import { PageHeader } from '@/components/ui/PageHeader'
 import { deleteServiceOrder } from '../actions'
 import type { Profile, Property, Role, ServiceOrder } from '@/lib/types/database'
 
@@ -43,10 +44,8 @@ export default async function ServiceOrderDetailPage({
   const canEdit = ['admin', 'secretaria'].includes(role)
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">
-        Ordem de Serviço
-      </h1>
+    <div className="animate-fade-in-up">
+      <PageHeader title="Ordem de Serviço" />
       <ServiceOrderForm
         order={order as ServiceOrder}
         properties={(properties ?? []) as Pick<Property, 'id' | 'name' | 'avg_cleaning_hours' | 'min_guests' | 'max_guests'>[]}

@@ -3,6 +3,9 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
+import { Input } from '@/components/ui/Input'
+import { Button } from '@/components/ui/Button'
+import { Lock, AlertCircle, Mail } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -29,54 +32,61 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
-      <h2 className="text-xl font-semibold text-gray-800 mb-6">Accedi</h2>
+    <div className="animate-fade-in">
+      <div className="bg-card rounded-2xl shadow-elevated border border-border p-8">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center">
+            <Lock size={18} className="text-accent" />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-foreground">Accedi</h2>
+            <p className="text-xs text-muted-foreground">Inserisci le tue credenziali</p>
+          </div>
+        </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-            Email
-          </label>
-          <input
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <Input
+            label="Email"
             id="email"
             type="email"
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="you@example.com"
             autoComplete="email"
+            leftIcon={<Mail size={16} />}
           />
-        </div>
 
-        <div>
-          <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-            Password
-          </label>
-          <input
+          <Input
+            label="Password"
             id="password"
             type="password"
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="••••••••"
             autoComplete="current-password"
+            leftIcon={<Lock size={16} />}
           />
-        </div>
 
-        {error && (
-          <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</p>
-        )}
+          {error && (
+            <div className="flex items-center gap-2 text-sm text-danger bg-danger-bg px-4 py-3 rounded-lg">
+              <AlertCircle size={16} className="shrink-0" />
+              {error}
+            </div>
+          )}
 
-        <button
-          type="submit"
-          disabled={isLoading}
-          className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
-        >
-          {isLoading ? 'Accesso in corso…' : 'Accedi'}
-        </button>
-      </form>
+          <Button
+            type="submit"
+            isLoading={isLoading}
+            variant="accent"
+            className="w-full justify-center mt-2"
+            size="lg"
+          >
+            {isLoading ? 'Accesso in corso…' : 'Accedi'}
+          </Button>
+        </form>
+      </div>
     </div>
   )
 }

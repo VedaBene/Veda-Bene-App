@@ -3,6 +3,9 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import type { Agency, Owner, Property, Role } from '@/lib/types/database'
+import { Search, Building2 } from 'lucide-react'
+import { Input } from '@/components/ui/Input'
+import { Card } from '@/components/ui/Card'
 
 type PropertyWithRelations = Property & {
   agency: Agency | null
@@ -30,61 +33,75 @@ export function PropertyList({
   )
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-      <div className="p-4 border-b border-gray-100">
-        <input
+    <Card>
+      <div className="p-4 border-b border-border/50">
+        <Input
           type="text"
           placeholder="Buscar por nome..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full max-w-sm px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          leftIcon={<Search size={16} />}
+          className="max-w-sm"
         />
       </div>
 
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-gray-100 bg-gray-50">
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Nome</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Tipo</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Zona</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Endereço</th>
+            <tr className="border-b border-border/50 bg-muted/30">
+              <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Nome</th>
+              <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Tipo</th>
+              <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Zona</th>
+              <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Endereço</th>
               {showPrice && (
-                <th className="text-right px-4 py-3 font-medium text-gray-600">Preço Base</th>
+                <th className="text-right px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Preço Base</th>
               )}
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-border/30">
             {filtered.length === 0 ? (
               <tr>
                 <td
                   colSpan={showPrice ? 5 : 4}
-                  className="px-4 py-8 text-center text-gray-400"
+                  className="px-5 py-12 text-center"
                 >
-                  {search ? 'Nenhum imóvel encontrado.' : 'Nenhum imóvel cadastrado.'}
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+                      <Building2 size={20} className="text-muted-foreground/50" />
+                    </div>
+                    <p className="text-sm text-muted-foreground font-medium">
+                      {search ? 'Nenhum imóvel encontrado.' : 'Nenhum imóvel cadastrado.'}
+                    </p>
+                  </div>
                 </td>
               </tr>
             ) : (
               filtered.map((p) => (
                 <tr
                   key={p.id}
-                  className="border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors"
+                  className="transition-colors hover:bg-muted/30"
                 >
-                  <td className="px-4 py-3">
+                  <td className="px-5 py-3.5">
                     <Link
                       href={`/properties/${p.id}`}
-                      className="font-medium text-blue-600 hover:underline"
+                      className="font-medium text-primary hover:text-accent transition-colors"
                     >
                       {p.name}
                     </Link>
                   </td>
-                  <td className="px-4 py-3 text-gray-600">
-                    {CLIENT_TYPE_LABEL[p.client_type] ?? p.client_type}
+                  <td className="px-5 py-3.5">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                      p.client_type === 'rental'
+                        ? 'bg-accent-light text-accent'
+                        : 'bg-purple-50 text-purple-700'
+                    }`}>
+                      {CLIENT_TYPE_LABEL[p.client_type] ?? p.client_type}
+                    </span>
                   </td>
-                  <td className="px-4 py-3 text-gray-600">{p.zone}</td>
-                  <td className="px-4 py-3 text-gray-500">{p.address ?? '—'}</td>
+                  <td className="px-5 py-3.5 text-foreground/70">{p.zone}</td>
+                  <td className="px-5 py-3.5 text-muted-foreground">{p.address ?? '—'}</td>
                   {showPrice && (
-                    <td className="px-4 py-3 text-right text-gray-700">
+                    <td className="px-5 py-3.5 text-right font-medium text-foreground">
                       {p.base_price != null ? `€ ${p.base_price.toFixed(2)}` : '—'}
                     </td>
                   )}
@@ -94,6 +111,6 @@ export function PropertyList({
           </tbody>
         </table>
       </div>
-    </div>
+    </Card>
   )
 }

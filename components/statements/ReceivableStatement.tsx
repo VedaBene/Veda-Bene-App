@@ -3,6 +3,10 @@
 import { useState, useTransition } from 'react'
 import { fetchReceivableData, type ReceivableRow } from '@/app/(app)/statements/actions'
 import { exportReceivablePDF } from '@/lib/utils/export-pdf'
+import { Button } from '@/components/ui/Button'
+import { Badge } from '@/components/ui/Badge'
+import { Card } from '@/components/ui/Card'
+import { Download, FileText, Filter, Receipt } from 'lucide-react'
 
 function today() {
   return new Date().toISOString().slice(0, 10)
@@ -14,7 +18,7 @@ function firstOfMonth() {
 }
 
 const inputCls =
-  'px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
+  'px-3 py-2.5 border border-input-border rounded-lg text-sm text-foreground bg-white transition-all duration-200 focus:ring-2 focus:ring-input-focus/20 focus:border-input-focus outline-none'
 
 type ClientTypeFilter = 'all' | 'rental' | 'particular'
 
@@ -61,120 +65,103 @@ export function ReceivableStatement({ initial }: { initial: ReceivableRow[] }) {
   const total = data.reduce((sum, r) => sum + r.total_value, 0)
 
   return (
-    <div className="space-y-4">
-      {/* Filtros */}
-      <div className="bg-white rounded-xl border border-gray-200 px-4 py-3 flex flex-wrap items-end gap-3">
-        <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">De</label>
-          <input
-            type="date"
-            value={startDate}
-            onChange={e => setStartDate(e.target.value)}
-            className={inputCls}
-          />
+    <div className="space-y-5">
+      {/* Filters */}
+      <Card className="px-5 py-4">
+        <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <label className="block text-xs font-semibold text-muted-foreground mb-1.5 uppercase tracking-wider">De</label>
+            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className={inputCls} />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-muted-foreground mb-1.5 uppercase tracking-wider">Até</label>
+            <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className={inputCls} />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-muted-foreground mb-1.5 uppercase tracking-wider">Tipo de Cliente</label>
+            <select value={clientType} onChange={e => setClientType(e.target.value as ClientTypeFilter)} className={inputCls}>
+              {CLIENT_TYPE_OPTIONS.map(o => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </div>
+          <Button type="button" onClick={handleFilter} isLoading={isPending} variant="accent" icon={<Filter size={16} />}>
+            {isPending ? 'Buscando…' : 'Filtrar'}
+          </Button>
+          <div className="ml-auto flex gap-2">
+            <Button type="button" onClick={handleCSV} variant="ghost" size="sm" icon={<Download size={14} />}>
+              CSV
+            </Button>
+            <Button type="button" onClick={handlePDF} variant="ghost" size="sm" icon={<FileText size={14} />}>
+              PDF
+            </Button>
+          </div>
         </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">Até</label>
-          <input
-            type="date"
-            value={endDate}
-            onChange={e => setEndDate(e.target.value)}
-            className={inputCls}
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">Tipo de Cliente</label>
-          <select
-            value={clientType}
-            onChange={e => setClientType(e.target.value as ClientTypeFilter)}
-            className={inputCls}
-          >
-            {CLIENT_TYPE_OPTIONS.map(o => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
-        </div>
-        <button
-          type="button"
-          onClick={handleFilter}
-          disabled={isPending}
-          className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-        >
-          {isPending ? 'Buscando…' : 'Filtrar'}
-        </button>
-        <div className="ml-auto flex gap-2">
-          <button
-            type="button"
-            onClick={handleCSV}
-            className="px-3 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            Exportar CSV
-          </button>
-          <button
-            type="button"
-            onClick={handlePDF}
-            className="px-3 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            Exportar PDF
-          </button>
-        </div>
-      </div>
+      </Card>
 
       {error && (
-        <p className="text-sm text-red-600 bg-red-50 px-4 py-3 rounded-lg">{error}</p>
+        <div className="text-sm text-danger bg-danger-bg px-4 py-3 rounded-xl">{error}</div>
       )}
 
-      {/* Tabela */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-gray-100 bg-gray-50">
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Cliente</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Tipo</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Imóvel</th>
-              <th className="text-right px-4 py-3 font-medium text-gray-600">Total OS</th>
-              <th className="text-right px-4 py-3 font-medium text-gray-600">Total (€)</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
-                  Nenhum dado encontrado para o período.
-                </td>
+      {/* Table */}
+      <Card>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border/50 bg-muted/30">
+                <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Cliente</th>
+                <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Tipo</th>
+                <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Imóvel</th>
+                <th className="text-right px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Total OS</th>
+                <th className="text-right px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Total (€)</th>
               </tr>
-            ) : (
-              data.map(r => (
-                <tr key={r.property_id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium text-gray-800">{r.client_name}</td>
-                  <td className="px-4 py-3 text-gray-600">
-                    <span className={`inline-block px-2 py-0.5 text-xs rounded-full ${r.client_type === 'rental' ? 'bg-blue-50 text-blue-700' : 'bg-purple-50 text-purple-700'}`}>
-                      {r.client_type === 'rental' ? 'B2B' : 'B2C'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-gray-600">{r.property_name}</td>
-                  <td className="px-4 py-3 text-right text-gray-600">{r.os_count}</td>
-                  <td className="px-4 py-3 text-right font-medium text-gray-800">
-                    € {r.total_value.toFixed(2)}
+            </thead>
+            <tbody className="divide-y divide-border/30">
+              {data.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-5 py-12 text-center">
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+                        <Receipt size={20} className="text-muted-foreground/50" />
+                      </div>
+                      <p className="text-sm text-muted-foreground font-medium">Nenhum dado encontrado para o período.</p>
+                    </div>
                   </td>
                 </tr>
-              ))
+              ) : (
+                data.map(r => (
+                  <tr key={r.property_id} className="transition-colors hover:bg-muted/30">
+                    <td className="px-5 py-3.5 font-medium text-foreground">{r.client_name}</td>
+                    <td className="px-5 py-3.5">
+                      <Badge
+                        variant={r.client_type === 'rental' ? 'info' : 'default'}
+                        label={r.client_type === 'rental' ? 'B2B' : 'B2C'}
+                      />
+                    </td>
+                    <td className="px-5 py-3.5 text-foreground/70">{r.property_name}</td>
+                    <td className="px-5 py-3.5 text-right text-foreground/70">{r.os_count}</td>
+                    <td className="px-5 py-3.5 text-right font-semibold text-foreground">
+                      € {r.total_value.toFixed(2)}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+            {data.length > 0 && (
+              <tfoot>
+                <tr className="border-t-2 border-border bg-accent/5">
+                  <td colSpan={4} className="px-5 py-3.5 font-bold text-foreground">
+                    Total Geral
+                  </td>
+                  <td className="px-5 py-3.5 text-right font-bold text-accent text-base">
+                    € {total.toFixed(2)}
+                  </td>
+                </tr>
+              </tfoot>
             )}
-          </tbody>
-          {data.length > 0 && (
-            <tfoot>
-              <tr className="border-t-2 border-gray-200 bg-gray-50">
-                <td colSpan={4} className="px-4 py-3 font-semibold text-gray-700">
-                  Total Geral
-                </td>
-                <td className="px-4 py-3 text-right font-bold text-gray-900">
-                  € {total.toFixed(2)}
-                </td>
-              </tr>
-            </tfoot>
-          )}
-        </table>
-      </div>
+          </table>
+        </div>
+      </Card>
     </div>
   )
 }

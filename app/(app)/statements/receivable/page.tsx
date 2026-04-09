@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import { ReceivableStatement } from '@/components/statements/ReceivableStatement'
+import { PageHeader } from '@/components/ui/PageHeader'
 import { fetchReceivableData } from '../actions'
 import type { Role } from '@/lib/types/database'
 
@@ -25,8 +26,8 @@ export default async function ReceivablePage() {
   const initial = await fetchReceivableData(startDate, endDate)
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Extrato a Receber</h1>
+    <div className="animate-fade-in-up">
+      <PageHeader title="Extrato a Receber" description="Resumo de valores a receber por imóvel no período selecionado" />
       <ReceivableStatement initial={initial} />
     </div>
   )

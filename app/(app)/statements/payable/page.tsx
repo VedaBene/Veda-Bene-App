@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import { PayableStatement } from '@/components/statements/PayableStatement'
+import { PageHeader } from '@/components/ui/PageHeader'
 import { fetchPayableData } from '../actions'
 import type { Role } from '@/lib/types/database'
 
@@ -25,8 +26,8 @@ export default async function PayablePage() {
   const initial = await fetchPayableData(startDate, endDate)
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Extrato a Pagar</h1>
+    <div className="animate-fade-in-up">
+      <PageHeader title="Extrato a Pagar" description="Resumo de pagamentos a funcionários no período selecionado" />
       <PayableStatement initial={initial} />
     </div>
   )

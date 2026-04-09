@@ -2,6 +2,9 @@
 
 import Link from 'next/link'
 import { UrgencyBadge } from './UrgencyBadge'
+import { Badge } from '@/components/ui/Badge'
+import { Card } from '@/components/ui/Card'
+import { ClipboardList } from 'lucide-react'
 import type { Profile, Property, Role, ServiceOrder } from '@/lib/types/database'
 
 type OSWithRelations = ServiceOrder & {
@@ -16,10 +19,10 @@ const STATUS_LABEL: Record<string, string> = {
   done: 'Finalizada',
 }
 
-const STATUS_COLOR: Record<string, string> = {
-  open: 'bg-yellow-100 text-yellow-700',
-  in_progress: 'bg-blue-100 text-blue-700',
-  done: 'bg-green-100 text-green-700',
+const STATUS_VARIANT: Record<string, 'warning' | 'info' | 'success'> = {
+  open: 'warning',
+  in_progress: 'info',
+  done: 'success',
 }
 
 function formatDateTime(value: string | null | undefined) {
@@ -52,7 +55,14 @@ function OSTable({
 
   if (orders.length === 0) {
     return (
-      <p className="px-4 py-6 text-sm text-center text-gray-400">{emptyText}</p>
+      <div className="px-5 py-10 text-center">
+        <div className="flex flex-col items-center gap-2">
+          <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+            <ClipboardList size={20} className="text-muted-foreground/50" />
+          </div>
+          <p className="text-sm text-muted-foreground font-medium">{emptyText}</p>
+        </div>
+      </div>
     )
   }
 
@@ -60,59 +70,59 @@ function OSTable({
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-gray-100 bg-gray-50">
-            <th className="text-left px-4 py-3 font-medium text-gray-600">Imóvel</th>
-            <th className="text-left px-4 py-3 font-medium text-gray-600">Data</th>
-            <th className="text-left px-4 py-3 font-medium text-gray-600">Checkout</th>
-            <th className="text-left px-4 py-3 font-medium text-gray-600">Checkin</th>
+          <tr className="border-b border-border/50 bg-muted/30">
+            <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Imóvel</th>
+            <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Data</th>
+            <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Checkout</th>
+            <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Checkin</th>
             {!isCliente && (
               <>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Limpeza</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Consegna</th>
+                <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Limpeza</th>
+                <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Consegna</th>
               </>
             )}
-            <th className="text-left px-4 py-3 font-medium text-gray-600">Status</th>
-            <th className="px-4 py-3" />
+            <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Status</th>
+            <th className="px-5 py-3" />
           </tr>
         </thead>
-        <tbody>
+        <tbody className="divide-y divide-border/30">
           {orders.map((os) => (
             <tr
               key={os.id}
-              className="border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors"
+              className="transition-colors hover:bg-muted/30"
             >
-              <td className="px-4 py-3">
+              <td className="px-5 py-3.5">
                 <div className="flex items-center gap-2">
-                  <span className="font-medium text-gray-800">
+                  <span className="font-medium text-foreground">
                     {os.property?.name ?? '—'}
                   </span>
                   <UrgencyBadge isUrgent={os.is_urgent} />
                 </div>
               </td>
-              <td className="px-4 py-3 text-gray-600">{formatDate(os.cleaning_date)}</td>
-              <td className="px-4 py-3 text-gray-600">{formatDateTime(os.checkout_at)}</td>
-              <td className="px-4 py-3 text-gray-600">{formatDateTime(os.checkin_at)}</td>
+              <td className="px-5 py-3.5 text-foreground/70">{formatDate(os.cleaning_date)}</td>
+              <td className="px-5 py-3.5 text-foreground/70">{formatDateTime(os.checkout_at)}</td>
+              <td className="px-5 py-3.5 text-foreground/70">{formatDateTime(os.checkin_at)}</td>
               {!isCliente && (
                 <>
-                  <td className="px-4 py-3 text-gray-600">
+                  <td className="px-5 py-3.5 text-foreground/70">
                     {os.cleaning_staff?.full_name ?? '—'}
                   </td>
-                  <td className="px-4 py-3 text-gray-600">
+                  <td className="px-5 py-3.5 text-foreground/70">
                     {os.consegna_staff?.full_name ?? '—'}
                   </td>
                 </>
               )}
-              <td className="px-4 py-3">
-                <span
-                  className={`inline-block px-2 py-0.5 text-xs font-medium rounded-full ${STATUS_COLOR[os.status] ?? 'bg-gray-100 text-gray-600'}`}
-                >
-                  {STATUS_LABEL[os.status] ?? os.status}
-                </span>
+              <td className="px-5 py-3.5">
+                <Badge
+                  variant={STATUS_VARIANT[os.status] ?? 'default'}
+                  label={STATUS_LABEL[os.status] ?? os.status}
+                  dot
+                />
               </td>
-              <td className="px-4 py-3 text-right">
+              <td className="px-5 py-3.5 text-right">
                 <Link
                   href={`/service-orders/${os.id}`}
-                  className="text-xs text-blue-600 hover:underline"
+                  className="text-xs font-medium text-accent hover:text-accent/80 transition-colors"
                 >
                   Ver
                 </Link>
@@ -135,20 +145,30 @@ export function ServiceOrderList({
   role: Role
 }) {
   return (
-    <div className="space-y-6">
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-        <div className="px-4 py-3 border-b border-gray-100">
-          <h2 className="font-semibold text-gray-700">Em Aberto</h2>
+    <div className="space-y-5">
+      <Card>
+        <div className="px-5 py-3.5 border-b border-border/50 flex items-center gap-2.5">
+          <h2 className="text-sm font-semibold text-foreground">Em Aberto</h2>
+          {active.length > 0 && (
+            <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-warning-bg text-warning text-[11px] font-bold">
+              {active.length}
+            </span>
+          )}
         </div>
         <OSTable orders={active} role={role} emptyText="Nenhuma OS em aberto." />
-      </div>
+      </Card>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-        <div className="px-4 py-3 border-b border-gray-100">
-          <h2 className="font-semibold text-gray-700">Finalizadas</h2>
+      <Card>
+        <div className="px-5 py-3.5 border-b border-border/50 flex items-center gap-2.5">
+          <h2 className="text-sm font-semibold text-foreground">Finalizadas</h2>
+          {done.length > 0 && (
+            <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-success-bg text-success text-[11px] font-bold">
+              {done.length}
+            </span>
+          )}
         </div>
         <OSTable orders={done} role={role} emptyText="Nenhuma OS finalizada." />
-      </div>
+      </Card>
     </div>
   )
 }

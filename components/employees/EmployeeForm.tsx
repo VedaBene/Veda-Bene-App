@@ -2,62 +2,14 @@
 
 import { useState, useTransition } from 'react'
 import { createEmployee, updateEmployee, deleteEmployee } from '@/app/(app)/employees/actions'
+import { Section } from '@/components/ui/Section'
+import { Field } from '@/components/ui/Field'
+import { Button } from '@/components/ui/Button'
+import { User, Wallet, CheckCircle, AlertCircle } from 'lucide-react'
 import type { Profile, Role } from '@/lib/types/database'
 
-function Section({
-  title,
-  isOpen,
-  onToggle,
-  children,
-}: {
-  title: string
-  isOpen: boolean
-  onToggle: () => void
-  children: React.ReactNode
-}) {
-  return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 text-left font-medium text-gray-700 transition-colors"
-      >
-        <span>{title}</span>
-        <span className="text-gray-400 text-xs">{isOpen ? '▲' : '▼'}</span>
-      </button>
-      {isOpen && (
-        <div className="px-4 py-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {children}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function Field({
-  label,
-  required,
-  full,
-  children,
-}: {
-  label: string
-  required?: boolean
-  full?: boolean
-  children: React.ReactNode
-}) {
-  return (
-    <div className={full ? 'sm:col-span-2' : ''}>
-      <label className="block text-sm font-medium text-gray-700 mb-1">
-        {label}
-        {required && <span className="text-red-500 ml-0.5">*</span>}
-      </label>
-      {children}
-    </div>
-  )
-}
-
 const inputCls =
-  'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-500'
+  'w-full px-3 py-2.5 border border-input-border rounded-lg text-sm text-foreground bg-white transition-all duration-200 focus:ring-2 focus:ring-input-focus/20 focus:border-input-focus disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed outline-none placeholder:text-muted-foreground/50'
 
 const EMPLOYEE_ROLES: { value: string; label: string }[] = [
   { value: 'limpeza', label: 'Limpeza' },
@@ -90,7 +42,6 @@ export function EmployeeForm({
   const isAdmin = viewerRole === 'admin'
   const canEdit = ['admin', 'secretaria'].includes(viewerRole) && !readOnly
 
-  // --- Dados Pessoais ---
   const [fullName, setFullName] = useState(employee?.full_name ?? '')
   const [email, setEmail] = useState(employee?.email ?? '')
   const [phone, setPhone] = useState(employee?.phone ?? '')
@@ -99,7 +50,6 @@ export function EmployeeForm({
   const [address, setAddress] = useState(employee?.address ?? '')
   const [role, setRole] = useState<string>(employee?.role ?? 'limpeza')
 
-  // --- Remuneração (admin only) ---
   const [hourlyRate, setHourlyRate] = useState(employee?.hourly_rate?.toString() ?? '')
   const [hasFixedSalary, setHasFixedSalary] = useState(
     employee?.monthly_salary != null,
@@ -160,144 +110,68 @@ export function EmployeeForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 max-w-3xl">
-      {/* 1. Dados Pessoais */}
-      <Section title="1. Dados Pessoais" isOpen={open.pessoal} onToggle={() => toggle('pessoal')}>
+      <Section title="1. Dados Pessoais" icon={<User size={18} />} isOpen={open.pessoal} onToggle={() => toggle('pessoal')}>
         <Field label="Nome Completo" required full>
-          <input
-            type="text"
-            value={fullName}
-            onChange={e => setFullName(e.target.value)}
-            required={canEdit}
-            disabled={!canEdit}
-            className={inputCls}
-            placeholder="Nome completo"
-          />
+          <input type="text" value={fullName} onChange={e => setFullName(e.target.value)} required={canEdit} disabled={!canEdit} className={inputCls} placeholder="Nome completo" />
         </Field>
 
         <Field label="Email" required>
-          <input
-            type="email"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            required={canEdit}
-            disabled={!canEdit || !!employee}
-            className={inputCls}
-            placeholder="email@exemplo.com"
-          />
+          <input type="email" value={email} onChange={e => setEmail(e.target.value)} required={canEdit} disabled={!canEdit || !!employee} className={inputCls} placeholder="email@exemplo.com" />
           {!!employee && (
-            <p className="mt-1 text-xs text-gray-400">Email não pode ser alterado após criação.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Email não pode ser alterado após criação.</p>
           )}
         </Field>
 
         <Field label="Telefone">
-          <input
-            type="text"
-            value={phone}
-            onChange={e => setPhone(e.target.value)}
-            disabled={!canEdit}
-            className={inputCls}
-            placeholder="+39 000 0000000"
-          />
+          <input type="text" value={phone} onChange={e => setPhone(e.target.value)} disabled={!canEdit} className={inputCls} placeholder="+39 000 0000000" />
         </Field>
 
         <Field label="Data de Nascimento">
-          <input
-            type="date"
-            value={birthDate}
-            onChange={e => setBirthDate(e.target.value)}
-            disabled={!canEdit}
-            className={inputCls}
-          />
+          <input type="date" value={birthDate} onChange={e => setBirthDate(e.target.value)} disabled={!canEdit} className={inputCls} />
         </Field>
 
         <Field label="Nacionalidade">
-          <input
-            type="text"
-            value={nationality}
-            onChange={e => setNationality(e.target.value)}
-            disabled={!canEdit}
-            className={inputCls}
-            placeholder="Ex: Italiana, Brasileira..."
-          />
+          <input type="text" value={nationality} onChange={e => setNationality(e.target.value)} disabled={!canEdit} className={inputCls} placeholder="Ex: Italiana, Brasileira..." />
         </Field>
 
         <Field label="Tipo de Funcionário" required>
-          <select
-            value={role}
-            onChange={e => setRole(e.target.value)}
-            required={canEdit}
-            disabled={!canEdit}
-            className={inputCls}
-          >
-            {EMPLOYEE_ROLES.map(r => (
-              <option key={r.value} value={r.value}>{r.label}</option>
-            ))}
+          <select value={role} onChange={e => setRole(e.target.value)} required={canEdit} disabled={!canEdit} className={inputCls}>
+            {EMPLOYEE_ROLES.map(r => (<option key={r.value} value={r.value}>{r.label}</option>))}
           </select>
         </Field>
 
         <Field label="Endereço" full>
-          <input
-            type="text"
-            value={address}
-            onChange={e => setAddress(e.target.value)}
-            disabled={!canEdit}
-            className={inputCls}
-          />
+          <input type="text" value={address} onChange={e => setAddress(e.target.value)} disabled={!canEdit} className={inputCls} />
         </Field>
       </Section>
 
-      {/* 2. Remuneração (admin only) */}
       {isAdmin && (
-        <Section title="2. Remuneração" isOpen={open.remuneracao} onToggle={() => toggle('remuneracao')}>
+        <Section title="2. Remuneração" icon={<Wallet size={18} />} isOpen={open.remuneracao} onToggle={() => toggle('remuneracao')}>
           <Field label="Valor por Hora (€)">
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={hourlyRate}
-              onChange={e => setHourlyRate(e.target.value)}
-              disabled={!canEdit}
-              className={inputCls}
-            />
+            <input type="number" step="0.01" min="0" value={hourlyRate} onChange={e => setHourlyRate(e.target.value)} disabled={!canEdit} className={inputCls} />
           </Field>
 
           <Field label="Salário Fixo">
-            <label className="flex items-center gap-2 cursor-pointer">
+            <label className="flex items-center gap-2.5 cursor-pointer">
               <input
                 type="checkbox"
                 checked={hasFixedSalary}
                 onChange={e => setHasFixedSalary(e.target.checked)}
                 disabled={!canEdit}
-                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                className="w-4 h-4 rounded border-input-border text-accent focus:ring-accent/20"
               />
-              <span className="text-sm text-gray-700">Possui salário mensal fixo</span>
+              <span className="text-sm text-foreground">Possui salário mensal fixo</span>
             </label>
           </Field>
 
           {hasFixedSalary && (
             <>
               <Field label="Salário Mensal (€)">
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={monthlySalary}
-                  onChange={e => setMonthlySalary(e.target.value)}
-                  disabled={!canEdit}
-                  className={inputCls}
-                />
+                <input type="number" step="0.01" min="0" value={monthlySalary} onChange={e => setMonthlySalary(e.target.value)} disabled={!canEdit} className={inputCls} />
               </Field>
 
               <Field label="Hora Extra (€)">
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={overtimeRate}
-                  onChange={e => setOvertimeRate(e.target.value)}
-                  disabled={!canEdit}
-                  className={inputCls}
-                />
+                <input type="number" step="0.01" min="0" value={overtimeRate} onChange={e => setOvertimeRate(e.target.value)} disabled={!canEdit} className={inputCls} />
               </Field>
             </>
           )}
@@ -305,34 +179,29 @@ export function EmployeeForm({
       )}
 
       {error && (
-        <p className="text-sm text-red-600 bg-red-50 px-4 py-3 rounded-lg">{error}</p>
+        <div className="flex items-center gap-2 text-sm text-danger bg-danger-bg px-4 py-3 rounded-xl">
+          <AlertCircle size={16} className="shrink-0" />
+          {error}
+        </div>
       )}
 
       {success && (
-        <p className="text-sm text-green-600 bg-green-50 px-4 py-3 rounded-lg">
+        <div className="flex items-center gap-2 text-sm text-success bg-success-bg px-4 py-3 rounded-xl">
+          <CheckCircle size={16} className="shrink-0" />
           Funcionário salvo com sucesso.
-        </p>
+        </div>
       )}
 
       {canEdit && (
         <div className="flex items-center justify-between pt-2">
-          <button
-            type="submit"
-            disabled={isPending}
-            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
-          >
+          <Button type="submit" isLoading={isPending} variant="accent">
             {isPending ? 'Salvando…' : employee ? 'Salvar Alterações' : 'Criar Funcionário'}
-          </button>
+          </Button>
 
           {deleteAction && (
-            <button
-              type="button"
-              onClick={handleDelete}
-              disabled={isDeleting}
-              className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-sm font-medium rounded-lg border border-red-200 transition-colors disabled:opacity-50"
-            >
+            <Button type="button" onClick={handleDelete} isLoading={isDeleting} variant="danger" size="sm">
               {isDeleting ? 'Excluindo…' : 'Excluir Funcionário'}
-            </button>
+            </Button>
           )}
         </div>
       )}

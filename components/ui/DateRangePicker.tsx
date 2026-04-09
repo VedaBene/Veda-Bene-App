@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Input } from './Input';
+import { CalendarRange } from 'lucide-react';
 
 interface DateRange {
   start: string;
@@ -24,8 +25,13 @@ export function DateRangePicker({ label, onChange, initialValue, className = '' 
   }, [start, end]);
 
   return (
-    <div className={`flex flex-col gap-1 ${className}`}>
-      {label && <label className="block text-sm font-medium text-gray-700">{label}</label>}
+    <div className={`flex flex-col gap-1.5 ${className}`}>
+      {label && (
+        <label className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+          <CalendarRange size={14} className="text-muted-foreground" />
+          {label}
+        </label>
+      )}
       <div className="flex items-center gap-2">
         <Input
           type="date"
@@ -33,7 +39,7 @@ export function DateRangePicker({ label, onChange, initialValue, className = '' 
           onChange={(e) => setStart(e.target.value)}
           className="w-full"
         />
-        <span className="text-gray-500">até</span>
+        <span className="text-xs text-muted-foreground font-medium shrink-0">até</span>
         <Input
           type="date"
           value={end}

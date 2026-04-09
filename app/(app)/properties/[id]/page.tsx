@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import { PropertyForm } from '@/components/properties/PropertyForm'
+import { PageHeader } from '@/components/ui/PageHeader'
 import { deleteProperty } from '../actions'
 import type { Agency, Owner, Property, Role } from '@/lib/types/database'
 
@@ -32,8 +33,8 @@ export default async function PropertyDetailPage({
   const canEdit = ['admin', 'secretaria'].includes(role)
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">{property.name}</h1>
+    <div className="animate-fade-in-up">
+      <PageHeader title={property.name} />
       <PropertyForm
         property={property as Property & { agency: Agency | null; owner: Owner | null }}
         agencies={(agencies ?? []) as Agency[]}

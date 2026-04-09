@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import { PropertyForm } from '@/components/properties/PropertyForm'
+import { PageHeader } from '@/components/ui/PageHeader'
 import type { Agency, Owner, Role } from '@/lib/types/database'
 
 export default async function NewPropertyPage() {
@@ -23,8 +24,8 @@ export default async function NewPropertyPage() {
   ])
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Novo Imóvel</h1>
+    <div className="animate-fade-in-up">
+      <PageHeader title="Novo Imóvel" />
       <PropertyForm
         agencies={(agencies ?? []) as Agency[]}
         owners={(owners ?? []) as Owner[]}
