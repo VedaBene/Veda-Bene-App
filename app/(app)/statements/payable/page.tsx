@@ -1,0 +1,33 @@
+import { redirect } from 'next/navigation'
+import { createClient } from '@/utils/supabase/server'
+import { PayableStatement } from '@/components/statements/PayableStatement'
+import { fetchPayableData } from '../actions'
+import type { Role } from '@/lib/types/database'
+
+export default async function PayablePage() {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user!.id)
+    .single()
+
+  const role = (profile?.role ?? 'cliente') as Role
+
+  if (role !== 'admin') redirect('/dashboard')
+
+  const now = new Date()
+  const startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10)
+  const endDate = now.toISOString().slice(0, 10)
+
+  const initial = await fetchPayableData(startDate, endDate)
+
+  return (
+    <div>
+      <h1 className="text-2xl font-bold text-gray-900 mb-6">Extrato a Pagar</h1>
+      <PayableStatement initial={initial} />
+    </div>
+  )
+}
