@@ -181,9 +181,7 @@ export async function updateServiceOrderStatus(id: string, status: OSStatus) {
 }
 
 export async function deleteServiceOrder(id: string) {
-  const { supabase, role } = await getAuthorizedClient()
-
-  if (role !== 'admin') return { success: false as const, error: 'Apenas admin pode excluir' }
+  const { supabase } = await getAuthorizedClient()
 
   const { error } = await supabase.from('service_orders').delete().eq('id', id)
   if (error) return { success: false as const, error: error.message }

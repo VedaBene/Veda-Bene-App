@@ -16,7 +16,7 @@ export default async function NewPropertyPage() {
 
   const role = (profile?.role ?? 'cliente') as Role
 
-  if (!['admin', 'secretaria'].includes(role)) redirect('/properties')
+  if (role !== 'admin') redirect('/properties')
 
   const [{ data: agencies }, { data: owners }] = await Promise.all([
     supabase.from('agencies').select('*').order('name'),

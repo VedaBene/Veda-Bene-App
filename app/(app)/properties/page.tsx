@@ -28,7 +28,7 @@ export default async function PropertiesPage() {
       <PageHeader
         title="Imóveis"
         action={
-          ['admin', 'secretaria'].includes(role) ? (
+          role === 'admin' ? (
             <Link href="/properties/new">
               <Button variant="accent" icon={<Plus size={16} />}>Novo Imóvel</Button>
             </Link>

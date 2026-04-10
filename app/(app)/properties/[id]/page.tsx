@@ -30,7 +30,7 @@ export default async function PropertyDetailPage({
 
   if (!property) notFound()
 
-  const canEdit = ['admin', 'secretaria'].includes(role)
+  const canEdit = role === 'admin'
 
   return (
     <div className="animate-fade-in-up">

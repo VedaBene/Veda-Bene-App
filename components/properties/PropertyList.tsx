@@ -27,6 +27,7 @@ export function PropertyList({
   const [search, setSearch] = useState('')
 
   const showPrice = role === 'admin' || role === 'secretaria'
+  const showType = role === 'admin' || role === 'secretaria'
 
   const filtered = properties.filter((p) =>
     p.name.toLowerCase().includes(search.toLowerCase())
@@ -50,7 +51,9 @@ export function PropertyList({
           <thead>
             <tr className="border-b border-border/50 bg-muted/30">
               <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Nome</th>
-              <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Tipo</th>
+              {showType && (
+                <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Tipo</th>
+              )}
               <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Zona</th>
               <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Endereço</th>
               {showPrice && (
@@ -62,7 +65,7 @@ export function PropertyList({
             {filtered.length === 0 ? (
               <tr>
                 <td
-                  colSpan={showPrice ? 5 : 4}
+                  colSpan={3 + (showType ? 1 : 0) + (showPrice ? 1 : 0)}
                   className="px-5 py-12 text-center"
                 >
                   <div className="flex flex-col items-center gap-2">
@@ -89,15 +92,17 @@ export function PropertyList({
                       {p.name}
                     </Link>
                   </td>
-                  <td className="px-5 py-3.5">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                      p.client_type === 'rental'
-                        ? 'bg-accent-light text-accent'
-                        : 'bg-purple-50 text-purple-700'
-                    }`}>
-                      {CLIENT_TYPE_LABEL[p.client_type] ?? p.client_type}
-                    </span>
-                  </td>
+                  {showType && (
+                    <td className="px-5 py-3.5">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                        p.client_type === 'rental'
+                          ? 'bg-accent-light text-accent'
+                          : 'bg-purple-50 text-purple-700'
+                      }`}>
+                        {CLIENT_TYPE_LABEL[p.client_type] ?? p.client_type}
+                      </span>
+                    </td>
+                  )}
                   <td className="px-5 py-3.5 text-foreground/70">{p.zone}</td>
                   <td className="px-5 py-3.5 text-muted-foreground">{p.address ?? '—'}</td>
                   {showPrice && (

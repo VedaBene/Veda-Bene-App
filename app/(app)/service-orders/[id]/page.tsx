@@ -51,7 +51,7 @@ export default async function ServiceOrderDetailPage({
         properties={(properties ?? []) as Pick<Property, 'id' | 'name' | 'avg_cleaning_hours' | 'min_guests' | 'max_guests'>[]}
         staff={(staffData ?? []) as Pick<Profile, 'id' | 'full_name'>[]}
         role={role}
-        deleteAction={role === 'admin' ? () => deleteServiceOrder(id) : undefined}
+        deleteAction={['admin', 'secretaria'].includes(role) ? () => deleteServiceOrder(id) : undefined}
         readOnly={!canEdit}
       />
     </div>

@@ -54,7 +54,6 @@ export function PropertyForm({
   )
   const [zone, setZone] = useState<Zone>(property?.zone ?? 'Saint Peter')
   const [phone, setPhone] = useState(property?.phone ?? '')
-  const [email, setEmail] = useState(property?.email ?? '')
   const [address, setAddress] = useState(property?.address ?? '')
   const [zipCode, setZipCode] = useState(property?.zip_code ?? '')
 
@@ -97,7 +96,8 @@ export function PropertyForm({
 
   const [notes, setNotes] = useState(property?.notes ?? '')
 
-  const showPricing = role === 'admin' || role === 'secretaria'
+  const showPricing = role === 'admin'
+  const showSensitiveInfo = role === 'admin' || role === 'secretaria'
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -109,7 +109,6 @@ export function PropertyForm({
     fd.set('client_type', clientType)
     fd.set('zone', zone)
     fd.set('phone', phone)
-    fd.set('email', email)
     fd.set('address', address)
     fd.set('zip_code', zipCode)
 
@@ -258,18 +257,20 @@ export function PropertyForm({
           <input type="text" value={name} onChange={(e) => setName(e.target.value)} required={!readOnly} disabled={readOnly} className={inputCls} placeholder="Nome do imóvel" />
         </Field>
 
-        <Field label="Tipo de Cliente" required full>
-          <ModeToggle
-            options={[
-              { value: 'rental', label: 'Rental' },
-              { value: 'particular', label: 'Particular' },
-            ]}
-            value={clientType}
-            onChange={(v) => setClientType(v as 'rental' | 'particular')}
-          />
-        </Field>
+        {showSensitiveInfo && (
+          <Field label="Tipo de Cliente" required full>
+            <ModeToggle
+              options={[
+                { value: 'rental', label: 'Rental' },
+                { value: 'particular', label: 'Particular' },
+              ]}
+              value={clientType}
+              onChange={(v) => setClientType(v as 'rental' | 'particular')}
+            />
+          </Field>
+        )}
 
-        {clientType === 'rental' && (
+        {showSensitiveInfo && clientType === 'rental' && (
           <Field label="Agência" full>
             {agencies.length > 0 && (
               <SmallToggle
@@ -295,7 +296,7 @@ export function PropertyForm({
           </Field>
         )}
 
-        {clientType === 'particular' && (
+        {showSensitiveInfo && clientType === 'particular' && (
           <Field label="Proprietário" full>
             {owners.length > 0 && (
               <SmallToggle
@@ -327,13 +328,11 @@ export function PropertyForm({
           </select>
         </Field>
 
-        <Field label="Telefone">
-          <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} disabled={readOnly} className={inputCls} placeholder="+39 000 0000000" />
-        </Field>
-
-        <Field label="Email">
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={readOnly} className={inputCls} />
-        </Field>
+        {showSensitiveInfo && (
+          <Field label="Telefone">
+            <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} disabled={readOnly} className={inputCls} placeholder="+39 000 0000000" />
+          </Field>
+        )}
 
         <Field label="Endereço" full>
           <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} disabled={readOnly} className={inputCls} />
