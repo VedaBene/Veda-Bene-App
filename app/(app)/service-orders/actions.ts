@@ -15,7 +15,7 @@ const intDef = (def = 0) =>
   z.preprocess(v => (v === '' || v == null ? def : Number(v)), z.number().int().min(0).default(def))
 
 const serviceOrderSchema = z.object({
-  property_id: z.string().uuid('Imóvel obrigatório'),
+  property_id: z.string().min(1, 'Imóvel obrigatório'),
   cleaning_staff_id: optStr,
   consegna_staff_id: optStr,
   cleaning_date: optStr,
@@ -65,7 +65,7 @@ export async function createServiceOrder(formData: FormData) {
   const { supabase } = await getAuthorizedClient()
 
   const parsed = serviceOrderSchema.safeParse(Object.fromEntries(formData))
-  if (!parsed.success) return { success: false as const, error: parsed.error.errors[0].message }
+  if (!parsed.success) return { success: false as const, error: parsed.error.issues[0].message }
 
   const { data } = parsed
 
@@ -116,7 +116,7 @@ export async function updateServiceOrder(id: string, formData: FormData) {
   const { supabase } = await getAuthorizedClient()
 
   const parsed = serviceOrderSchema.safeParse(Object.fromEntries(formData))
-  if (!parsed.success) return { success: false as const, error: parsed.error.errors[0].message }
+  if (!parsed.success) return { success: false as const, error: parsed.error.issues[0].message }
 
   const { data } = parsed
 

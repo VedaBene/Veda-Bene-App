@@ -12,10 +12,6 @@ const ZONES = [
 ] as const
 
 const optStr = z.preprocess(v => (v === '' ? undefined : v), z.string().optional())
-const posNum = z.preprocess(
-  v => (v === '' || v == null ? undefined : Number(v)),
-  z.number().positive().optional()
-)
 const optNum = z.preprocess(
   v => (v === '' || v == null ? undefined : Number(v)),
   z.number().min(0).optional()
@@ -42,12 +38,12 @@ const propertySchema = z.object({
   new_owner_email: optStr,
   new_owner_phone: optStr,
   // metragem
-  sqm_interior: posNum,
-  sqm_exterior: posNum,
-  sqm_total: posNum,
+  sqm_interior: optNum,
+  sqm_exterior: optNum,
+  sqm_total: optNum,
   // capacidade
-  min_guests: posNum,
-  max_guests: posNum,
+  min_guests: optNum,
+  max_guests: optNum,
   double_beds: intDef(0),
   single_beds: intDef(0),
   sofa_beds: intDef(0),
@@ -55,9 +51,9 @@ const propertySchema = z.object({
   bidets: intDef(0),
   cribs: intDef(0),
   // precificação
-  base_price: posNum,
+  base_price: optNum,
   extra_per_person: optNum,
-  avg_cleaning_hours: posNum,
+  avg_cleaning_hours: optNum,
   // notas
   notes: optStr,
 })
@@ -155,7 +151,7 @@ export async function createProperty(formData: FormData) {
   const { supabase } = await getAuthorizedClient()
 
   const parsed = propertySchema.safeParse(Object.fromEntries(formData))
-  if (!parsed.success) return { success: false as const, error: parsed.error.errors[0].message }
+  if (!parsed.success) return { success: false as const, error: parsed.error.issues[0].message }
 
   const { agency_id, owner_id } = await resolveRelations(supabase, parsed.data)
 
@@ -175,7 +171,7 @@ export async function updateProperty(id: string, formData: FormData) {
   const { supabase } = await getAuthorizedClient()
 
   const parsed = propertySchema.safeParse(Object.fromEntries(formData))
-  if (!parsed.success) return { success: false as const, error: parsed.error.errors[0].message }
+  if (!parsed.success) return { success: false as const, error: parsed.error.issues[0].message }
 
   const { agency_id, owner_id } = await resolveRelations(supabase, parsed.data)
 

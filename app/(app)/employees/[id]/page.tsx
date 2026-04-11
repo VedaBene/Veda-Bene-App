@@ -38,7 +38,7 @@ export default async function EmployeeDetailPage({
       <EmployeeForm
         employee={employee as Profile}
         viewerRole={role}
-        deleteAction={role === 'admin' ? () => deleteEmployee(id) : undefined}
+        deleteAction={role === 'admin' ? deleteEmployee.bind(null, id) : undefined}
       />
     </div>
   )

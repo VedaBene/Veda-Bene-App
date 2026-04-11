@@ -54,20 +54,18 @@ export async function createEmployee(formData: FormData) {
 
   const raw = Object.fromEntries(formData)
   const parsed = employeeSchema.safeParse(raw)
-  if (!parsed.success) return { success: false as const, error: parsed.error.errors[0].message }
+  if (!parsed.success) return { success: false as const, error: parsed.error.issues[0].message }
 
   const { data } = parsed
 
   const adminClient = createAdminClient()
 
-  // Criar usuário no auth.users com senha temporária
-  const tempPassword = Math.random().toString(36).slice(-10) + 'A1!'
-  const { data: authUser, error: authError } = await adminClient.auth.admin.createUser({
-    email: data.email,
-    password: tempPassword,
-    email_confirm: true,
-    user_metadata: { full_name: data.full_name },
-  })
+  // Convida o funcionário por email — o Supabase cria o usuário e envia
+  // um link para ele definir a própria senha no primeiro acesso
+  const { data: authUser, error: authError } = await adminClient.auth.admin.inviteUserByEmail(
+    data.email,
+    { data: { full_name: data.full_name } },
+  )
 
   if (authError) return { success: false as const, error: authError.message }
 
@@ -100,7 +98,7 @@ export async function updateEmployee(id: string, formData: FormData) {
 
   const raw = Object.fromEntries(formData)
   const parsed = employeeSchema.safeParse(raw)
-  if (!parsed.success) return { success: false as const, error: parsed.error.errors[0].message }
+  if (!parsed.success) return { success: false as const, error: parsed.error.issues[0].message }
 
   const { data } = parsed
   const supabase = await createClient()

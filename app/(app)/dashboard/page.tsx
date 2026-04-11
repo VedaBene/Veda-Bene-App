@@ -4,13 +4,14 @@ import { TopPropertiesTable } from '@/components/dashboard/TopPropertiesTable'
 import { RevenueChart } from '@/components/dashboard/RevenueChart'
 import { StaffCostChart } from '@/components/dashboard/StaffCostChart'
 import { PageHeader } from '@/components/ui/PageHeader'
+import { DateTimeDisplay } from '@/components/ui/DateTimeDisplay'
 
 export default async function DashboardPage() {
   const { data, role } = await fetchDashboardData()
 
   return (
     <div className="space-y-6 animate-fade-in-up">
-      <PageHeader title="Dashboard" />
+      <PageHeader title="Dashboard" action={<DateTimeDisplay />} />
 
       <StatsCards
         propertiesThisMonth={data.propertiesThisMonth}

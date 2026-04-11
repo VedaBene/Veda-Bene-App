@@ -30,7 +30,7 @@ export default async function ServiceOrderDetailPage({
       .single(),
     supabase
       .from('properties')
-      .select('id, name, avg_cleaning_hours, min_guests, max_guests')
+      .select('id, name, avg_cleaning_hours, min_guests, max_guests, double_beds, single_beds, sofa_beds, bathrooms, bidets, cribs')
       .order('name'),
     supabase
       .from('profiles')
@@ -48,10 +48,10 @@ export default async function ServiceOrderDetailPage({
       <PageHeader title="Ordem de Serviço" />
       <ServiceOrderForm
         order={order as ServiceOrder}
-        properties={(properties ?? []) as Pick<Property, 'id' | 'name' | 'avg_cleaning_hours' | 'min_guests' | 'max_guests'>[]}
+        properties={(properties ?? []) as Pick<Property, 'id' | 'name' | 'avg_cleaning_hours' | 'min_guests' | 'max_guests' | 'double_beds' | 'single_beds' | 'sofa_beds' | 'bathrooms' | 'bidets' | 'cribs'>[]}
         staff={(staffData ?? []) as Pick<Profile, 'id' | 'full_name'>[]}
         role={role}
-        deleteAction={['admin', 'secretaria'].includes(role) ? () => deleteServiceOrder(id) : undefined}
+        deleteAction={['admin', 'secretaria'].includes(role) ? deleteServiceOrder.bind(null, id) : undefined}
         readOnly={!canEdit}
       />
     </div>

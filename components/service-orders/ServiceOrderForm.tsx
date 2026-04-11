@@ -11,7 +11,20 @@ import { Building2, CalendarDays, Users, CheckCircle, AlertCircle, Zap } from 'l
 import type { OSStatus, Profile, Property, Role, ServiceOrder } from '@/lib/types/database'
 
 type StaffOption = Pick<Profile, 'id' | 'full_name'>
-type PropertyOption = Pick<Property, 'id' | 'name' | 'avg_cleaning_hours' | 'min_guests' | 'max_guests'>
+type PropertyOption = Pick<
+  Property,
+  | 'id'
+  | 'name'
+  | 'avg_cleaning_hours'
+  | 'min_guests'
+  | 'max_guests'
+  | 'double_beds'
+  | 'single_beds'
+  | 'sofa_beds'
+  | 'bathrooms'
+  | 'bidets'
+  | 'cribs'
+>
 
 const inputCls =
   'w-full px-3 py-2.5 border border-input-border rounded-lg text-sm text-foreground bg-white transition-all duration-200 focus:ring-2 focus:ring-input-focus/20 focus:border-input-focus disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed outline-none placeholder:text-muted-foreground/50'
@@ -242,15 +255,93 @@ export function ServiceOrderForm({
       </Section>
 
       <Section title="3. Ocupação Real" icon={<Users size={18} />} isOpen={open.ocupacao} onToggle={() => toggle('ocupacao')}>
-        <Field label="Hóspedes Reais" full>
+        <Field
+          label={
+            <>
+              Hóspedes Reais
+              {selectedProperty?.max_guests != null && (
+                <span className="ml-1 text-xs font-normal text-muted-foreground">
+                  (máx {selectedProperty.max_guests})
+                </span>
+              )}
+            </>
+          }
+          full
+        >
           <input type="number" min="0" value={realGuests} onChange={e => setRealGuests(e.target.value)} disabled={!canEdit} className={inputCls} />
         </Field>
-        <Field label="Camas de Casal"><input type="number" min="0" value={doubleBeds} onChange={e => setDoubleBeds(e.target.value)} disabled={!canEdit} className={inputCls} /></Field>
-        <Field label="Camas de Solteiro"><input type="number" min="0" value={singleBeds} onChange={e => setSingleBeds(e.target.value)} disabled={!canEdit} className={inputCls} /></Field>
-        <Field label="Sofá-camas"><input type="number" min="0" value={sofaBeds} onChange={e => setSofaBeds(e.target.value)} disabled={!canEdit} className={inputCls} /></Field>
-        <Field label="Banheiros"><input type="number" min="0" value={bathrooms} onChange={e => setBathrooms(e.target.value)} disabled={!canEdit} className={inputCls} /></Field>
-        <Field label="Bidês"><input type="number" min="0" value={bidets} onChange={e => setBidets(e.target.value)} disabled={!canEdit} className={inputCls} /></Field>
-        <Field label="Berços"><input type="number" min="0" value={cribs} onChange={e => setCribs(e.target.value)} disabled={!canEdit} className={inputCls} /></Field>
+        <Field
+          label={
+            <>
+              Camas de Casal
+              {selectedProperty?.double_beds != null && (
+                <span className="ml-1 text-xs font-normal text-muted-foreground">({selectedProperty.double_beds})</span>
+              )}
+            </>
+          }
+        >
+          <input type="number" min="0" value={doubleBeds} onChange={e => setDoubleBeds(e.target.value)} disabled={!canEdit} className={inputCls} />
+        </Field>
+        <Field
+          label={
+            <>
+              Camas de Solteiro
+              {selectedProperty?.single_beds != null && (
+                <span className="ml-1 text-xs font-normal text-muted-foreground">({selectedProperty.single_beds})</span>
+              )}
+            </>
+          }
+        >
+          <input type="number" min="0" value={singleBeds} onChange={e => setSingleBeds(e.target.value)} disabled={!canEdit} className={inputCls} />
+        </Field>
+        <Field
+          label={
+            <>
+              Sofá-camas
+              {selectedProperty?.sofa_beds != null && (
+                <span className="ml-1 text-xs font-normal text-muted-foreground">({selectedProperty.sofa_beds})</span>
+              )}
+            </>
+          }
+        >
+          <input type="number" min="0" value={sofaBeds} onChange={e => setSofaBeds(e.target.value)} disabled={!canEdit} className={inputCls} />
+        </Field>
+        <Field
+          label={
+            <>
+              Banheiros
+              {selectedProperty?.bathrooms != null && (
+                <span className="ml-1 text-xs font-normal text-muted-foreground">({selectedProperty.bathrooms})</span>
+              )}
+            </>
+          }
+        >
+          <input type="number" min="0" value={bathrooms} onChange={e => setBathrooms(e.target.value)} disabled={!canEdit} className={inputCls} />
+        </Field>
+        <Field
+          label={
+            <>
+              Bidês
+              {selectedProperty?.bidets != null && (
+                <span className="ml-1 text-xs font-normal text-muted-foreground">({selectedProperty.bidets})</span>
+              )}
+            </>
+          }
+        >
+          <input type="number" min="0" value={bidets} onChange={e => setBidets(e.target.value)} disabled={!canEdit} className={inputCls} />
+        </Field>
+        <Field
+          label={
+            <>
+              Berços
+              {selectedProperty?.cribs != null && (
+                <span className="ml-1 text-xs font-normal text-muted-foreground">({selectedProperty.cribs})</span>
+              )}
+            </>
+          }
+        >
+          <input type="number" min="0" value={cribs} onChange={e => setCribs(e.target.value)} disabled={!canEdit} className={inputCls} />
+        </Field>
       </Section>
 
       {error && (

@@ -40,7 +40,7 @@ export default async function PropertyDetailPage({
         agencies={(agencies ?? []) as Agency[]}
         owners={(owners ?? []) as Owner[]}
         role={role}
-        deleteAction={role === 'admin' ? () => deleteProperty(id) : undefined}
+        deleteAction={role === 'admin' ? deleteProperty.bind(null, id) : undefined}
         readOnly={!canEdit}
       />
     </div>
