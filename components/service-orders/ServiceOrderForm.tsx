@@ -138,7 +138,7 @@ export function ServiceOrderForm({
   useEffect(() => {
     if (checkoutAt && checkinAt) {
       const hours = hoursUntil(checkoutAt, checkinAt)
-      setUrgencyWarning(hours !== null && hours > 0 && hours < 4)
+      setUrgencyWarning(hours !== null && hours > 0 && hours < 3)
     } else {
       setUrgencyWarning(false)
     }
@@ -458,7 +458,7 @@ export function ServiceOrderForm({
         {urgencyWarning && (
           <div className="sm:col-span-2 flex items-center gap-2 px-4 py-3 bg-urgent-bg border border-urgent/20 rounded-xl text-sm text-urgent font-medium">
             <Zap size={16} className="shrink-0" />
-            Intervalo menor que 4 horas — esta OS será marcada como <strong className="ml-1">Urgente</strong>.
+            Intervalo menor que 3 horas — esta OS será marcada como <strong className="ml-1">Urgente</strong>.
           </div>
         )}
       </Section>

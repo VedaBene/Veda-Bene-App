@@ -82,9 +82,11 @@ export function PropertyForm({
   const [doubleBeds, setDoubleBeds] = useState(property?.double_beds?.toString() ?? '0')
   const [singleBeds, setSingleBeds] = useState(property?.single_beds?.toString() ?? '0')
   const [sofaBeds, setSofaBeds] = useState(property?.sofa_beds?.toString() ?? '0')
+  const [armchairBeds, setArmchairBeds] = useState(property?.armchair_beds?.toString() ?? '0')
   const [bathrooms, setBathrooms] = useState(property?.bathrooms?.toString() ?? '0')
   const [bidets, setBidets] = useState(property?.bidets?.toString() ?? '0')
   const [cribs, setCribs] = useState(property?.cribs?.toString() ?? '0')
+  const [bedrooms, setBedrooms] = useState(property?.bedrooms?.toString() ?? '0')
 
   const [basePrice, setBasePrice] = useState(property?.base_price?.toString() ?? '')
   const [extraPerPerson, setExtraPerPerson] = useState(
@@ -138,9 +140,11 @@ export function PropertyForm({
     fd.set('double_beds', doubleBeds)
     fd.set('single_beds', singleBeds)
     fd.set('sofa_beds', sofaBeds)
+    fd.set('armchair_beds', armchairBeds)
     fd.set('bathrooms', bathrooms)
     fd.set('bidets', bidets)
     fd.set('cribs', cribs)
+    fd.set('bedrooms', bedrooms)
 
     if (showPricing) {
       fd.set('base_price', basePrice)
@@ -361,6 +365,8 @@ export function PropertyForm({
         <Field label="Camas de Casal"><input type="number" min="0" value={doubleBeds} onChange={(e) => setDoubleBeds(e.target.value)} disabled={readOnly} className={inputCls} /></Field>
         <Field label="Camas de Solteiro"><input type="number" min="0" value={singleBeds} onChange={(e) => setSingleBeds(e.target.value)} disabled={readOnly} className={inputCls} /></Field>
         <Field label="Sofá-camas"><input type="number" min="0" value={sofaBeds} onChange={(e) => setSofaBeds(e.target.value)} disabled={readOnly} className={inputCls} /></Field>
+        <Field label="Poltrona-camas"><input type="number" min="0" value={armchairBeds} onChange={(e) => setArmchairBeds(e.target.value)} disabled={readOnly} className={inputCls} /></Field>
+        <Field label="Quartos"><input type="number" min="0" value={bedrooms} onChange={(e) => setBedrooms(e.target.value)} disabled={readOnly} className={inputCls} /></Field>
         <Field label="Banheiros"><input type="number" min="0" value={bathrooms} onChange={(e) => setBathrooms(e.target.value)} disabled={readOnly} className={inputCls} /></Field>
         <Field label="Bidês"><input type="number" min="0" value={bidets} onChange={(e) => setBidets(e.target.value)} disabled={readOnly} className={inputCls} /></Field>
         <Field label="Berços"><input type="number" min="0" value={cribs} onChange={(e) => setCribs(e.target.value)} disabled={readOnly} className={inputCls} /></Field>

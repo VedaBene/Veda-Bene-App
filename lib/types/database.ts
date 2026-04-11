@@ -90,6 +90,7 @@ export type ServiceOrder = {
   bidets: number
   cribs: number
   total_price?: number | null
+  order_number: number
   is_urgent: boolean
   started_at?: string | null
   completed_at?: string | null

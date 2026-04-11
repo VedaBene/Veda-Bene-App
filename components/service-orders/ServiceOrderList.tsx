@@ -33,6 +33,7 @@ function formatDateTime(value: string | null | undefined) {
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: 'UTC',
   })
 }
 
@@ -71,6 +72,7 @@ function OSTable({
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-border/50 bg-muted/30">
+            <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">OS #</th>
             <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Imóvel</th>
             <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Data</th>
             <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Checkout</th>
@@ -91,12 +93,15 @@ function OSTable({
               key={os.id}
               className="transition-colors hover:bg-muted/30"
             >
+              <td className="px-5 py-3.5 text-foreground/50 text-xs font-mono">
+                #{os.order_number}
+              </td>
               <td className="px-5 py-3.5">
                 <div className="flex items-center gap-2">
                   <span className="font-medium text-foreground">
                     {os.property?.name ?? '—'}
                   </span>
-                  <UrgencyBadge isUrgent={os.is_urgent} />
+                  <UrgencyBadge isUrgent={os.is_urgent && os.status !== 'done'} />
                 </div>
               </td>
               <td className="px-5 py-3.5 text-foreground/70">{formatDate(os.cleaning_date)}</td>
