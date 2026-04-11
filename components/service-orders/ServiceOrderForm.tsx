@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useTransition, useEffect } from 'react'
-import { createServiceOrder, updateServiceOrder, updateServiceOrderStatus, deleteServiceOrder } from '@/app/(app)/service-orders/actions'
+import { useState, useTransition, useEffect, useRef } from 'react'
+import { createServiceOrder, updateServiceOrder, updateServiceOrderStatus, deleteServiceOrder, startCleaning, finishCleaning } from '@/app/(app)/service-orders/actions'
 import { UrgencyBadge } from './UrgencyBadge'
 import { Section } from '@/components/ui/Section'
 import { Field } from '@/components/ui/Field'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
-import { Building2, CalendarDays, Users, CheckCircle, AlertCircle, Zap } from 'lucide-react'
+import { Building2, CalendarDays, Users, CheckCircle, AlertCircle, Zap, Play, Flag, Timer, X } from 'lucide-react'
 import type { OSStatus, Profile, Property, Role, ServiceOrder } from '@/lib/types/database'
 
 type StaffOption = Pick<Profile, 'id' | 'full_name'>
@@ -48,11 +48,42 @@ function hoursUntil(checkout: string, checkin: string): number | null {
   return (ci.getTime() - co.getTime()) / 3600000
 }
 
+function formatWorkedTime(minutes: number): string {
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  if (h === 0) return `${m}min`
+  return m === 0 ? `${h}h` : `${h}h ${m}min`
+}
+
+function LiveTimer({ startedAt }: { startedAt: string }) {
+  const [elapsed, setElapsed] = useState(0)
+
+  useEffect(() => {
+    const start = new Date(startedAt).getTime()
+    function tick() {
+      setElapsed(Math.floor((Date.now() - start) / 1000))
+    }
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [startedAt])
+
+  const h = Math.floor(elapsed / 3600)
+  const m = Math.floor((elapsed % 3600) / 60)
+  const s = elapsed % 60
+  const parts = h > 0
+    ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+    : `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+
+  return <span className="font-mono text-sm font-semibold tabular-nums">{parts}</span>
+}
+
 export function ServiceOrderForm({
   order,
   properties,
   staff,
   role,
+  userId,
   deleteAction,
   readOnly = false,
 }: {
@@ -60,6 +91,7 @@ export function ServiceOrderForm({
   properties: PropertyOption[]
   staff: StaffOption[]
   role: Role
+  userId?: string
   deleteAction?: () => Promise<unknown>
   readOnly?: boolean
 }) {
@@ -69,6 +101,12 @@ export function ServiceOrderForm({
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
 
+  // Time tracking modals
+  const [showStartModal, setShowStartModal] = useState(false)
+  const [showFinishModal, setShowFinishModal] = useState(false)
+  const [finishNotes, setFinishNotes] = useState('')
+  const [isTrackingAction, setIsTrackingAction] = useState(false)
+
   const [open, setOpen] = useState({ imovel: true, visita: true, ocupacao: false })
   function toggle(s: keyof typeof open) {
     setOpen(prev => ({ ...prev, [s]: !prev[s] }))
@@ -76,6 +114,11 @@ export function ServiceOrderForm({
 
   const isCliente = role === 'cliente'
   const canEdit = ['admin', 'secretaria'].includes(role) && !readOnly
+
+  // Determines if current user is the assigned worker for this order
+  const isAssignedLimpeza = role === 'limpeza' && !!userId && order?.cleaning_staff_id === userId
+  const isAssignedConsegna = role === 'consegna' && !!userId && order?.consegna_staff_id === userId
+  const isAssignedWorker = isAssignedLimpeza || isAssignedConsegna
 
   const [propertyId, setPropertyId] = useState(order?.property_id ?? properties[0]?.id ?? '')
   const [cleaningStaffId, setCleaningStaffId] = useState(order?.cleaning_staff_id ?? '')
@@ -164,6 +207,27 @@ export function ServiceOrderForm({
     }
   }
 
+  async function handleStartCleaning() {
+    if (!order) return
+    setIsTrackingAction(true)
+    setError(null)
+    const result = await startCleaning(order.id)
+    if (result && !result.success) setError(result.error)
+    setIsTrackingAction(false)
+    setShowStartModal(false)
+  }
+
+  async function handleFinishCleaning() {
+    if (!order) return
+    setIsTrackingAction(true)
+    setError(null)
+    const result = await finishCleaning(order.id, finishNotes)
+    if (result && !result.success) setError(result.error)
+    setIsTrackingAction(false)
+    setShowFinishModal(false)
+    setFinishNotes('')
+  }
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4 max-w-3xl">
       {/* Status bar */}
@@ -191,6 +255,151 @@ export function ServiceOrderForm({
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Time tracking panel — visible to assigned worker */}
+      {order && isAssignedWorker && (
+        <div className="p-4 bg-card rounded-xl border border-border shadow-card space-y-3">
+          <div className="flex items-center gap-2">
+            <Timer size={16} className="text-accent" />
+            <span className="text-sm font-semibold text-foreground">Controle de Tempo</span>
+          </div>
+
+          {/* Open: show start button */}
+          {order.status === 'open' && (
+            <div className="flex items-center gap-3">
+              <p className="text-sm text-muted-foreground flex-1">Clique abaixo para iniciar a limpeza e registrar o horário de início.</p>
+              <Button type="button" variant="accent" icon={<Play size={15} />} onClick={() => setShowStartModal(true)}>
+                Iniciar Limpeza
+              </Button>
+            </div>
+          )}
+
+          {/* In progress: show live timer + finish button */}
+          {order.status === 'in_progress' && (
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 text-info flex-1">
+                <span className="text-xs text-muted-foreground">Em andamento há</span>
+                {order.started_at
+                  ? <LiveTimer startedAt={order.started_at} />
+                  : <span className="text-sm font-medium">—</span>
+                }
+              </div>
+              <Button type="button" variant="accent" icon={<Flag size={15} />} onClick={() => setShowFinishModal(true)}>
+                Concluir Limpeza
+              </Button>
+            </div>
+          )}
+
+          {/* Done: show summary */}
+          {order.status === 'done' && order.worked_minutes != null && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <CheckCircle size={15} className="text-success shrink-0" />
+              Tempo total: <span className="font-semibold text-foreground">{formatWorkedTime(order.worked_minutes)}</span>
+              {order.completion_notes && (
+                <span className="ml-2 text-foreground/60 truncate max-w-xs" title={order.completion_notes}>
+                  · {order.completion_notes}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Completion notes display for admin/secretaria */}
+      {order && canEdit && order.status === 'done' && (order.worked_minutes != null || order.completion_notes) && (
+        <div className="p-4 bg-card rounded-xl border border-border shadow-card space-y-2">
+          <div className="flex items-center gap-2">
+            <Timer size={16} className="text-accent" />
+            <span className="text-sm font-semibold text-foreground">Resumo de Tempo</span>
+          </div>
+          {order.worked_minutes != null && (
+            <p className="text-sm text-muted-foreground">
+              Tempo trabalhado: <span className="font-semibold text-foreground">{formatWorkedTime(order.worked_minutes)}</span>
+            </p>
+          )}
+          {order.completion_notes && (
+            <p className="text-sm text-muted-foreground">
+              Observações: <span className="text-foreground">{order.completion_notes}</span>
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Modal: Iniciar Limpeza */}
+      {showStartModal && order && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-card border border-border rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4 space-y-4">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-2">
+                <Play size={18} className="text-accent" />
+                <h2 className="text-base font-semibold text-foreground">Iniciar Limpeza</h2>
+              </div>
+              <button type="button" onClick={() => setShowStartModal(false)} className="text-muted-foreground hover:text-foreground transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="rounded-xl bg-muted/40 border border-border/50 px-4 py-3 space-y-1">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Imóvel</p>
+              <p className="text-sm font-semibold text-foreground">{selectedProperty?.name ?? '—'}</p>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Ao confirmar, o horário de início será registrado e o status da OS passará para <strong>Em andamento</strong>.
+            </p>
+            <div className="flex gap-2 pt-1">
+              <Button type="button" variant="ghost" onClick={() => setShowStartModal(false)} className="flex-1">
+                Cancelar
+              </Button>
+              <Button type="button" variant="accent" isLoading={isTrackingAction} onClick={handleStartCleaning} className="flex-1">
+                Confirmar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Concluir Limpeza */}
+      {showFinishModal && order && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-card border border-border rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4 space-y-4">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-2">
+                <Flag size={18} className="text-accent" />
+                <h2 className="text-base font-semibold text-foreground">Concluir Limpeza</h2>
+              </div>
+              <button type="button" onClick={() => { setShowFinishModal(false); setFinishNotes('') }} className="text-muted-foreground hover:text-foreground transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="rounded-xl bg-muted/40 border border-border/50 px-4 py-3 space-y-1">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Imóvel</p>
+              <p className="text-sm font-semibold text-foreground">{selectedProperty?.name ?? '—'}</p>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Observações <span className="normal-case font-normal">(opcional)</span>
+              </label>
+              <textarea
+                value={finishNotes}
+                onChange={e => setFinishNotes(e.target.value)}
+                placeholder="Problemas no imóvel, ocorrências, observações gerais…"
+                rows={3}
+                className="w-full px-3 py-2.5 border border-input-border rounded-lg text-sm text-foreground bg-white resize-none transition-all focus:ring-2 focus:ring-input-focus/20 focus:border-input-focus outline-none placeholder:text-muted-foreground/50"
+              />
+            </div>
+            <p className="text-sm text-muted-foreground">
+              O horário de conclusão será registrado e o tempo total calculado automaticamente.
+            </p>
+            <div className="flex gap-2 pt-1">
+              <Button type="button" variant="ghost" onClick={() => { setShowFinishModal(false); setFinishNotes('') }} className="flex-1">
+                Cancelar
+              </Button>
+              <Button type="button" variant="accent" isLoading={isTrackingAction} onClick={handleFinishCleaning} className="flex-1">
+                Confirmar
+              </Button>
+            </div>
+          </div>
         </div>
       )}
 

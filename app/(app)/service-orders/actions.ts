@@ -180,6 +180,67 @@ export async function updateServiceOrderStatus(id: string, status: OSStatus) {
   return { success: true as const }
 }
 
+export async function startCleaning(id: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  if (!profile || !['admin', 'secretaria', 'limpeza', 'consegna'].includes(profile.role)) {
+    return { success: false as const, error: 'Sem permissão' }
+  }
+
+  const { error } = await supabase
+    .from('service_orders')
+    .update({
+      status: 'in_progress',
+      started_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+
+  if (error) return { success: false as const, error: error.message }
+
+  revalidatePath('/service-orders')
+  revalidatePath(`/service-orders/${id}`)
+  return { success: true as const }
+}
+
+export async function finishCleaning(id: string, notes: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  if (!profile || !['admin', 'secretaria', 'limpeza', 'consegna'].includes(profile.role)) {
+    return { success: false as const, error: 'Sem permissão' }
+  }
+
+  const { error } = await supabase
+    .from('service_orders')
+    .update({
+      status: 'done',
+      completed_at: new Date().toISOString(),
+      completion_notes: notes.trim() || null,
+    })
+    .eq('id', id)
+
+  if (error) return { success: false as const, error: error.message }
+
+  revalidatePath('/service-orders')
+  revalidatePath(`/service-orders/${id}`)
+  return { success: true as const }
+}
+
 export async function deleteServiceOrder(id: string) {
   const { supabase } = await getAuthorizedClient()
 

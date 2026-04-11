@@ -91,7 +91,10 @@ export type ServiceOrder = {
   cribs: number
   total_price?: number | null
   is_urgent: boolean
+  started_at?: string | null
   completed_at?: string | null
+  completion_notes?: string | null
+  worked_minutes?: number | null
   created_at: string
 }
 

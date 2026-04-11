@@ -51,6 +51,7 @@ export default async function ServiceOrderDetailPage({
         properties={(properties ?? []) as Pick<Property, 'id' | 'name' | 'avg_cleaning_hours' | 'min_guests' | 'max_guests' | 'double_beds' | 'single_beds' | 'sofa_beds' | 'bathrooms' | 'bidets' | 'cribs'>[]}
         staff={(staffData ?? []) as Pick<Profile, 'id' | 'full_name'>[]}
         role={role}
+        userId={user!.id}
         deleteAction={['admin', 'secretaria'].includes(role) ? deleteServiceOrder.bind(null, id) : undefined}
         readOnly={!canEdit}
       />
