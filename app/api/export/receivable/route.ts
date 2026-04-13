@@ -21,12 +21,13 @@ export async function GET(request: NextRequest) {
   const start = searchParams.get('start') ?? ''
   const end = searchParams.get('end') ?? ''
   const clientType = searchParams.get('client_type') as 'rental' | 'particular' | null
+  const clientId = searchParams.get('client_id') ?? undefined
 
   if (!start || !end) {
     return NextResponse.json({ error: 'Parâmetros start e end obrigatórios' }, { status: 400 })
   }
 
-  const csv = await exportReceivableCSV(start, end, clientType ?? undefined)
+  const csv = await exportReceivableCSV(start, end, clientType ?? undefined, clientId)
   const filename = `extrato-a-receber_${start}_${end}.csv`
 
   return new NextResponse(csv, {

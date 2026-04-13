@@ -13,15 +13,21 @@ function row(cells: (string | number | null | undefined)[]): string {
   return cells.map(escapeCSV).join(',')
 }
 
-export async function exportPayableCSV(startDate: string, endDate: string): Promise<string> {
+export async function exportPayableCSV(startDate: string, endDate: string, employeeId?: string): Promise<string> {
   const supabase = await createClient()
 
-  const { data: orders } = await supabase
+  let query = supabase
     .from('service_orders')
     .select('cleaning_staff_id, consegna_staff_id, property:properties(avg_cleaning_hours)')
     .eq('status', 'done')
     .gte('completed_at', startDate)
     .lte('completed_at', endDate)
+
+  if (employeeId) {
+    query = query.or(`cleaning_staff_id.eq.${employeeId},consegna_staff_id.eq.${employeeId}`)
+  }
+
+  const { data: orders } = await query
 
   if (!orders || orders.length === 0) {
     return 'Funcionário,Total OS,Total Horas,Valor/Hora,Salário Fixo,Total a Pagar\n'
@@ -69,6 +75,7 @@ export async function exportReceivableCSV(
   startDate: string,
   endDate: string,
   clientType?: 'rental' | 'particular',
+  clientId?: string,
 ): Promise<string> {
   const supabase = await createClient()
 
@@ -78,8 +85,8 @@ export async function exportReceivableCSV(
       total_price,
       property:properties(
         id, name, client_type,
-        agency:agencies(name),
-        owner:owners(name)
+        agency:agencies(id, name),
+        owner:owners(id, name)
       )
     `)
     .eq('status', 'done')
@@ -95,15 +102,21 @@ export async function exportReceivableCSV(
   const map = new Map<string, { client_name: string; client_type: string; property_name: string; os_count: number; total_value: number }>()
 
   for (const o of orders) {
-    const prop = o.property as { id: string; name: string; client_type: string; agency: { name: string } | null; owner: { name: string } | null } | null
+    const prop = o.property as { id: string; name: string; client_type: string; agency: { id: string; name: string } | null; owner: { id: string; name: string } | null } | null
     if (!prop) continue
     if (clientType && prop.client_type !== clientType) continue
 
-    const clientName = prop.client_type === 'rental' ? (prop.agency?.name ?? '—') : (prop.owner?.name ?? '—')
-    const typeLabel = prop.client_type === 'rental' ? 'B2B' : 'B2C'
+    if (clientId) {
+      const matchesAgency = prop.agency?.id === clientId
+      const matchesOwner = prop.owner?.id === clientId
+      if (!matchesAgency && !matchesOwner) continue
+    }
+
+    const resolvedClientName = prop.client_type === 'rental' ? (prop.agency?.name ?? '—') : (prop.owner?.name ?? '—')
+    const typeLabel = prop.client_type === 'rental' ? 'Agência' : 'Particular'
 
     if (!map.has(prop.id)) {
-      map.set(prop.id, { client_name: clientName, client_type: typeLabel, property_name: prop.name, os_count: 0, total_value: 0 })
+      map.set(prop.id, { client_name: resolvedClientName, client_type: typeLabel, property_name: prop.name, os_count: 0, total_value: 0 })
     }
     const r = map.get(prop.id)!
     r.os_count++

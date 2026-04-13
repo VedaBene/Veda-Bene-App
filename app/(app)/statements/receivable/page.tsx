@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import { ReceivableStatement } from '@/components/statements/ReceivableStatement'
 import { PageHeader } from '@/components/ui/PageHeader'
-import { fetchReceivableData } from '../actions'
+import { fetchReceivableData, fetchAgencies, fetchOwners } from '../actions'
 import type { Role } from '@/lib/types/database'
 
 export default async function ReceivablePage() {
@@ -23,12 +23,16 @@ export default async function ReceivablePage() {
   const startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10)
   const endDate = now.toISOString().slice(0, 10)
 
-  const initial = await fetchReceivableData(startDate, endDate)
+  const [initial, agencies, owners] = await Promise.all([
+    fetchReceivableData(startDate, endDate),
+    fetchAgencies(),
+    fetchOwners(),
+  ])
 
   return (
     <div className="animate-fade-in-up">
       <PageHeader title="Extrato a Receber" description="Resumo de valores a receber por imóvel no período selecionado" />
-      <ReceivableStatement initial={initial} />
+      <ReceivableStatement initial={initial} agencies={agencies} owners={owners} />
     </div>
   )
 }

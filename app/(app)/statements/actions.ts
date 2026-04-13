@@ -23,6 +23,16 @@ export type ReceivableRow = {
   total_value: number
 }
 
+export type EmployeeOption = {
+  id: string
+  full_name: string
+}
+
+export type ClientOption = {
+  id: string
+  name: string
+}
+
 async function getAuthorizedClient(minRole: 'secretaria' | 'admin' = 'secretaria') {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -42,19 +52,36 @@ async function getAuthorizedClient(minRole: 'secretaria' | 'admin' = 'secretaria
   return { supabase, role: profile.role as Role }
 }
 
+export async function fetchEmployees(): Promise<EmployeeOption[]> {
+  const { supabase } = await getAuthorizedClient('admin')
+  const { data } = await supabase
+    .from('profiles')
+    .select('id, full_name')
+    .in('role', ['limpeza', 'consegna'])
+    .order('full_name')
+  return data ?? []
+}
+
 export async function fetchPayableData(
   startDate: string,
   endDate: string,
+  employeeId?: string,
 ): Promise<PayableRow[]> {
   const { supabase } = await getAuthorizedClient('admin')
 
   // Buscar OSs finalizadas no período com horas do imóvel
-  const { data: orders } = await supabase
+  let query = supabase
     .from('service_orders')
     .select('cleaning_staff_id, consegna_staff_id, property:properties(avg_cleaning_hours)')
     .eq('status', 'done')
     .gte('completed_at', startDate)
     .lte('completed_at', endDate)
+
+  if (employeeId) {
+    query = query.or(`cleaning_staff_id.eq.${employeeId},consegna_staff_id.eq.${employeeId}`)
+  }
+
+  const { data: orders } = await query
 
   if (!orders || orders.length === 0) return []
 
@@ -114,10 +141,29 @@ export async function fetchPayableData(
   }))
 }
 
+export async function fetchAgencies(): Promise<ClientOption[]> {
+  const { supabase } = await getAuthorizedClient('secretaria')
+  const { data } = await supabase
+    .from('agencies')
+    .select('id, name')
+    .order('name')
+  return data ?? []
+}
+
+export async function fetchOwners(): Promise<ClientOption[]> {
+  const { supabase } = await getAuthorizedClient('secretaria')
+  const { data } = await supabase
+    .from('owners')
+    .select('id, name')
+    .order('name')
+  return data ?? []
+}
+
 export async function fetchReceivableData(
   startDate: string,
   endDate: string,
   clientType?: 'rental' | 'particular' | 'all',
+  clientId?: string,
 ): Promise<ReceivableRow[]> {
   const { supabase } = await getAuthorizedClient('secretaria')
 
@@ -154,7 +200,14 @@ export async function fetchReceivableData(
     // Filtro de tipo de cliente
     if (clientType && clientType !== 'all' && prop.client_type !== clientType) continue
 
-    const clientName =
+    // Filtro por cliente específico (agência ou proprietário)
+    if (clientId) {
+      const matchesAgency = prop.agency?.id === clientId
+      const matchesOwner = prop.owner?.id === clientId
+      if (!matchesAgency && !matchesOwner) continue
+    }
+
+    const resolvedName =
       prop.client_type === 'rental'
         ? (prop.agency?.name ?? '—')
         : (prop.owner?.name ?? '—')
@@ -164,7 +217,7 @@ export async function fetchReceivableData(
         property_id: prop.id,
         property_name: prop.name,
         client_type: prop.client_type,
-        client_name: clientName,
+        client_name: resolvedName,
         os_count: 0,
         total_value: 0,
       })

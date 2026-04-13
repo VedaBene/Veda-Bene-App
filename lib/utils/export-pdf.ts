@@ -30,7 +30,7 @@ function printHTML(title: string, tableHTML: string) {
   win.document.close()
 }
 
-export function exportPayablePDF(data: PayableRow[], startDate: string, endDate: string) {
+export function exportPayablePDF(data: PayableRow[], startDate: string, endDate: string, employeeName?: string) {
   const total = data.reduce((sum, r) => sum + (r.total_amount ?? 0), 0)
 
   const rows = data.map(r => `
@@ -43,7 +43,12 @@ export function exportPayablePDF(data: PayableRow[], startDate: string, endDate:
       <td>${r.total_amount != null ? `€ ${r.total_amount.toFixed(2)}` : '—'}</td>
     </tr>`).join('')
 
+  const subtitle = employeeName
+    ? `<p style="margin-bottom:4px;color:#6b7280">Funcionário: <strong>${employeeName}</strong></p>`
+    : ''
+
   const table = `
+    ${subtitle}
     <p style="margin-bottom:12px;color:#6b7280">Período: ${startDate} → ${endDate}</p>
     <table>
       <thead>
@@ -61,7 +66,11 @@ export function exportPayablePDF(data: PayableRow[], startDate: string, endDate:
       </tfoot>
     </table>`
 
-  printHTML('Extrato a Pagar — Veda Bene', table)
+  const title = employeeName
+    ? `Extrato a Pagar — ${employeeName} — Veda Bene`
+    : 'Extrato a Pagar — Veda Bene'
+
+  printHTML(title, table)
 }
 
 export function exportReceivablePDF(data: ReceivableRow[], startDate: string, endDate: string) {
@@ -70,7 +79,7 @@ export function exportReceivablePDF(data: ReceivableRow[], startDate: string, en
   const rows = data.map(r => `
     <tr>
       <td>${r.client_name}</td>
-      <td>${r.client_type === 'rental' ? 'B2B' : 'B2C'}</td>
+      <td>${r.client_type === 'rental' ? 'Agência' : 'Particular'}</td>
       <td>${r.property_name}</td>
       <td>${r.os_count}</td>
       <td>€ ${r.total_value.toFixed(2)}</td>

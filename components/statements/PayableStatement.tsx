@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { fetchPayableData, type PayableRow } from '@/app/(app)/statements/actions'
+import { fetchPayableData, type PayableRow, type EmployeeOption } from '@/app/(app)/statements/actions'
 import { exportPayablePDF } from '@/lib/utils/export-pdf'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
@@ -19,9 +19,16 @@ function firstOfMonth() {
 const inputCls =
   'px-3 py-2.5 border border-input-border rounded-lg text-sm text-foreground bg-white transition-all duration-200 focus:ring-2 focus:ring-input-focus/20 focus:border-input-focus outline-none'
 
-export function PayableStatement({ initial }: { initial: PayableRow[] }) {
+export function PayableStatement({
+  initial,
+  employees,
+}: {
+  initial: PayableRow[]
+  employees: EmployeeOption[]
+}) {
   const [startDate, setStartDate] = useState(firstOfMonth())
   const [endDate, setEndDate] = useState(today())
+  const [employeeId, setEmployeeId] = useState<string>('all')
   const [data, setData] = useState(initial)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -30,7 +37,11 @@ export function PayableStatement({ initial }: { initial: PayableRow[] }) {
     setError(null)
     startTransition(async () => {
       try {
-        const rows = await fetchPayableData(startDate, endDate)
+        const rows = await fetchPayableData(
+          startDate,
+          endDate,
+          employeeId === 'all' ? undefined : employeeId,
+        )
         setData(rows)
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Erro ao buscar dados')
@@ -40,11 +51,16 @@ export function PayableStatement({ initial }: { initial: PayableRow[] }) {
 
   function handleCSV() {
     const params = new URLSearchParams({ start: startDate, end: endDate })
+    if (employeeId !== 'all') params.set('employee_id', employeeId)
     window.open(`/api/export/payable?${params}`, '_blank')
   }
 
   function handlePDF() {
-    exportPayablePDF(data, startDate, endDate)
+    const employeeName =
+      employeeId !== 'all'
+        ? employees.find(e => e.id === employeeId)?.full_name
+        : undefined
+    exportPayablePDF(data, startDate, endDate, employeeName)
   }
 
   const total = data.reduce((sum, r) => sum + (r.total_amount ?? 0), 0)
@@ -61,6 +77,15 @@ export function PayableStatement({ initial }: { initial: PayableRow[] }) {
           <div>
             <label className="block text-xs font-semibold text-muted-foreground mb-1.5 uppercase tracking-wider">Até</label>
             <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className={inputCls} />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-muted-foreground mb-1.5 uppercase tracking-wider">Funcionário</label>
+            <select value={employeeId} onChange={e => setEmployeeId(e.target.value)} className={inputCls}>
+              <option value="all">Todos</option>
+              {employees.map(emp => (
+                <option key={emp.id} value={emp.id}>{emp.full_name}</option>
+              ))}
+            </select>
           </div>
           <Button type="button" onClick={handleFilter} isLoading={isPending} variant="accent" icon={<Filter size={16} />}>
             {isPending ? 'Buscando…' : 'Filtrar'}

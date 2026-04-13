@@ -20,12 +20,13 @@ export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl
   const start = searchParams.get('start') ?? ''
   const end = searchParams.get('end') ?? ''
+  const employeeId = searchParams.get('employee_id') ?? undefined
 
   if (!start || !end) {
     return NextResponse.json({ error: 'Parâmetros start e end obrigatórios' }, { status: 400 })
   }
 
-  const csv = await exportPayableCSV(start, end)
+  const csv = await exportPayableCSV(start, end, employeeId)
   const filename = `extrato-a-pagar_${start}_${end}.csv`
 
   return new NextResponse(csv, {

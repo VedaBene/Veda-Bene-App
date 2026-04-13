@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { fetchReceivableData, type ReceivableRow } from '@/app/(app)/statements/actions'
+import { fetchReceivableData, type ReceivableRow, type ClientOption } from '@/app/(app)/statements/actions'
 import { exportReceivablePDF } from '@/lib/utils/export-pdf'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
@@ -24,17 +24,31 @@ type ClientTypeFilter = 'all' | 'rental' | 'particular'
 
 const CLIENT_TYPE_OPTIONS: { value: ClientTypeFilter; label: string }[] = [
   { value: 'all', label: 'Todos' },
-  { value: 'rental', label: 'B2B (Agências)' },
-  { value: 'particular', label: 'B2C (Particulares)' },
+  { value: 'rental', label: 'Agência' },
+  { value: 'particular', label: 'Particular' },
 ]
 
-export function ReceivableStatement({ initial }: { initial: ReceivableRow[] }) {
+export function ReceivableStatement({
+  initial,
+  agencies,
+  owners,
+}: {
+  initial: ReceivableRow[]
+  agencies: ClientOption[]
+  owners: ClientOption[]
+}) {
   const [startDate, setStartDate] = useState(firstOfMonth())
   const [endDate, setEndDate] = useState(today())
   const [clientType, setClientType] = useState<ClientTypeFilter>('all')
+  const [clientId, setClientId] = useState<string>('all')
   const [data, setData] = useState(initial)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+
+  function handleTypeChange(newType: ClientTypeFilter) {
+    setClientType(newType)
+    setClientId('all')
+  }
 
   function handleFilter() {
     setError(null)
@@ -44,6 +58,7 @@ export function ReceivableStatement({ initial }: { initial: ReceivableRow[] }) {
           startDate,
           endDate,
           clientType === 'all' ? undefined : clientType,
+          clientId === 'all' ? undefined : clientId,
         )
         setData(rows)
       } catch (e) {
@@ -55,12 +70,16 @@ export function ReceivableStatement({ initial }: { initial: ReceivableRow[] }) {
   function handleCSV() {
     const params = new URLSearchParams({ start: startDate, end: endDate })
     if (clientType !== 'all') params.set('client_type', clientType)
+    if (clientId !== 'all') params.set('client_id', clientId)
     window.open(`/api/export/receivable?${params}`, '_blank')
   }
 
   function handlePDF() {
     exportReceivablePDF(data, startDate, endDate)
   }
+
+  const clientOptions = clientType === 'rental' ? agencies : clientType === 'particular' ? owners : []
+  const clientLabel = clientType === 'rental' ? 'Agência' : clientType === 'particular' ? 'Proprietário' : null
 
   const total = data.reduce((sum, r) => sum + r.total_value, 0)
 
@@ -79,12 +98,23 @@ export function ReceivableStatement({ initial }: { initial: ReceivableRow[] }) {
           </div>
           <div>
             <label className="block text-xs font-semibold text-muted-foreground mb-1.5 uppercase tracking-wider">Tipo de Cliente</label>
-            <select value={clientType} onChange={e => setClientType(e.target.value as ClientTypeFilter)} className={inputCls}>
+            <select value={clientType} onChange={e => handleTypeChange(e.target.value as ClientTypeFilter)} className={inputCls}>
               {CLIENT_TYPE_OPTIONS.map(o => (
                 <option key={o.value} value={o.value}>{o.label}</option>
               ))}
             </select>
           </div>
+          {clientLabel && (
+            <div>
+              <label className="block text-xs font-semibold text-muted-foreground mb-1.5 uppercase tracking-wider">{clientLabel}</label>
+              <select value={clientId} onChange={e => setClientId(e.target.value)} className={inputCls}>
+                <option value="all">Todos</option>
+                {clientOptions.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <Button type="button" onClick={handleFilter} isLoading={isPending} variant="accent" icon={<Filter size={16} />}>
             {isPending ? 'Buscando…' : 'Filtrar'}
           </Button>
@@ -135,7 +165,7 @@ export function ReceivableStatement({ initial }: { initial: ReceivableRow[] }) {
                     <td className="px-5 py-3.5">
                       <Badge
                         variant={r.client_type === 'rental' ? 'info' : 'default'}
-                        label={r.client_type === 'rental' ? 'B2B' : 'B2C'}
+                        label={r.client_type === 'rental' ? 'Agência' : 'Particular'}
                       />
                     </td>
                     <td className="px-5 py-3.5 text-foreground/70">{r.property_name}</td>
