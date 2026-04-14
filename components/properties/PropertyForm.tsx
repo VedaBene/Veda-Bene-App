@@ -265,7 +265,7 @@ export function PropertyForm({
           <Field label="Tipo de Cliente" required full>
             <ModeToggle
               options={[
-                { value: 'rental', label: 'Rental' },
+                { value: 'rental', label: 'Agência' },
                 { value: 'particular', label: 'Particular' },
               ]}
               value={clientType}

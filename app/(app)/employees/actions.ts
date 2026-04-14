@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
@@ -60,11 +61,21 @@ export async function createEmployee(formData: FormData) {
 
   const adminClient = createAdminClient()
 
+  const headersList = await headers()
+  const host = headersList.get('host') ?? 'localhost:3000'
+  const proto = headersList.get('x-forwarded-proto') ?? 'http'
+  const origin = `${proto}://${host}`
+
   // Convida o funcionário por email — o Supabase cria o usuário e envia
-  // um link para ele definir a própria senha no primeiro acesso
+  // um link para ele definir a própria senha no primeiro acesso.
+  // redirectTo aponta para /auth/callback com type=invite para que o callback
+  // saiba redirecionar para a página de definição de senha.
   const { data: authUser, error: authError } = await adminClient.auth.admin.inviteUserByEmail(
     data.email,
-    { data: { full_name: data.full_name } },
+    {
+      data: { full_name: data.full_name },
+      redirectTo: `${origin}/auth/callback?type=invite`,
+    },
   )
 
   if (authError) return { success: false as const, error: authError.message }
