@@ -1,13 +1,13 @@
 'use client'
 
 import { useState, useTransition, useEffect, useRef } from 'react'
-import { createServiceOrder, updateServiceOrder, updateServiceOrderStatus, deleteServiceOrder, startCleaning, finishCleaning } from '@/app/(app)/service-orders/actions'
+import { createServiceOrder, updateServiceOrder, updateServiceOrderStatus, deleteServiceOrder, startCleaning, finishCleaning, updateExtraServices } from '@/app/(app)/service-orders/actions'
 import { UrgencyBadge } from './UrgencyBadge'
 import { Section } from '@/components/ui/Section'
 import { Field } from '@/components/ui/Field'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
-import { Building2, CalendarDays, Users, CheckCircle, AlertCircle, Zap, Play, Flag, Timer, X } from 'lucide-react'
+import { Building2, CalendarDays, Users, CheckCircle, AlertCircle, Zap, Play, Flag, Timer, X, ClipboardList, PlusCircle } from 'lucide-react'
 import type { OSStatus, Profile, Property, Role, ServiceOrder } from '@/lib/types/database'
 
 type StaffOption = Pick<Profile, 'id' | 'full_name'>
@@ -107,7 +107,7 @@ export function ServiceOrderForm({
   const [finishNotes, setFinishNotes] = useState('')
   const [isTrackingAction, setIsTrackingAction] = useState(false)
 
-  const [open, setOpen] = useState({ imovel: true, visita: true, ocupacao: false })
+  const [open, setOpen] = useState({ imovel: true, visita: true, ocupacao: false, obsLimpeza: false, extras: false })
   function toggle(s: keyof typeof open) {
     setOpen(prev => ({ ...prev, [s]: !prev[s] }))
   }
@@ -152,6 +152,16 @@ export function ServiceOrderForm({
   const [bidets, setBidets] = useState(order?.bidets?.toString() ?? '0')
   const [cribs, setCribs] = useState(order?.cribs?.toString() ?? '0')
 
+  // Tópico 4 & 5
+  const [cleaningNotes, setCleaningNotes] = useState(order?.cleaning_notes ?? '')
+  const [extraDesc, setExtraDesc] = useState(order?.extra_services_description ?? '')
+  const [extraPrice, setExtraPrice] = useState(order?.extra_services_price?.toString() ?? '0')
+  const [isSavingExtras, setIsSavingExtras] = useState(false)
+
+  const isAdminOrSec = ['admin', 'secretaria'].includes(role)
+  // Section 5 can be edited even on finalized orders (by admin/secretaria)
+  const canEditExtras = isAdminOrSec && order?.status === 'done'
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
@@ -173,6 +183,9 @@ export function ServiceOrderForm({
     fd.set('bathrooms', bathrooms)
     fd.set('bidets', bidets)
     fd.set('cribs', cribs)
+    fd.set('cleaning_notes', cleaningNotes)
+    fd.set('extra_services_description', extraDesc)
+    fd.set('extra_services_price', extraPrice)
 
     startTransition(async () => {
       const result = order
@@ -215,6 +228,17 @@ export function ServiceOrderForm({
     if (result && !result.success) setError(result.error)
     setIsTrackingAction(false)
     setShowStartModal(false)
+  }
+
+  async function handleSaveExtras() {
+    if (!order) return
+    setIsSavingExtras(true)
+    setError(null)
+    setSuccess(false)
+    const result = await updateExtraServices(order.id, extraDesc, parseFloat(extraPrice) || 0)
+    if (result && !result.success) setError(result.error)
+    else setSuccess(true)
+    setIsSavingExtras(false)
   }
 
   async function handleFinishCleaning() {
@@ -552,6 +576,56 @@ export function ServiceOrderForm({
           <input type="number" min="0" value={cribs} onChange={e => setCribs(e.target.value)} disabled={!canEdit} className={inputCls} />
         </Field>
       </Section>
+
+      {/* Tópico 4: Observações de limpeza — apenas admin/secretaria */}
+      {isAdminOrSec && (
+        <Section title="4. Observações de Limpeza" icon={<ClipboardList size={18} />} isOpen={open.obsLimpeza} onToggle={() => toggle('obsLimpeza')}>
+          <Field label="Observações" full>
+            <textarea
+              value={cleaningNotes}
+              onChange={e => setCleaningNotes(e.target.value)}
+              placeholder="Orientações do cliente, pontos de atenção, pedidos especiais de limpeza…"
+              rows={4}
+              disabled={!canEdit}
+              className={`${inputCls} resize-none`}
+            />
+          </Field>
+        </Section>
+      )}
+
+      {/* Tópico 5: Serviços extras — apenas admin/secretaria, editável mesmo após finalização */}
+      {isAdminOrSec && (
+        <Section title="5. Serviços Extras" icon={<PlusCircle size={18} />} isOpen={open.extras} onToggle={() => toggle('extras')}>
+          <Field label="Descrição dos serviços" full>
+            <textarea
+              value={extraDesc}
+              onChange={e => setExtraDesc(e.target.value)}
+              placeholder="Descreva os serviços adicionais realizados…"
+              rows={3}
+              disabled={!canEdit && !canEditExtras}
+              className={`${inputCls} resize-none`}
+            />
+          </Field>
+          <Field label="Valor dos serviços extras (€)">
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={extraPrice}
+              onChange={e => setExtraPrice(e.target.value)}
+              disabled={!canEdit && !canEditExtras}
+              className={inputCls}
+            />
+          </Field>
+          {canEditExtras && (
+            <div className="sm:col-span-2">
+              <Button type="button" variant="accent" isLoading={isSavingExtras} onClick={handleSaveExtras}>
+                {isSavingExtras ? 'Salvando…' : 'Salvar Serviços Extras'}
+              </Button>
+            </div>
+          )}
+        </Section>
+      )}
 
       {error && (
         <div className="flex items-center gap-2 text-sm text-danger bg-danger-bg px-4 py-3 rounded-xl">
