@@ -46,7 +46,67 @@ export function PropertyList({
         />
       </div>
 
-      <div className="overflow-x-auto">
+      {/* Mobile View (Cards) */}
+      <div className="md:hidden">
+        {filtered.length === 0 ? (
+          <div className="px-5 py-12 text-center">
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+                <Building2 size={20} className="text-muted-foreground/50" />
+              </div>
+              <p className="text-sm text-muted-foreground font-medium">
+                {search ? 'Nenhum imóvel encontrado.' : 'Nenhum imóvel cadastrado.'}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col px-3 py-3 gap-3">
+            {filtered.map((p) => (
+              <Link
+                key={p.id}
+                href={`/properties/${p.id}`}
+                className="block bg-card rounded-xl border border-border p-4 shadow-sm active:scale-[0.98] transition-transform"
+              >
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <h3 className="font-semibold text-primary/90 text-[15px] leading-tight">
+                    {p.name}
+                  </h3>
+                  {showType && (
+                    <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                      p.client_type === 'rental'
+                        ? 'bg-accent-light text-accent'
+                        : 'bg-purple-50 text-purple-700'
+                    }`}>
+                      {CLIENT_TYPE_LABEL[p.client_type] ?? p.client_type}
+                    </span>
+                  )}
+                </div>
+                
+                <div className="flex flex-col gap-1.5 mt-3">
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="font-medium text-foreground">{p.zone}</span>
+                  </div>
+                  <div className="text-xs text-muted-foreground line-clamp-1">
+                    {p.address ?? 'Sem endereço cadastrado'}
+                  </div>
+                </div>
+
+                {showPrice && p.base_price != null && (
+                  <div className="mt-3 pt-3 border-t border-border/50 flex justify-between items-center">
+                    <span className="text-xs text-muted-foreground">Preço Base</span>
+                    <span className="font-medium text-foreground text-sm">
+                      € {p.base_price.toFixed(2)}
+                    </span>
+                  </div>
+                )}
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Desktop View (Table) */}
+      <div className="hidden md:block overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border/50 bg-muted/30">
@@ -87,14 +147,14 @@ export function PropertyList({
                   <td className="px-5 py-3.5">
                     <Link
                       href={`/properties/${p.id}`}
-                      className="font-medium text-primary hover:text-accent transition-colors"
+                      className="font-medium text-primary hover:text-accent transition-colors block h-full w-full"
                     >
                       {p.name}
                     </Link>
                   </td>
                   {showType && (
                     <td className="px-5 py-3.5">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                         p.client_type === 'rental'
                           ? 'bg-accent-light text-accent'
                           : 'bg-purple-50 text-purple-700'
@@ -104,7 +164,7 @@ export function PropertyList({
                     </td>
                   )}
                   <td className="px-5 py-3.5 text-foreground/70">{p.zone}</td>
-                  <td className="px-5 py-3.5 text-muted-foreground">{p.address ?? '—'}</td>
+                  <td className="px-5 py-3.5 text-muted-foreground max-w-xs truncate">{p.address ?? '—'}</td>
                   {showPrice && (
                     <td className="px-5 py-3.5 text-right font-medium text-foreground">
                       {p.base_price != null ? `€ ${p.base_price.toFixed(2)}` : '—'}

@@ -122,7 +122,7 @@ export async function updateEmployee(id: string, formData: FormData) {
       birth_date: data.birth_date ?? null,
       nationality: data.nationality ?? null,
       address: data.address ?? null,
-      role: data.role,
+      ...(role === 'admin' && { role: data.role }),
       ...(role === 'admin' && {
         hourly_rate: data.hourly_rate ?? null,
         monthly_salary: data.has_fixed_salary ? (data.monthly_salary ?? null) : null,

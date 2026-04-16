@@ -165,75 +165,145 @@ function OSTable({
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-border/50 bg-muted/30">
-            <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">OS #</th>
-            <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Imóvel</th>
-            <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Data</th>
-            <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Checkout</th>
-            <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Checkin</th>
-            {!isCliente && (
-              <>
-                <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Limpeza</th>
-                <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Consegna</th>
-              </>
-            )}
-            <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Status</th>
-            <th className="px-5 py-3" />
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border/30">
-          {orders.map((os) => (
-            <tr
-              key={os.id}
-              className="transition-colors hover:bg-muted/30"
-            >
-              <td className="px-5 py-3.5 text-foreground/50 text-xs font-mono">
+    <>
+      {/* Mobile View (Cards) */}
+      <div className="flex flex-col gap-3 px-3 py-3 md:hidden">
+        {orders.map((os) => (
+          <Link
+            key={os.id}
+            href={`/service-orders/${os.id}`}
+            className="block bg-card rounded-xl border border-border p-4 shadow-sm active:scale-[0.98] transition-transform"
+          >
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-[11px] font-mono text-muted-foreground bg-muted/60 px-2 py-1 rounded-md shrink-0 font-medium">
                 #{os.order_number}
-              </td>
-              <td className="px-5 py-3.5">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-foreground">
-                    {os.property?.name ?? '—'}
+              </span>
+              <Badge
+                variant={STATUS_VARIANT[os.status] ?? 'default'}
+                label={STATUS_LABEL[os.status] ?? os.status}
+                dot
+              />
+            </div>
+            
+            <div className="flex items-center gap-2 mb-3">
+              <h3 className="font-bold text-primary/90 text-[15px] leading-tight line-clamp-1">
+                {os.property?.name ?? '—'}
+              </h3>
+              <UrgencyBadge isUrgent={os.is_urgent && os.status !== 'done'} />
+            </div>
+
+            <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-xs text-muted-foreground">
+              <div>
+                <span className="block text-[10px] font-bold uppercase tracking-wider mb-0.5 text-muted-foreground/60">
+                  Limpeza
+                </span>
+                <span className="font-semibold text-foreground/80">{formatDate(os.cleaning_date)}</span>
+              </div>
+              
+              {!isCliente && (
+                <div>
+                  <span className="block text-[10px] font-bold uppercase tracking-wider mb-0.5 text-muted-foreground/60">
+                    Equipe
                   </span>
-                  <UrgencyBadge isUrgent={os.is_urgent && os.status !== 'done'} />
+                  <div className="flex flex-col gap-0.5">
+                    <span className="truncate" title={os.cleaning_staff?.full_name ?? '—'}>
+                      <span className="opacity-60 font-medium">L:</span> {os.cleaning_staff?.full_name?.split(' ')[0] ?? '—'}
+                    </span>
+                    <span className="truncate" title={os.consegna_staff?.full_name ?? '—'}>
+                      <span className="opacity-60 font-medium">C:</span> {os.consegna_staff?.full_name?.split(' ')[0] ?? '—'}
+                    </span>
+                  </div>
                 </div>
-              </td>
-              <td className="px-5 py-3.5 text-foreground/70">{formatDate(os.cleaning_date)}</td>
-              <td className="px-5 py-3.5 text-foreground/70">{formatDateTime(os.checkout_at)}</td>
-              <td className="px-5 py-3.5 text-foreground/70">{formatDateTime(os.checkin_at)}</td>
+              )}
+
+              <div className="col-span-1">
+                <span className="block text-[10px] font-bold uppercase tracking-wider mb-0.5 text-muted-foreground/60">
+                  Checkout
+                </span>
+                <span className="font-medium">{formatDateTime(os.checkout_at)}</span>
+              </div>
+              <div className="col-span-1">
+                <span className="block text-[10px] font-bold uppercase tracking-wider mb-0.5 text-muted-foreground/60">
+                  Check-in
+                </span>
+                <span className="font-medium">{formatDateTime(os.checkin_at)}</span>
+              </div>
+            </div>
+          </Link>
+        ))}
+      </div>
+
+      {/* Desktop View (Table) */}
+      <div className="hidden md:block overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border/50 bg-muted/30">
+              <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">OS #</th>
+              <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Imóvel</th>
+              <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Data</th>
+              <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Checkout</th>
+              <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Checkin</th>
               {!isCliente && (
                 <>
-                  <td className="px-5 py-3.5 text-foreground/70">
-                    {os.cleaning_staff?.full_name ?? '—'}
-                  </td>
-                  <td className="px-5 py-3.5 text-foreground/70">
-                    {os.consegna_staff?.full_name ?? '—'}
-                  </td>
+                  <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Limpeza</th>
+                  <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Consegna</th>
                 </>
               )}
-              <td className="px-5 py-3.5">
-                <Badge
-                  variant={STATUS_VARIANT[os.status] ?? 'default'}
-                  label={STATUS_LABEL[os.status] ?? os.status}
-                  dot
-                />
-              </td>
-              <td className="px-5 py-3.5 text-right">
-                <Link
-                  href={`/service-orders/${os.id}`}
-                  className="text-xs font-medium text-accent hover:text-accent/80 transition-colors"
-                >
-                  Ver
-                </Link>
-              </td>
+              <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Status</th>
+              <th className="px-5 py-3" />
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody className="divide-y divide-border/30">
+            {orders.map((os) => (
+              <tr
+                key={os.id}
+                className="transition-colors hover:bg-muted/30"
+              >
+                <td className="px-5 py-3.5 text-foreground/50 text-xs font-mono">
+                  #{os.order_number}
+                </td>
+                <td className="px-5 py-3.5">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-foreground">
+                      {os.property?.name ?? '—'}
+                    </span>
+                    <UrgencyBadge isUrgent={os.is_urgent && os.status !== 'done'} />
+                  </div>
+                </td>
+                <td className="px-5 py-3.5 text-foreground/70">{formatDate(os.cleaning_date)}</td>
+                <td className="px-5 py-3.5 text-foreground/70">{formatDateTime(os.checkout_at)}</td>
+                <td className="px-5 py-3.5 text-foreground/70">{formatDateTime(os.checkin_at)}</td>
+                {!isCliente && (
+                  <>
+                    <td className="px-5 py-3.5 text-foreground/70">
+                      {os.cleaning_staff?.full_name ?? '—'}
+                    </td>
+                    <td className="px-5 py-3.5 text-foreground/70">
+                      {os.consegna_staff?.full_name ?? '—'}
+                    </td>
+                  </>
+                )}
+                <td className="px-5 py-3.5">
+                  <Badge
+                    variant={STATUS_VARIANT[os.status] ?? 'default'}
+                    label={STATUS_LABEL[os.status] ?? os.status}
+                    dot
+                  />
+                </td>
+                <td className="px-5 py-3.5 text-right">
+                  <Link
+                    href={`/service-orders/${os.id}`}
+                    className="text-xs font-medium text-accent hover:text-accent/80 transition-colors"
+                  >
+                    Ver
+                  </Link>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   )
 }
 
