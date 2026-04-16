@@ -7,7 +7,7 @@ import { Plus } from 'lucide-react'
 import type { Profile, Property, Role, ServiceOrder } from '@/lib/types/database'
 
 type OSWithRelations = ServiceOrder & {
-  property: Pick<Property, 'id' | 'name'> | null
+  property: Pick<Property, 'id' | 'name' | 'avg_cleaning_hours'> | null
   cleaning_staff: Pick<Profile, 'id' | 'full_name'> | null
   consegna_staff: Pick<Profile, 'id' | 'full_name'> | null
 }
@@ -28,7 +28,7 @@ export default async function ServiceOrdersPage() {
     .from('service_orders')
     .select(`
       *,
-      property:properties(id, name),
+      property:properties(id, name, avg_cleaning_hours),
       cleaning_staff:profiles!cleaning_staff_id(id, full_name),
       consegna_staff:profiles!consegna_staff_id(id, full_name)
     `)
@@ -51,7 +51,7 @@ export default async function ServiceOrdersPage() {
         }
       />
 
-      <ServiceOrderList active={active} done={done} role={role} />
+      <ServiceOrderList active={active} done={done} role={role} userId={user!.id} />
     </div>
   )
 }

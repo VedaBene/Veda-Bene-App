@@ -72,7 +72,7 @@ export async function fetchPayableData(
   // Buscar OSs finalizadas no período com horas do imóvel
   let query = supabase
     .from('service_orders')
-    .select('cleaning_staff_id, consegna_staff_id, property:properties(avg_cleaning_hours)')
+    .select('cleaning_staff_id, consegna_staff_id, worked_minutes, property:properties(avg_cleaning_hours)')
     .eq('status', 'done')
     .gte('completed_at', startDate)
     .lte('completed_at', endDate)
@@ -116,7 +116,10 @@ export async function fetchPayableData(
   }
 
   for (const o of orders) {
-    const hours = (o.property as { avg_cleaning_hours?: number | null } | null)?.avg_cleaning_hours ?? 0
+    const wm = (o as { worked_minutes?: number | null }).worked_minutes
+    const hours = wm != null
+      ? wm / 60
+      : (o.property as { avg_cleaning_hours?: number | null } | null)?.avg_cleaning_hours ?? 0
     if (o.cleaning_staff_id && map.has(o.cleaning_staff_id)) {
       const row = map.get(o.cleaning_staff_id)!
       row.os_count++

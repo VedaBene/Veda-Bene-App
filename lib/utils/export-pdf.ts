@@ -53,7 +53,7 @@ export function exportPayablePDF(data: PayableRow[], startDate: string, endDate:
     <table>
       <thead>
         <tr>
-          <th>Funcionário</th><th>Total OS</th><th>Total Horas</th>
+          <th>Funcionário</th><th>Total OS</th><th>Horas Trabalhadas</th>
           <th>Valor/Hora</th><th>Salário Fixo</th><th>Total a Pagar</th>
         </tr>
       </thead>

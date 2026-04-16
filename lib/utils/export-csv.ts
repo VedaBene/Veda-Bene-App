@@ -18,7 +18,7 @@ export async function exportPayableCSV(startDate: string, endDate: string, emplo
 
   let query = supabase
     .from('service_orders')
-    .select('cleaning_staff_id, consegna_staff_id, property:properties(avg_cleaning_hours)')
+    .select('cleaning_staff_id, consegna_staff_id, worked_minutes, property:properties(avg_cleaning_hours)')
     .eq('status', 'done')
     .gte('completed_at', startDate)
     .lte('completed_at', endDate)
@@ -30,7 +30,7 @@ export async function exportPayableCSV(startDate: string, endDate: string, emplo
   const { data: orders } = await query
 
   if (!orders || orders.length === 0) {
-    return 'Funcionário,Total OS,Total Horas,Valor/Hora,Salário Fixo,Total a Pagar\n'
+    return 'Funcionário,Total OS,Horas Trabalhadas,Valor/Hora,Salário Fixo,Total a Pagar\n'
   }
 
   const staffIds = new Set<string>()
@@ -51,7 +51,10 @@ export async function exportPayableCSV(startDate: string, endDate: string, emplo
   }
 
   for (const o of orders) {
-    const hours = (o.property as { avg_cleaning_hours?: number | null } | null)?.avg_cleaning_hours ?? 0
+    const wm = (o as { worked_minutes?: number | null }).worked_minutes
+    const hours = wm != null
+      ? wm / 60
+      : (o.property as { avg_cleaning_hours?: number | null } | null)?.avg_cleaning_hours ?? 0
     if (o.cleaning_staff_id && map.has(o.cleaning_staff_id)) {
       const s = map.get(o.cleaning_staff_id)!; s.os_count++; s.total_hours += hours
     }
@@ -60,7 +63,7 @@ export async function exportPayableCSV(startDate: string, endDate: string, emplo
     }
   }
 
-  const header = row(['Funcionário', 'Total OS', 'Total Horas', 'Valor/Hora (€)', 'Salário Fixo (€)', 'Total a Pagar (€)'])
+  const header = row(['Funcionário', 'Total OS', 'Horas Trabalhadas', 'Valor/Hora (€)', 'Salário Fixo (€)', 'Total a Pagar (€)'])
   const rows = [...map.values()].map(s => {
     const totalAmount = s.monthly_salary != null
       ? s.monthly_salary

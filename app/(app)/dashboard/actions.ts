@@ -70,7 +70,7 @@ export async function fetchDashboardData(): Promise<{ data: DashboardData; role:
 
     supabase
       .from('service_orders')
-      .select('property:properties(avg_cleaning_hours)')
+      .select('worked_minutes, property:properties(avg_cleaning_hours)')
       .eq('status', 'done')
       .gte('completed_at', monthStart)
       .lte('completed_at', today),
@@ -96,7 +96,7 @@ export async function fetchDashboardData(): Promise<{ data: DashboardData; role:
 
     supabase
       .from('service_orders')
-      .select('completed_at, total_price, cleaning_staff_id, consegna_staff_id, property:properties(avg_cleaning_hours)')
+      .select('completed_at, total_price, cleaning_staff_id, consegna_staff_id, worked_minutes, property:properties(avg_cleaning_hours)')
       .eq('status', 'done')
       .gte('completed_at', threeMonthsAgoStart)
       .lte('completed_at', today),
@@ -110,8 +110,11 @@ export async function fetchDashboardData(): Promise<{ data: DashboardData; role:
   const hoursData = hoursRes.status === 'fulfilled' ? hoursRes.value.data ?? [] : []
   const hoursThisMonth = Math.round(
     hoursData.reduce((sum, o) => {
-      const prop = o.property as { avg_cleaning_hours?: number | null } | null
-      return sum + (prop?.avg_cleaning_hours ?? 0)
+      const wm = (o as { worked_minutes?: number | null }).worked_minutes
+      const hours = wm != null
+        ? wm / 60
+        : ((o.property as { avg_cleaning_hours?: number | null } | null)?.avg_cleaning_hours ?? 0)
+      return sum + hours
     }, 0) * 100
   ) / 100
 
@@ -177,7 +180,10 @@ export async function fetchDashboardData(): Promise<{ data: DashboardData; role:
     const monthOrders = recentOrders.filter(o => o.completed_at?.startsWith(key))
     let cost = 0
     for (const o of monthOrders) {
-      const hours = (o.property as { avg_cleaning_hours?: number | null } | null)?.avg_cleaning_hours ?? 0
+      const wm = (o as { worked_minutes?: number | null }).worked_minutes
+      const hours = wm != null
+        ? wm / 60
+        : ((o.property as { avg_cleaning_hours?: number | null } | null)?.avg_cleaning_hours ?? 0)
       for (const staffId of [o.cleaning_staff_id, o.consegna_staff_id]) {
         if (!staffId) continue
         const p = profilesMap.get(staffId)
