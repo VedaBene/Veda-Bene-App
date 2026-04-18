@@ -17,7 +17,7 @@ export default async function PayablePage() {
 
   const role = (profile?.role ?? 'cliente') as Role
 
-  if (role !== 'admin') redirect('/dashboard')
+  if (role !== 'admin') redirect('/service-orders')
 
   const now = new Date()
   const startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10)

@@ -19,7 +19,7 @@ export default async function EmployeesPage() {
 
   const role = (profile?.role ?? 'cliente') as Role
 
-  if (!['admin', 'secretaria'].includes(role)) redirect('/dashboard')
+  if (role !== 'admin') redirect('/service-orders')
 
   const { data: employees } = await supabase
     .from('profiles')

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 import { Input } from '@/components/ui/Input'
@@ -28,7 +29,7 @@ export default function LoginPage() {
       return
     }
 
-    router.push('/dashboard')
+    router.push('/service-orders')
   }
 
   return (
@@ -85,6 +86,12 @@ export default function LoginPage() {
           >
             {isLoading ? 'Accesso in corso…' : 'Accedi'}
           </Button>
+
+          <div className="text-center mt-4">
+            <Link href="/forgot-password" className="text-sm text-accent hover:underline">
+              Esqueci minha senha
+            </Link>
+          </div>
         </form>
       </div>
     </div>

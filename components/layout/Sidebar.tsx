@@ -26,12 +26,12 @@ type NavItem = {
 }
 
 const navItems: NavItem[] = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'secretaria', 'limpeza', 'consegna', 'cliente'] },
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin'] },
   { href: '/properties', label: 'Imóveis', icon: Home, roles: ['admin', 'secretaria', 'limpeza', 'consegna', 'cliente'] },
   { href: '/service-orders', label: 'Ordens de Serviço', icon: ClipboardList, roles: ['admin', 'secretaria', 'limpeza', 'consegna', 'cliente'] },
-  { href: '/employees', label: 'Funcionários', icon: Users, roles: ['admin', 'secretaria'] },
+  { href: '/employees', label: 'Funcionários', icon: Users, roles: ['admin'] },
   { href: '/statements/payable', label: 'A Pagar', icon: ArrowUpRight, roles: ['admin'], group: 'Financeiro' },
-  { href: '/statements/receivable', label: 'A Receber', icon: ArrowDownLeft, roles: ['admin', 'secretaria'], group: 'Financeiro' },
+  { href: '/statements/receivable', label: 'A Receber', icon: ArrowDownLeft, roles: ['admin'], group: 'Financeiro' },
 ]
 
 type SidebarProps = {
@@ -74,7 +74,7 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
       >
         {/* Logo */}
         <div className="flex items-center justify-between h-16 px-5 border-b border-sidebar-border shrink-0">
-          <Link href="/dashboard" className="flex items-center gap-2.5 group">
+          <Link href="/service-orders" className="flex items-center gap-2.5 group">
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shadow-card">
               <Sparkles size={16} className="text-primary-foreground" />
             </div>
