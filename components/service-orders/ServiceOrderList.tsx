@@ -31,6 +31,24 @@ const STATUS_VARIANT: Record<string, 'warning' | 'info' | 'success'> = {
   done: 'success',
 }
 
+function PricingModeBadge({ mode }: { mode: OSWithRelations['pricing_mode'] }) {
+  if (mode === 'ripasso') {
+    return (
+      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-accent/10 text-accent">
+        Ripasso
+      </span>
+    )
+  }
+  if (mode === 'out_long_stay') {
+    return (
+      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-info/10 text-info">
+        Out Long Stay
+      </span>
+    )
+  }
+  return null
+}
+
 function formatDateTime(value: string | null | undefined) {
   if (!value) return '—'
   return new Date(value).toLocaleString('pt-BR', {
@@ -212,11 +230,12 @@ function OSTable({
                   />
                 </div>
 
-                <div className="flex items-center gap-2 mb-3">
+                <div className="flex items-center gap-2 mb-3 flex-wrap">
                   <h3 className="font-bold text-primary/90 text-[15px] leading-tight line-clamp-1">
                     {os.property?.name ?? '—'}
                   </h3>
                   <UrgencyBadge isUrgent={os.is_urgent && os.status !== 'done'} />
+                  <PricingModeBadge mode={os.pricing_mode} />
                 </div>
 
                 <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-xs text-muted-foreground">
@@ -343,11 +362,12 @@ function OSTable({
                     #{os.order_number}
                   </td>
                   <td className="px-5 py-3.5">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium text-foreground">
                         {os.property?.name ?? '—'}
                       </span>
                       <UrgencyBadge isUrgent={os.is_urgent && os.status !== 'done'} />
+                      <PricingModeBadge mode={os.pricing_mode} />
                     </div>
                   </td>
                   <td className="px-5 py-3.5 text-foreground/70">{formatDate(os.cleaning_date)}</td>

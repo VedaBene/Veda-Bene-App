@@ -1,6 +1,7 @@
 export type Role = 'admin' | 'secretaria' | 'limpeza' | 'consegna' | 'cliente'
 export type ClientType = 'rental' | 'particular'
 export type OSStatus = 'open' | 'in_progress' | 'done'
+export type PricingMode = 'standard' | 'ripasso' | 'out_long_stay'
 export type Zone =
   | 'Saint Peter'
   | 'Piazza Navona'
@@ -99,6 +100,7 @@ export type ServiceOrder = {
   cleaning_notes?: string | null
   extra_services_description?: string | null
   extra_services_price?: number | null
+  pricing_mode: PricingMode
   created_at: string
 }
 

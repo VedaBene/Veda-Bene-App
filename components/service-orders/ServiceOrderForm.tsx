@@ -9,7 +9,7 @@ import { Field } from '@/components/ui/Field'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Building2, CalendarDays, Users, CheckCircle, AlertCircle, Zap, Play, Flag, Timer, X, ClipboardList, PlusCircle } from 'lucide-react'
-import type { OSStatus, Profile, Property, Role, ServiceOrder } from '@/lib/types/database'
+import type { OSStatus, PricingMode, Profile, Property, Role, ServiceOrder } from '@/lib/types/database'
 
 type StaffOption = Pick<Profile, 'id' | 'full_name'>
 type PropertyOption = Pick<
@@ -25,6 +25,7 @@ type PropertyOption = Pick<
   | 'bathrooms'
   | 'bidets'
   | 'cribs'
+  | 'base_price'
 >
 
 const inputCls =
@@ -40,6 +41,62 @@ const STATUS_VARIANT: Record<OSStatus, 'warning' | 'info' | 'success'> = {
   open: 'warning',
   in_progress: 'info',
   done: 'success',
+}
+
+const PRICING_MODE_OPTIONS: { value: PricingMode; label: string; hint: string }[] = [
+  { value: 'standard', label: 'Padrão', hint: 'Preço base + adicional por pessoa' },
+  { value: 'ripasso', label: 'Ripasso', hint: '60% do preço base do imóvel' },
+  { value: 'out_long_stay', label: 'Out Long Stay', hint: 'Tempo trabalhado × €25/h' },
+]
+
+function PricingModeSelector({
+  value,
+  onChange,
+  disabled,
+  basePrice,
+}: {
+  value: PricingMode
+  onChange: (v: PricingMode) => void
+  disabled: boolean
+  basePrice: number | null
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        {PRICING_MODE_OPTIONS.map(opt => {
+          const active = value === opt.value
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              disabled={disabled}
+              onClick={() => onChange(opt.value)}
+              className={`text-left rounded-lg border px-3 py-2.5 transition-all ${
+                active
+                  ? 'border-accent bg-accent/5 ring-2 ring-accent/20'
+                  : 'border-input-border bg-white hover:border-accent/40'
+              } ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+            >
+              <div className="text-sm font-semibold text-foreground">{opt.label}</div>
+              <div className="text-xs text-muted-foreground mt-0.5">{opt.hint}</div>
+            </button>
+          )
+        })}
+      </div>
+      {value === 'ripasso' && (
+        <p className="text-xs text-muted-foreground">
+          {basePrice != null
+            ? <>Valor calculado: <strong className="text-foreground">€{(basePrice * 0.6).toFixed(2)}</strong> (60% de €{basePrice.toFixed(2)})</>
+            : 'Defina o preço base no cadastro do imóvel para que o cálculo funcione.'}
+        </p>
+      )}
+      {value === 'out_long_stay' && (
+        <p className="text-xs text-muted-foreground">
+          Valor será calculado ao finalizar a limpeza (tempo trabalhado × €25/h).
+        </p>
+      )}
+    </div>
+  )
 }
 
 function hoursUntil(checkout: string, checkin: string): number | null {
@@ -127,6 +184,7 @@ export function ServiceOrderForm({
   const [cleaningNotes, setCleaningNotes] = useState(order?.cleaning_notes ?? '')
   const [extraDesc, setExtraDesc] = useState(order?.extra_services_description ?? '')
   const [extraPrice, setExtraPrice] = useState(order?.extra_services_price?.toString() ?? '0')
+  const [pricingMode, setPricingMode] = useState<PricingMode>(order?.pricing_mode ?? 'standard')
   const [isSavingExtras, setIsSavingExtras] = useState(false)
 
   const isAdminOrSec = ['admin', 'secretaria'].includes(role)
@@ -157,6 +215,7 @@ export function ServiceOrderForm({
     fd.set('cleaning_notes', cleaningNotes)
     fd.set('extra_services_description', extraDesc)
     fd.set('extra_services_price', extraPrice)
+    fd.set('pricing_mode', pricingMode)
 
     startTransition(async () => {
       const result = order
@@ -206,7 +265,7 @@ export function ServiceOrderForm({
     setIsSavingExtras(true)
     setError(null)
     setSuccess(false)
-    const result = await updateExtraServices(order.id, extraDesc, parseFloat(extraPrice) || 0)
+    const result = await updateExtraServices(order.id, extraDesc, parseFloat(extraPrice) || 0, pricingMode)
     if (result && !result.success) setError(result.error)
     else setSuccess(true)
     setIsSavingExtras(false)
@@ -567,6 +626,14 @@ export function ServiceOrderForm({
       {/* Tópico 5: Serviços extras — apenas admin/secretaria, editável mesmo após finalização */}
       {isAdminOrSec && (
         <Section title="5. Serviços Extras" icon={<PlusCircle size={18} />} isOpen={open.extras} onToggle={() => toggle('extras')}>
+          <Field label="Modo de precificação" full>
+            <PricingModeSelector
+              value={pricingMode}
+              onChange={setPricingMode}
+              disabled={!canEdit && !canEditExtras}
+              basePrice={selectedProperty?.base_price ?? null}
+            />
+          </Field>
           <Field label="Descrição dos serviços" full>
             <textarea
               value={extraDesc}
@@ -577,7 +644,7 @@ export function ServiceOrderForm({
               className={`${inputCls} resize-none`}
             />
           </Field>
-          <Field label="Valor dos serviços extras (€)">
+          <Field label="Valor extra manual (€)">
             <input
               type="number"
               min="0"
@@ -587,6 +654,9 @@ export function ServiceOrderForm({
               disabled={!canEdit && !canEditExtras}
               className={inputCls}
             />
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              Soma por cima do valor calculado pelo modo selecionado.
+            </p>
           </Field>
           {canEditExtras && (
             <div className="sm:col-span-2">

@@ -4,7 +4,10 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
-import type { OSStatus } from '@/lib/types/database'
+import type { OSStatus, PricingMode } from '@/lib/types/database'
+
+const RIPASSO_RATE = 0.6
+const OUT_LONG_STAY_HOURLY_RATE = 25
 
 const optStr = z.preprocess(v => (v === '' ? undefined : v), z.string().optional())
 const optNum = z.preprocess(
@@ -31,6 +34,7 @@ const serviceOrderSchema = z.object({
   cleaning_notes: optStr,
   extra_services_description: optStr,
   extra_services_price: optNum,
+  pricing_mode: z.enum(['standard', 'ripasso', 'out_long_stay']).default('standard'),
 })
 
 async function getAuthorizedClient() {
@@ -52,17 +56,31 @@ async function getAuthorizedClient() {
 }
 
 function calculateTotalPrice(
+  pricingMode: PricingMode,
   basePrice: number | null,
   extraPerPerson: number | null,
   realGuests: number | null,
   minGuests: number | null,
   extraServicesPrice: number | null = null,
+  workedMinutes: number | null = null,
 ): number | null {
+  const extras = extraServicesPrice ?? 0
+
+  if (pricingMode === 'ripasso') {
+    if (basePrice == null) return null
+    return basePrice * RIPASSO_RATE + extras
+  }
+
+  if (pricingMode === 'out_long_stay') {
+    if (workedMinutes == null) return null
+    return (workedMinutes / 60) * OUT_LONG_STAY_HOURLY_RATE + extras
+  }
+
   if (basePrice == null) return null
   const extra = extraPerPerson ?? 0
   const guests = realGuests ?? 0
   const min = minGuests ?? 0
-  return basePrice + extra * Math.max(0, guests - min) + (extraServicesPrice ?? 0)
+  return basePrice + extra * Math.max(0, guests - min) + extras
 }
 
 export async function createServiceOrder(formData: FormData) {
@@ -81,11 +99,13 @@ export async function createServiceOrder(formData: FormData) {
 
   const total_price = property
     ? calculateTotalPrice(
+        data.pricing_mode,
         property.base_price,
         property.extra_per_person,
         data.real_guests ?? null,
         property.min_guests,
         data.extra_services_price ?? null,
+        null,
       )
     : null
 
@@ -109,6 +129,7 @@ export async function createServiceOrder(formData: FormData) {
       cleaning_notes: data.cleaning_notes ?? null,
       extra_services_description: data.extra_services_description ?? null,
       extra_services_price: data.extra_services_price ?? 0,
+      pricing_mode: data.pricing_mode,
       total_price,
     })
     .select('id')
@@ -128,19 +149,24 @@ export async function updateServiceOrder(id: string, formData: FormData) {
 
   const { data } = parsed
 
-  const { data: property } = await supabase
-    .from('properties')
-    .select('base_price, extra_per_person, min_guests')
-    .eq('id', data.property_id)
-    .single()
+  const [{ data: property }, { data: current }] = await Promise.all([
+    supabase
+      .from('properties')
+      .select('base_price, extra_per_person, min_guests')
+      .eq('id', data.property_id)
+      .single(),
+    supabase.from('service_orders').select('worked_minutes').eq('id', id).single(),
+  ])
 
   const total_price = property
     ? calculateTotalPrice(
+        data.pricing_mode,
         property.base_price,
         property.extra_per_person,
         data.real_guests ?? null,
         property.min_guests,
         data.extra_services_price ?? null,
+        current?.worked_minutes ?? null,
       )
     : null
 
@@ -163,6 +189,7 @@ export async function updateServiceOrder(id: string, formData: FormData) {
       cleaning_notes: data.cleaning_notes ?? null,
       extra_services_description: data.extra_services_description ?? null,
       extra_services_price: data.extra_services_price ?? 0,
+      pricing_mode: data.pricing_mode,
       total_price,
     })
     .eq('id', id)
@@ -248,18 +275,44 @@ export async function finishCleaning(id: string, notes: string) {
 
   if (error) return { success: false as const, error: error.message }
 
+  // Out Long Stay: recalcula total_price agora que worked_minutes está disponível.
+  const { data: finished } = await supabase
+    .from('service_orders')
+    .select('pricing_mode, worked_minutes, extra_services_price')
+    .eq('id', id)
+    .single()
+
+  if (finished?.pricing_mode === 'out_long_stay') {
+    const total_price = calculateTotalPrice(
+      'out_long_stay',
+      null,
+      null,
+      null,
+      null,
+      finished.extra_services_price ?? null,
+      finished.worked_minutes ?? null,
+    )
+    await supabase.from('service_orders').update({ total_price }).eq('id', id)
+  }
+
   revalidatePath('/service-orders')
   revalidatePath(`/service-orders/${id}`)
+  revalidatePath('/statements/receivable')
   return { success: true as const }
 }
 
-export async function updateExtraServices(id: string, description: string, price: number) {
+export async function updateExtraServices(
+  id: string,
+  description: string,
+  price: number,
+  pricingMode: PricingMode = 'standard',
+) {
   const { supabase } = await getAuthorizedClient()
 
   // Fetch the current order + property to recalculate total_price
   const { data: order } = await supabase
     .from('service_orders')
-    .select('property_id, real_guests')
+    .select('property_id, real_guests, worked_minutes')
     .eq('id', id)
     .single()
 
@@ -273,11 +326,13 @@ export async function updateExtraServices(id: string, description: string, price
 
   const total_price = property
     ? calculateTotalPrice(
+        pricingMode,
         property.base_price,
         property.extra_per_person,
         order.real_guests,
         property.min_guests,
         price,
+        order.worked_minutes ?? null,
       )
     : null
 
@@ -286,6 +341,7 @@ export async function updateExtraServices(id: string, description: string, price
     .update({
       extra_services_description: description.trim() || null,
       extra_services_price: price,
+      pricing_mode: pricingMode,
       total_price,
     })
     .eq('id', id)
