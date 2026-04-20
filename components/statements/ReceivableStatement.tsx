@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { fetchReceivableData, type ReceivableRow, type ClientOption } from '@/app/(app)/statements/actions'
+import { fetchReceivableData, fetchReceivableDetail, type ReceivableRow, type ClientOption } from '@/app/(app)/statements/actions'
 import { exportReceivablePDF } from '@/lib/utils/export-pdf'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
@@ -75,7 +75,20 @@ export function ReceivableStatement({
   }
 
   function handlePDF() {
-    exportReceivablePDF(data, startDate, endDate)
+    setError(null)
+    startTransition(async () => {
+      try {
+        const rows = await fetchReceivableDetail(
+          startDate,
+          endDate,
+          clientType === 'all' ? undefined : clientType,
+          clientId === 'all' ? undefined : clientId,
+        )
+        exportReceivablePDF(rows, startDate, endDate)
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Erro ao gerar PDF')
+      }
+    })
   }
 
   const clientOptions = clientType === 'rental' ? agencies : clientType === 'particular' ? owners : []

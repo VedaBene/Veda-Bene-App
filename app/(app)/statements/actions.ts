@@ -33,6 +33,31 @@ export type ClientOption = {
   name: string
 }
 
+export type ReceivableDetailRow = {
+  order_id: string
+  order_number: number
+  completed_at: string | null
+  property_name: string
+  client_type: 'rental' | 'particular'
+  client_name: string
+  real_guests: number | null
+  extra_services_price: number | null
+  total_price: number
+}
+
+export type PayableDetailRow = {
+  employee_id: string
+  employee_name: string
+  order_id: string
+  order_number: number
+  completed_at: string | null
+  property_name: string
+  hours: number
+  hourly_rate: number | null
+  monthly_salary: number | null
+  os_total: number | null
+}
+
 async function getAuthorizedClient(minRole: 'secretaria' | 'admin' = 'secretaria') {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -235,4 +260,180 @@ export async function fetchReceivableData(
     ...r,
     total_value: Math.round(r.total_value * 100) / 100,
   }))
+}
+
+export async function fetchReceivableDetail(
+  startDate: string,
+  endDate: string,
+  clientType?: 'rental' | 'particular' | 'all',
+  clientId?: string,
+): Promise<ReceivableDetailRow[]> {
+  const { supabase } = await getAuthorizedClient('secretaria')
+
+  const { data: orders } = await supabase
+    .from('service_orders')
+    .select(`
+      id, order_number, completed_at, real_guests, extra_services_price, total_price,
+      property:properties(
+        id, name, client_type,
+        agency:agencies(id, name),
+        owner:owners(id, name)
+      )
+    `)
+    .eq('status', 'done')
+    .gte('completed_at', startDate)
+    .lte('completed_at', endDate)
+    .order('completed_at', { ascending: true })
+
+  if (!orders) return []
+
+  const rows: ReceivableDetailRow[] = []
+
+  for (const o of orders) {
+    const prop = (o as unknown as {
+      property: {
+        id: string
+        name: string
+        client_type: 'rental' | 'particular'
+        agency: { id: string; name: string } | null
+        owner: { id: string; name: string } | null
+      } | null
+    }).property
+
+    if (!prop) continue
+
+    if (clientType && clientType !== 'all' && prop.client_type !== clientType) continue
+
+    if (clientId) {
+      const matchesAgency = prop.agency?.id === clientId
+      const matchesOwner = prop.owner?.id === clientId
+      if (!matchesAgency && !matchesOwner) continue
+    }
+
+    const clientName =
+      prop.client_type === 'rental'
+        ? (prop.agency?.name ?? '—')
+        : (prop.owner?.name ?? '—')
+
+    const order = o as unknown as {
+      id: string
+      order_number: number
+      completed_at: string | null
+      real_guests: number | null
+      extra_services_price: number | null
+      total_price: number | null
+    }
+
+    rows.push({
+      order_id: order.id,
+      order_number: order.order_number,
+      completed_at: order.completed_at,
+      property_name: prop.name,
+      client_type: prop.client_type,
+      client_name: clientName,
+      real_guests: order.real_guests,
+      extra_services_price: order.extra_services_price,
+      total_price: Math.round((order.total_price ?? 0) * 100) / 100,
+    })
+  }
+
+  return rows
+}
+
+export async function fetchPayableDetail(
+  startDate: string,
+  endDate: string,
+  employeeId?: string,
+): Promise<PayableDetailRow[]> {
+  const { supabase } = await getAuthorizedClient('admin')
+
+  let query = supabase
+    .from('service_orders')
+    .select(`
+      id, order_number, completed_at, worked_minutes,
+      cleaning_staff_id, consegna_staff_id,
+      property:properties(name, avg_cleaning_hours)
+    `)
+    .eq('status', 'done')
+    .gte('completed_at', startDate)
+    .lte('completed_at', endDate)
+    .order('completed_at', { ascending: true })
+
+  if (employeeId) {
+    query = query.or(`cleaning_staff_id.eq.${employeeId},consegna_staff_id.eq.${employeeId}`)
+  }
+
+  const { data: orders } = await query
+  if (!orders || orders.length === 0) return []
+
+  const staffIds = new Set<string>()
+  for (const o of orders) {
+    if (o.cleaning_staff_id) staffIds.add(o.cleaning_staff_id)
+    if (o.consegna_staff_id) staffIds.add(o.consegna_staff_id)
+  }
+  if (staffIds.size === 0) return []
+
+  const { data: profiles } = await supabase
+    .from('profiles')
+    .select('id, full_name, hourly_rate, monthly_salary')
+    .in('id', [...staffIds])
+
+  if (!profiles) return []
+
+  const profileById = new Map(profiles.map(p => [p.id, p]))
+  const rows: PayableDetailRow[] = []
+
+  for (const o of orders) {
+    const order = o as unknown as {
+      id: string
+      order_number: number
+      completed_at: string | null
+      worked_minutes: number | null
+      cleaning_staff_id: string | null
+      consegna_staff_id: string | null
+      property: { name: string; avg_cleaning_hours: number | null } | null
+    }
+
+    const hours = order.worked_minutes != null
+      ? order.worked_minutes / 60
+      : order.property?.avg_cleaning_hours ?? 0
+
+    const staffIdsForOrder = new Set<string>()
+    if (order.cleaning_staff_id) staffIdsForOrder.add(order.cleaning_staff_id)
+    if (order.consegna_staff_id) staffIdsForOrder.add(order.consegna_staff_id)
+
+    for (const sid of staffIdsForOrder) {
+      if (employeeId && sid !== employeeId) continue
+      const p = profileById.get(sid)
+      if (!p) continue
+
+      const roundedHours = Math.round(hours * 100) / 100
+      const osTotal =
+        p.monthly_salary != null
+          ? null
+          : p.hourly_rate != null
+            ? Math.round(p.hourly_rate * hours * 100) / 100
+            : null
+
+      rows.push({
+        employee_id: p.id,
+        employee_name: p.full_name,
+        order_id: order.id,
+        order_number: order.order_number,
+        completed_at: order.completed_at,
+        property_name: order.property?.name ?? '—',
+        hours: roundedHours,
+        hourly_rate: p.hourly_rate ?? null,
+        monthly_salary: p.monthly_salary ?? null,
+        os_total: osTotal,
+      })
+    }
+  }
+
+  rows.sort((a, b) => {
+    if (a.employee_name !== b.employee_name) return a.employee_name.localeCompare(b.employee_name)
+    return (a.completed_at ?? '').localeCompare(b.completed_at ?? '')
+  })
+
+  return rows
 }

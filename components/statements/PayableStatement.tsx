@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { fetchPayableData, type PayableRow, type EmployeeOption } from '@/app/(app)/statements/actions'
+import { fetchPayableData, fetchPayableDetail, type PayableRow, type EmployeeOption } from '@/app/(app)/statements/actions'
 import { exportPayablePDF } from '@/lib/utils/export-pdf'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
@@ -56,11 +56,23 @@ export function PayableStatement({
   }
 
   function handlePDF() {
+    setError(null)
     const employeeName =
       employeeId !== 'all'
         ? employees.find(e => e.id === employeeId)?.full_name
         : undefined
-    exportPayablePDF(data, startDate, endDate, employeeName)
+    startTransition(async () => {
+      try {
+        const rows = await fetchPayableDetail(
+          startDate,
+          endDate,
+          employeeId === 'all' ? undefined : employeeId,
+        )
+        exportPayablePDF(rows, startDate, endDate, employeeName)
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Erro ao gerar PDF')
+      }
+    })
   }
 
   const total = data.reduce((sum, r) => sum + (r.total_amount ?? 0), 0)
