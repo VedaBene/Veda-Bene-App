@@ -64,6 +64,7 @@ export type Property = {
   double_beds: number
   single_beds: number
   sofa_beds: number
+  armchair_beds: number
   bathrooms: number
   bidets: number
   cribs: number
@@ -87,6 +88,7 @@ export type ServiceOrder = {
   double_beds: number
   single_beds: number
   sofa_beds: number
+  armchair_beds: number
   bathrooms: number
   bidets: number
   cribs: number

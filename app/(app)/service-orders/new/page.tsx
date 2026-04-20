@@ -21,7 +21,7 @@ export default async function NewServiceOrderPage() {
   const [{ data: properties }, { data: staffData }] = await Promise.all([
     supabase
       .from('properties')
-      .select('id, name, avg_cleaning_hours, min_guests, max_guests, double_beds, single_beds, sofa_beds, bathrooms, bidets, cribs, base_price')
+      .select('id, name, avg_cleaning_hours, min_guests, max_guests, double_beds, single_beds, sofa_beds, armchair_beds, bathrooms, bidets, cribs, base_price')
       .order('name'),
     supabase
       .from('profiles')
@@ -34,7 +34,7 @@ export default async function NewServiceOrderPage() {
     <div className="animate-fade-in-up">
       <PageHeader title="Nova Ordem de Serviço" />
       <ServiceOrderForm
-        properties={(properties ?? []) as Pick<Property, 'id' | 'name' | 'avg_cleaning_hours' | 'min_guests' | 'max_guests' | 'double_beds' | 'single_beds' | 'sofa_beds' | 'bathrooms' | 'bidets' | 'cribs' | 'base_price'>[]}
+        properties={(properties ?? []) as Pick<Property, 'id' | 'name' | 'avg_cleaning_hours' | 'min_guests' | 'max_guests' | 'double_beds' | 'single_beds' | 'sofa_beds' | 'armchair_beds' | 'bathrooms' | 'bidets' | 'cribs' | 'base_price'>[]}
         staff={(staffData ?? []) as Pick<Profile, 'id' | 'full_name'>[]}
         role={role}
       />

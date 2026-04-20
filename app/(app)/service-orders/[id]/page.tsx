@@ -26,11 +26,11 @@ export default async function ServiceOrderDetailPage({
   const propertiesQuery = isAdminOrSec
     ? supabase
         .from('properties')
-        .select('id, name, avg_cleaning_hours, min_guests, max_guests, double_beds, single_beds, sofa_beds, bathrooms, bidets, cribs, base_price')
+        .select('id, name, avg_cleaning_hours, min_guests, max_guests, double_beds, single_beds, sofa_beds, armchair_beds, bathrooms, bidets, cribs, base_price')
         .order('name')
     : supabase
         .from('properties')
-        .select('id, name, avg_cleaning_hours, min_guests, max_guests, double_beds, single_beds, sofa_beds, bathrooms, bidets, cribs')
+        .select('id, name, avg_cleaning_hours, min_guests, max_guests, double_beds, single_beds, sofa_beds, armchair_beds, bathrooms, bidets, cribs')
         .order('name')
 
   const [{ data: order }, { data: properties }, { data: staffData }] = await Promise.all([
@@ -56,7 +56,7 @@ export default async function ServiceOrderDetailPage({
       <PageHeader title="Ordem de Serviço" />
       <ServiceOrderForm
         order={order as ServiceOrder}
-        properties={(properties ?? []) as Pick<Property, 'id' | 'name' | 'avg_cleaning_hours' | 'min_guests' | 'max_guests' | 'double_beds' | 'single_beds' | 'sofa_beds' | 'bathrooms' | 'bidets' | 'cribs' | 'base_price'>[]}
+        properties={(properties ?? []) as Pick<Property, 'id' | 'name' | 'avg_cleaning_hours' | 'min_guests' | 'max_guests' | 'double_beds' | 'single_beds' | 'sofa_beds' | 'armchair_beds' | 'bathrooms' | 'bidets' | 'cribs' | 'base_price'>[]}
         staff={(staffData ?? []) as Pick<Profile, 'id' | 'full_name'>[]}
         role={role}
         userId={user!.id}

@@ -22,6 +22,7 @@ type PropertyOption = Pick<
   | 'double_beds'
   | 'single_beds'
   | 'sofa_beds'
+  | 'armchair_beds'
   | 'bathrooms'
   | 'bidets'
   | 'cribs'
@@ -176,6 +177,7 @@ export function ServiceOrderForm({
   const [doubleBeds, setDoubleBeds] = useState(order?.double_beds?.toString() ?? '0')
   const [singleBeds, setSingleBeds] = useState(order?.single_beds?.toString() ?? '0')
   const [sofaBeds, setSofaBeds] = useState(order?.sofa_beds?.toString() ?? '0')
+  const [armchairBeds, setArmchairBeds] = useState(order?.armchair_beds?.toString() ?? '0')
   const [bathrooms, setBathrooms] = useState(order?.bathrooms?.toString() ?? '0')
   const [bidets, setBidets] = useState(order?.bidets?.toString() ?? '0')
   const [cribs, setCribs] = useState(order?.cribs?.toString() ?? '0')
@@ -209,6 +211,7 @@ export function ServiceOrderForm({
     fd.set('double_beds', doubleBeds)
     fd.set('single_beds', singleBeds)
     fd.set('sofa_beds', sofaBeds)
+    fd.set('armchair_beds', armchairBeds)
     fd.set('bathrooms', bathrooms)
     fd.set('bidets', bidets)
     fd.set('cribs', cribs)
@@ -522,9 +525,13 @@ export function ServiceOrderForm({
           label={
             <>
               Hóspedes Reais
-              {selectedProperty?.max_guests != null && (
+              {(selectedProperty?.min_guests != null || selectedProperty?.max_guests != null) && (
                 <span className="ml-1 text-xs font-normal text-muted-foreground">
-                  (máx {selectedProperty.max_guests})
+                  {selectedProperty.min_guests != null && selectedProperty.max_guests != null
+                    ? `(mín ${selectedProperty.min_guests} / máx ${selectedProperty.max_guests})`
+                    : selectedProperty.max_guests != null
+                    ? `(máx ${selectedProperty.max_guests})`
+                    : `(mín ${selectedProperty.min_guests})`}
                 </span>
               )}
             </>
@@ -568,6 +575,18 @@ export function ServiceOrderForm({
           }
         >
           <input type="number" min="0" value={sofaBeds} onChange={e => setSofaBeds(e.target.value)} disabled={!canEdit} className={inputCls} />
+        </Field>
+        <Field
+          label={
+            <>
+              Poltrona-camas
+              {selectedProperty?.armchair_beds != null && (
+                <span className="ml-1 text-xs font-normal text-muted-foreground">({selectedProperty.armchair_beds})</span>
+              )}
+            </>
+          }
+        >
+          <input type="number" min="0" value={armchairBeds} onChange={e => setArmchairBeds(e.target.value)} disabled={!canEdit} className={inputCls} />
         </Field>
         <Field
           label={
