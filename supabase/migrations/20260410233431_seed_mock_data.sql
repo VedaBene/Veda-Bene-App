@@ -1,0 +1,6 @@
+-- Historical placeholder.
+-- The remote project contains a migration named `seed_mock_data`, but the
+-- original seed statements are not present in this repository.
+--
+-- This file intentionally keeps the migration slot so the local filesystem
+-- matches the remote migration history without copying production data into Git.
