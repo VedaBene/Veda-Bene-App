@@ -4,7 +4,9 @@ import { PropertyList } from '@/components/properties/PropertyList'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Button } from '@/components/ui/Button'
 import { Plus } from 'lucide-react'
-import type { Agency, Owner, Property, Role } from '@/lib/types/database'
+import { toPropertyListItem } from '@/lib/server/view-models'
+import type { Role } from '@/lib/types/database'
+import type { PropertyListItem } from '@/lib/types/view-models'
 
 export default async function PropertiesPage() {
   const supabase = await createClient()
@@ -18,10 +20,19 @@ export default async function PropertiesPage() {
 
   const role = (profile?.role ?? 'cliente') as Role
 
+  const propertiesSelect =
+    role === 'admin' || role === 'secretaria'
+      ? 'id, name, zone, address, client_type, base_price'
+      : 'id, name, zone, address'
+
   const { data: properties } = await supabase
     .from('properties')
-    .select('*, agency:agencies(*), owner:owners(*)')
+    .select(propertiesSelect)
     .order('created_at', { ascending: false })
+
+  const items = ((properties ?? []) as PropertyListItem[]).map(property =>
+    toPropertyListItem(property, role),
+  )
 
   return (
     <div className="animate-fade-in-up">
@@ -37,7 +48,7 @@ export default async function PropertiesPage() {
       />
 
       <PropertyList
-        properties={(properties ?? []) as (Property & { agency: Agency | null; owner: Owner | null })[]}
+        properties={items}
         role={role}
       />
     </div>

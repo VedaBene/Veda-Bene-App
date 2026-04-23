@@ -22,7 +22,7 @@ export function DateRangePicker({ label, onChange, initialValue, className = '' 
 
   useEffect(() => {
     onChange({ start, end });
-  }, [start, end]);
+  }, [onChange, start, end]);
 
   return (
     <div className={`flex flex-col gap-1.5 ${className}`}>

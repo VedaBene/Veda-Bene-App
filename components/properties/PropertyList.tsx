@@ -2,15 +2,11 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import type { Agency, Owner, Property, Role } from '@/lib/types/database'
+import type { Role } from '@/lib/types/database'
+import type { PropertyListItem } from '@/lib/types/view-models'
 import { Search, Building2 } from 'lucide-react'
 import { Input } from '@/components/ui/Input'
 import { Card } from '@/components/ui/Card'
-
-type PropertyWithRelations = Property & {
-  agency: Agency | null
-  owner: Owner | null
-}
 
 const CLIENT_TYPE_LABEL: Record<string, string> = {
   rental: 'Rental',
@@ -21,7 +17,7 @@ export function PropertyList({
   properties,
   role,
 }: {
-  properties: PropertyWithRelations[]
+  properties: PropertyListItem[]
   role: Role
 }) {
   const [search, setSearch] = useState('')

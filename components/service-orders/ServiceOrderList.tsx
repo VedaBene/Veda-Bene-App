@@ -11,13 +11,8 @@ import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { ClipboardList, Search, FileDown, X, Play, Flag, Timer } from 'lucide-react'
-import type { Profile, Property, Role, ServiceOrder } from '@/lib/types/database'
-
-type OSWithRelations = ServiceOrder & {
-  property: Pick<Property, 'id' | 'name' | 'avg_cleaning_hours'> | null
-  cleaning_staff: Pick<Profile, 'id' | 'full_name'> | null
-  consegna_staff: Pick<Profile, 'id' | 'full_name'> | null
-}
+import type { Role } from '@/lib/types/database'
+import type { ServiceOrderListItem } from '@/lib/types/view-models'
 
 const STATUS_LABEL: Record<string, string> = {
   open: 'Aberta',
@@ -31,7 +26,7 @@ const STATUS_VARIANT: Record<string, 'warning' | 'info' | 'success'> = {
   done: 'success',
 }
 
-function PricingModeBadge({ mode }: { mode: OSWithRelations['pricing_mode'] }) {
+function PricingModeBadge({ mode }: { mode: ServiceOrderListItem['pricing_mode'] }) {
   if (mode === 'ripasso') {
     return (
       <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-accent/10 text-accent">
@@ -67,7 +62,7 @@ function formatDate(value: string | null | undefined) {
   return `${d}/${m}/${y}`
 }
 
-const OCCUPANCY_FIELDS: { key: keyof OSWithRelations; label: string }[] = [
+const OCCUPANCY_FIELDS: { key: keyof ServiceOrderListItem; label: string }[] = [
   { key: 'real_guests', label: 'Hóspedes' },
   { key: 'double_beds', label: 'Camas Casal' },
   { key: 'single_beds', label: 'Camas Solteiro' },
@@ -77,7 +72,16 @@ const OCCUPANCY_FIELDS: { key: keyof OSWithRelations; label: string }[] = [
   { key: 'cribs', label: 'Berços' },
 ]
 
-function generatePDF(orders: OSWithRelations[], date: string) {
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function generatePDF(orders: ServiceOrderListItem[], date: string) {
   const dateLabel = date ? formatDate(date) : 'Todas as datas'
   const now = new Date().toLocaleString('pt-BR', { timeZone: 'UTC' })
 
@@ -90,7 +94,7 @@ function generatePDF(orders: OSWithRelations[], date: string) {
   const rows = orders.map((o) => `
     <tr>
       <td>#${o.order_number}</td>
-      <td>${o.property?.name ?? '—'}</td>
+      <td>${escapeHtml(o.property?.name ?? '—')}</td>
       <td>${formatDateTime(o.checkout_at)}</td>
       <td>${formatDateTime(o.checkin_at)}</td>
       ${OCCUPANCY_FIELDS.map(({ key }) => {
@@ -162,7 +166,7 @@ function generatePDF(orders: OSWithRelations[], date: string) {
   win.document.close()
 }
 
-function isAssignedWorker(o: OSWithRelations, role: Role, userId?: string): boolean {
+function isAssignedWorker(o: ServiceOrderListItem, role: Role, userId?: string): boolean {
   if (!userId) return false
   if (role === 'limpeza' && o.cleaning_staff_id === userId) return true
   if (role === 'consegna' && o.consegna_staff_id === userId) return true
@@ -190,12 +194,12 @@ function OSTable({
   onStart,
   onFinish,
 }: {
-  orders: OSWithRelations[]
+  orders: ServiceOrderListItem[]
   role: Role
   emptyText: string
   userId?: string
-  onStart?: (o: OSWithRelations) => void
-  onFinish?: (o: OSWithRelations) => void
+  onStart?: (o: ServiceOrderListItem) => void
+  onFinish?: (o: ServiceOrderListItem) => void
 }) {
   const isCliente = role === 'cliente'
   const isWorker = role === 'limpeza' || role === 'consegna'
@@ -449,8 +453,8 @@ export function ServiceOrderList({
   role,
   userId,
 }: {
-  active: OSWithRelations[]
-  done: OSWithRelations[]
+  active: ServiceOrderListItem[]
+  done: ServiceOrderListItem[]
   role: Role
   userId?: string
 }) {
@@ -459,12 +463,12 @@ export function ServiceOrderList({
   const [search, setSearch] = useState('')
   const [date, setDate] = useState('')
 
-  const [startModalOrder, setStartModalOrder] = useState<OSWithRelations | null>(null)
-  const [finishModalOrder, setFinishModalOrder] = useState<OSWithRelations | null>(null)
+  const [startModalOrder, setStartModalOrder] = useState<ServiceOrderListItem | null>(null)
+  const [finishModalOrder, setFinishModalOrder] = useState<ServiceOrderListItem | null>(null)
   const [finishNotes, setFinishNotes] = useState('')
   const [isTrackingAction, setIsTrackingAction] = useState(false)
 
-  const filterOrder = (o: OSWithRelations) => {
+  const filterOrder = (o: ServiceOrderListItem) => {
     const matchName = !search || (o.property?.name ?? '').toLowerCase().includes(search.toLowerCase())
     const matchDate = !date || o.cleaning_date === date
     return matchName && matchDate

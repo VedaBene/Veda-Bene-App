@@ -5,7 +5,8 @@ import { EmployeeList } from '@/components/employees/EmployeeList'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Button } from '@/components/ui/Button'
 import { Plus } from 'lucide-react'
-import type { Profile, Role } from '@/lib/types/database'
+import type { Role } from '@/lib/types/database'
+import type { EmployeeListItem } from '@/lib/types/view-models'
 
 export default async function EmployeesPage() {
   const supabase = await createClient()
@@ -23,7 +24,7 @@ export default async function EmployeesPage() {
 
   const { data: employees } = await supabase
     .from('profiles')
-    .select('*')
+    .select('id, full_name, email, phone, birth_date, nationality, role, hourly_rate, monthly_salary, overtime_rate')
     .in('role', ['admin', 'secretaria', 'limpeza', 'consegna'])
     .order('full_name')
 
@@ -40,7 +41,7 @@ export default async function EmployeesPage() {
         }
       />
 
-      <EmployeeList employees={(employees ?? []) as Profile[]} role={role} />
+      <EmployeeList employees={(employees ?? []) as EmployeeListItem[]} role={role} />
     </div>
   )
 }

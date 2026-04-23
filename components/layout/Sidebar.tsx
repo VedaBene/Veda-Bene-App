@@ -53,9 +53,10 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
   const visibleItems = navItems.filter(
     (item) => !role || item.roles.includes(role)
   )
-
-  // Group items
-  let lastGroup: string | undefined = undefined
+  const groupedItems = visibleItems.map((item, index) => ({
+    item,
+    showGroupLabel: !!item.group && item.group !== visibleItems[index - 1]?.group,
+  }))
 
   return (
     <>
@@ -93,11 +94,9 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
 
         {/* Navigation */}
         <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto custom-scrollbar">
-          {visibleItems.map((item) => {
+          {groupedItems.map(({ item, showGroupLabel }) => {
             const isActive = pathname.startsWith(item.href)
             const Icon = item.icon
-            const showGroupLabel = item.group && item.group !== lastGroup
-            if (item.group) lastGroup = item.group
 
             return (
               <div key={item.href}>

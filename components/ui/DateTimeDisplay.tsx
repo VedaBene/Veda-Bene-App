@@ -3,26 +3,13 @@
 import { useEffect, useState } from 'react'
 
 export function DateTimeDisplay() {
-  const [date, setDate] = useState<Date | null>(null)
+  const [date, setDate] = useState(() => new Date())
 
   useEffect(() => {
-    // Definir data inicial
-    setDate(new Date())
-    
-    // Atualizar cada segundo
     const timer = setInterval(() => setDate(new Date()), 1000)
-    
+
     return () => clearInterval(timer)
   }, [])
-
-  if (!date) {
-    return (
-      <div className="flex flex-col gap-1 w-32 items-end">
-        <div className="h-4 bg-muted animate-pulse rounded w-16"></div>
-        <div className="h-3 bg-muted animate-pulse rounded w-24"></div>
-      </div>
-    )
-  }
 
   // Formato: 14:30
   const timeStr = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })

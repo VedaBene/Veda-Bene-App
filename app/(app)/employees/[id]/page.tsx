@@ -3,7 +3,9 @@ import { createClient } from '@/utils/supabase/server'
 import { EmployeeForm } from '@/components/employees/EmployeeForm'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { deleteEmployee } from '../actions'
-import type { Profile, Role } from '@/lib/types/database'
+import { toEmployeeFormData } from '@/lib/server/view-models'
+import type { Role } from '@/lib/types/database'
+import type { EmployeeFormData } from '@/lib/types/view-models'
 
 export default async function EmployeeDetailPage({
   params,
@@ -24,9 +26,14 @@ export default async function EmployeeDetailPage({
 
   if (!['admin', 'secretaria'].includes(role)) redirect('/dashboard')
 
+  const employeeSelect =
+    role === 'admin'
+      ? 'id, full_name, email, phone, birth_date, nationality, address, role, hourly_rate, monthly_salary, overtime_rate'
+      : 'id, full_name, email, phone, birth_date, nationality, address, role'
+
   const { data: employee } = await supabase
     .from('profiles')
-    .select('*')
+    .select(employeeSelect)
     .eq('id', id)
     .single()
 
@@ -36,7 +43,7 @@ export default async function EmployeeDetailPage({
     <div className="animate-fade-in-up">
       <PageHeader title={employee.full_name} />
       <EmployeeForm
-        employee={employee as Profile}
+        employee={toEmployeeFormData(employee as EmployeeFormData, role)}
         viewerRole={role}
         deleteAction={role === 'admin' ? deleteEmployee.bind(null, id) : undefined}
       />

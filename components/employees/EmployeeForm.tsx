@@ -1,12 +1,13 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { createEmployee, updateEmployee, deleteEmployee } from '@/app/(app)/employees/actions'
+import { createEmployee, updateEmployee } from '@/app/(app)/employees/actions'
 import { Section } from '@/components/ui/Section'
 import { Field } from '@/components/ui/Field'
 import { Button } from '@/components/ui/Button'
 import { User, Wallet, CheckCircle, AlertCircle } from 'lucide-react'
-import type { Profile, Role } from '@/lib/types/database'
+import type { Role } from '@/lib/types/database'
+import type { EmployeeFormData } from '@/lib/types/view-models'
 
 const inputCls =
   'w-full px-3 py-2.5 border border-input-border rounded-lg text-sm text-foreground bg-white transition-all duration-200 focus:ring-2 focus:ring-input-focus/20 focus:border-input-focus disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed outline-none placeholder:text-muted-foreground/50'
@@ -24,7 +25,7 @@ export function EmployeeForm({
   deleteAction,
   readOnly = false,
 }: {
-  employee?: Profile
+  employee?: EmployeeFormData
   viewerRole: Role
   deleteAction?: () => Promise<unknown>
   readOnly?: boolean

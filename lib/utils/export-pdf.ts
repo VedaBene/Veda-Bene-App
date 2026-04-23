@@ -1,14 +1,24 @@
 import type { ReceivableDetailRow, PayableDetailRow } from '@/app/(app)/statements/actions'
 
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 function printHTML(title: string, bodyHTML: string) {
   const win = window.open('', '_blank')
   if (!win) return
+  const safeTitle = escapeHtml(title)
 
   win.document.write(`<!DOCTYPE html>
 <html lang="pt">
 <head>
   <meta charset="UTF-8" />
-  <title>${title}</title>
+  <title>${safeTitle}</title>
   <style>
     body { font-family: Arial, sans-serif; font-size: 12px; color: #111; padding: 24px; }
     h1 { font-size: 16px; margin-bottom: 16px; }
@@ -24,7 +34,7 @@ function printHTML(title: string, bodyHTML: string) {
   </style>
 </head>
 <body>
-  <h1>${title}</h1>
+  <h1>${safeTitle}</h1>
   ${bodyHTML}
   <br/>
   <button onclick="window.print()">Imprimir / Salvar PDF</button>
@@ -32,15 +42,6 @@ function printHTML(title: string, bodyHTML: string) {
 </body>
 </html>`)
   win.document.close()
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
 }
 
 function formatDate(iso: string | null): string {

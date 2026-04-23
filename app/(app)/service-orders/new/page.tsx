@@ -2,7 +2,8 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import { ServiceOrderForm } from '@/components/service-orders/ServiceOrderForm'
 import { PageHeader } from '@/components/ui/PageHeader'
-import type { Profile, Property, Role } from '@/lib/types/database'
+import type { Role } from '@/lib/types/database'
+import type { ServiceOrderPropertyOption, StaffOption } from '@/lib/types/view-models'
 
 export default async function NewServiceOrderPage() {
   const supabase = await createClient()
@@ -34,8 +35,8 @@ export default async function NewServiceOrderPage() {
     <div className="animate-fade-in-up">
       <PageHeader title="Nova Ordem de Serviço" />
       <ServiceOrderForm
-        properties={(properties ?? []) as Pick<Property, 'id' | 'name' | 'avg_cleaning_hours' | 'min_guests' | 'max_guests' | 'double_beds' | 'single_beds' | 'sofa_beds' | 'armchair_beds' | 'bathrooms' | 'bidets' | 'cribs' | 'base_price'>[]}
-        staff={(staffData ?? []) as Pick<Profile, 'id' | 'full_name'>[]}
+        properties={(properties ?? []) as ServiceOrderPropertyOption[]}
+        staff={(staffData ?? []) as StaffOption[]}
         role={role}
       />
     </div>

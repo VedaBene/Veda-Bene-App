@@ -6,7 +6,8 @@ import { Section } from '@/components/ui/Section'
 import { Field } from '@/components/ui/Field'
 import { Button } from '@/components/ui/Button'
 import { Building2, Ruler, BedDouble, Euro, MessageSquare, CheckCircle, AlertCircle } from 'lucide-react'
-import type { Agency, Owner, Property, Role, Zone } from '@/lib/types/database'
+import type { Role, Zone } from '@/lib/types/database'
+import type { PropertyFormData } from '@/lib/types/view-models'
 
 const ZONES: Zone[] = [
   'Saint Peter', 'Piazza Navona', 'Trastevere Area', 'Colosseum',
@@ -17,6 +18,70 @@ const ZONES: Zone[] = [
 const inputCls =
   'w-full px-3 py-2.5 border border-input-border rounded-lg text-sm text-foreground bg-white transition-all duration-200 focus:ring-2 focus:ring-input-focus/20 focus:border-input-focus disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed outline-none placeholder:text-muted-foreground/50'
 
+function ModeToggle({
+  options,
+  value,
+  onChange,
+  disabled,
+}: {
+  options: { value: string; label: string }[]
+  value: string
+  onChange: (v: string) => void
+  disabled: boolean
+}) {
+  return (
+    <div className="flex gap-2">
+      {options.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          disabled={disabled}
+          onClick={() => onChange(o.value)}
+          className={`px-4 py-2 text-sm font-medium rounded-lg border transition-all duration-200 cursor-pointer ${
+            value === o.value
+              ? 'bg-accent text-white border-accent shadow-card'
+              : 'bg-white text-foreground border-input-border hover:bg-muted disabled:cursor-not-allowed'
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function SmallToggle({
+  options,
+  value,
+  onChange,
+  disabled,
+}: {
+  options: { value: string; label: string }[]
+  value: string
+  onChange: (v: string) => void
+  disabled: boolean
+}) {
+  return (
+    <div className="flex gap-2 mb-2">
+      {options.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          disabled={disabled}
+          onClick={() => onChange(o.value)}
+          className={`text-xs px-3 py-1 rounded-lg border transition-all duration-200 cursor-pointer ${
+            value === o.value
+              ? 'bg-accent/10 border-accent/40 text-accent font-semibold'
+              : 'border-input-border text-muted-foreground hover:bg-muted disabled:cursor-not-allowed'
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export function PropertyForm({
   property,
   agencies,
@@ -25,9 +90,9 @@ export function PropertyForm({
   deleteAction,
   readOnly = false,
 }: {
-  property?: Property & { agency: Agency | null; owner: Owner | null }
-  agencies: Agency[]
-  owners: Owner[]
+  property?: PropertyFormData
+  agencies: { id: string; name: string }[]
+  owners: { id: string; name: string }[]
   role: Role
   deleteAction?: () => Promise<unknown>
   readOnly?: boolean
@@ -189,66 +254,6 @@ export function PropertyForm({
     }
   }
 
-  function ModeToggle({
-    options,
-    value,
-    onChange,
-  }: {
-    options: { value: string; label: string }[]
-    value: string
-    onChange: (v: string) => void
-  }) {
-    return (
-      <div className="flex gap-2">
-        {options.map((o) => (
-          <button
-            key={o.value}
-            type="button"
-            disabled={readOnly}
-            onClick={() => onChange(o.value)}
-            className={`px-4 py-2 text-sm font-medium rounded-lg border transition-all duration-200 cursor-pointer ${
-              value === o.value
-                ? 'bg-accent text-white border-accent shadow-card'
-                : 'bg-white text-foreground border-input-border hover:bg-muted disabled:cursor-not-allowed'
-            }`}
-          >
-            {o.label}
-          </button>
-        ))}
-      </div>
-    )
-  }
-
-  function SmallToggle({
-    options,
-    value,
-    onChange,
-  }: {
-    options: { value: string; label: string }[]
-    value: string
-    onChange: (v: string) => void
-  }) {
-    return (
-      <div className="flex gap-2 mb-2">
-        {options.map((o) => (
-          <button
-            key={o.value}
-            type="button"
-            disabled={readOnly}
-            onClick={() => onChange(o.value)}
-            className={`text-xs px-3 py-1 rounded-lg border transition-all duration-200 cursor-pointer ${
-              value === o.value
-                ? 'bg-accent/10 border-accent/40 text-accent font-semibold'
-                : 'border-input-border text-muted-foreground hover:bg-muted disabled:cursor-not-allowed'
-            }`}
-          >
-            {o.label}
-          </button>
-        ))}
-      </div>
-    )
-  }
-
   return (
     <form onSubmit={handleSubmit} className="space-y-4 max-w-3xl">
       <Section
@@ -270,6 +275,7 @@ export function PropertyForm({
               ]}
               value={clientType}
               onChange={(v) => setClientType(v as 'rental' | 'particular')}
+              disabled={readOnly}
             />
           </Field>
         )}
@@ -284,6 +290,7 @@ export function PropertyForm({
                 ]}
                 value={agencyMode}
                 onChange={(v) => setAgencyMode(v as 'existing' | 'new')}
+                disabled={readOnly}
               />
             )}
             {agencyMode === 'existing' ? (
@@ -310,6 +317,7 @@ export function PropertyForm({
                 ]}
                 value={ownerMode}
                 onChange={(v) => setOwnerMode(v as 'existing' | 'new')}
+                disabled={readOnly}
               />
             )}
             {ownerMode === 'existing' ? (

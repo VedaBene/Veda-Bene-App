@@ -1,7 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import type { Profile, Role } from '@/lib/types/database'
+import type { Role } from '@/lib/types/database'
+import type { EmployeeListItem } from '@/lib/types/view-models'
 import { Badge } from '@/components/ui/Badge'
 import { Card } from '@/components/ui/Card'
 import { Users } from 'lucide-react'
@@ -32,7 +33,7 @@ export function EmployeeList({
   employees,
   role,
 }: {
-  employees: Profile[]
+  employees: EmployeeListItem[]
   role: Role
 }) {
   const showSalary = role === 'admin'

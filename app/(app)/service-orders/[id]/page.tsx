@@ -3,7 +3,13 @@ import { createClient } from '@/utils/supabase/server'
 import { ServiceOrderForm } from '@/components/service-orders/ServiceOrderForm'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { deleteServiceOrder } from '../actions'
-import type { Profile, Property, Role, ServiceOrder } from '@/lib/types/database'
+import { toServiceOrderFormData } from '@/lib/server/view-models'
+import type { Role } from '@/lib/types/database'
+import type {
+  ServiceOrderFormData,
+  ServiceOrderPropertyOption,
+  StaffOption,
+} from '@/lib/types/view-models'
 
 export default async function ServiceOrderDetailPage({
   params,
@@ -22,6 +28,34 @@ export default async function ServiceOrderDetailPage({
 
   const role = (profile?.role ?? 'cliente') as Role
   const isAdminOrSec = ['admin', 'secretaria'].includes(role)
+  const orderSelect = [
+    'id',
+    'property_id',
+    'cleaning_staff_id',
+    'consegna_staff_id',
+    'cleaning_date',
+    'checkout_at',
+    'checkin_at',
+    'status',
+    'real_guests',
+    'double_beds',
+    'single_beds',
+    'sofa_beds',
+    'armchair_beds',
+    'bathrooms',
+    'bidets',
+    'cribs',
+    'order_number',
+    'is_urgent',
+    'started_at',
+    'completed_at',
+    'completion_notes',
+    'worked_minutes',
+    'pricing_mode',
+    ...(isAdminOrSec
+      ? ['cleaning_notes', 'extra_services_description', 'extra_services_price']
+      : []),
+  ].join(', ')
 
   const propertiesQuery = isAdminOrSec
     ? supabase
@@ -36,7 +70,7 @@ export default async function ServiceOrderDetailPage({
   const [{ data: order }, { data: properties }, { data: staffData }] = await Promise.all([
     supabase
       .from('service_orders')
-      .select('*')
+      .select(orderSelect)
       .eq('id', id)
       .single(),
     propertiesQuery,
@@ -55,9 +89,9 @@ export default async function ServiceOrderDetailPage({
     <div className="animate-fade-in-up">
       <PageHeader title="Ordem de Serviço" />
       <ServiceOrderForm
-        order={order as ServiceOrder}
-        properties={(properties ?? []) as Pick<Property, 'id' | 'name' | 'avg_cleaning_hours' | 'min_guests' | 'max_guests' | 'double_beds' | 'single_beds' | 'sofa_beds' | 'armchair_beds' | 'bathrooms' | 'bidets' | 'cribs' | 'base_price'>[]}
-        staff={(staffData ?? []) as Pick<Profile, 'id' | 'full_name'>[]}
+        order={toServiceOrderFormData(order as ServiceOrderFormData, role, user!.id)}
+        properties={(properties ?? []) as ServiceOrderPropertyOption[]}
+        staff={(staffData ?? []) as StaffOption[]}
         role={role}
         userId={user!.id}
         deleteAction={['admin', 'secretaria'].includes(role) ? deleteServiceOrder.bind(null, id) : undefined}

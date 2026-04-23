@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useTransition, useEffect, useRef } from 'react'
-import { createServiceOrder, updateServiceOrder, updateServiceOrderStatus, deleteServiceOrder, startCleaning, finishCleaning, updateExtraServices } from '@/app/(app)/service-orders/actions'
+import { useState, useTransition } from 'react'
+import { createServiceOrder, updateServiceOrder, updateServiceOrderStatus, startCleaning, finishCleaning, updateExtraServices } from '@/app/(app)/service-orders/actions'
 import { LiveTimer, formatWorkedTime } from './LiveTimer'
 import { UrgencyBadge } from './UrgencyBadge'
 import { Section } from '@/components/ui/Section'
@@ -9,25 +9,12 @@ import { Field } from '@/components/ui/Field'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Building2, CalendarDays, Users, CheckCircle, AlertCircle, Zap, Play, Flag, Timer, X, ClipboardList, PlusCircle } from 'lucide-react'
-import type { OSStatus, PricingMode, Profile, Property, Role, ServiceOrder } from '@/lib/types/database'
-
-type StaffOption = Pick<Profile, 'id' | 'full_name'>
-type PropertyOption = Pick<
-  Property,
-  | 'id'
-  | 'name'
-  | 'avg_cleaning_hours'
-  | 'min_guests'
-  | 'max_guests'
-  | 'double_beds'
-  | 'single_beds'
-  | 'sofa_beds'
-  | 'armchair_beds'
-  | 'bathrooms'
-  | 'bidets'
-  | 'cribs'
-  | 'base_price'
->
+import type { OSStatus, PricingMode, Role } from '@/lib/types/database'
+import type {
+  ServiceOrderFormData,
+  ServiceOrderPropertyOption,
+  StaffOption,
+} from '@/lib/types/view-models'
 
 const inputCls =
   'w-full px-3 py-2.5 border border-input-border rounded-lg text-sm text-foreground bg-white transition-all duration-200 focus:ring-2 focus:ring-input-focus/20 focus:border-input-focus disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed outline-none placeholder:text-muted-foreground/50'
@@ -116,8 +103,8 @@ export function ServiceOrderForm({
   deleteAction,
   readOnly = false,
 }: {
-  order?: ServiceOrder
-  properties: PropertyOption[]
+  order?: ServiceOrderFormData
+  properties: ServiceOrderPropertyOption[]
   staff: StaffOption[]
   role: Role
   userId?: string
@@ -163,15 +150,11 @@ export function ServiceOrderForm({
     order?.checkin_at ? order.checkin_at.slice(0, 16) : '',
   )
 
-  const [urgencyWarning, setUrgencyWarning] = useState(false)
-  useEffect(() => {
-    if (checkoutAt && checkinAt) {
-      const hours = hoursUntil(checkoutAt, checkinAt)
-      setUrgencyWarning(hours !== null && hours > 0 && hours < 3)
-    } else {
-      setUrgencyWarning(false)
-    }
-  }, [checkoutAt, checkinAt])
+  const urgencyWarning = (() => {
+    if (!checkoutAt || !checkinAt) return false
+    const hours = hoursUntil(checkoutAt, checkinAt)
+    return hours !== null && hours > 0 && hours < 3
+  })()
 
   const [realGuests, setRealGuests] = useState(order?.real_guests?.toString() ?? '')
   const [doubleBeds, setDoubleBeds] = useState(order?.double_beds?.toString() ?? '0')
