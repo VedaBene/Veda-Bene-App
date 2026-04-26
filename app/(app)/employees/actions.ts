@@ -7,7 +7,7 @@ import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { getSiteOrigin } from '@/utils/site-url'
-import type { Role } from '@/lib/types/database'
+import { getAuthorizedClient } from '@/lib/server/authz'
 
 const optStr = z.preprocess(v => (v === '' ? undefined : v), z.string().optional())
 const optNum = z.preprocess(
@@ -30,29 +30,8 @@ const employeeSchema = z.object({
   overtime_rate: optNum,
 })
 
-async function getAuthorizedClient(requiredRole: Role = 'secretaria') {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  const allowed: Role[] =
-    requiredRole === 'admin' ? ['admin'] : ['admin', 'secretaria']
-
-  if (!profile || !allowed.includes(profile.role as Role)) {
-    throw new Error('Sem permissão')
-  }
-
-  return { supabase, role: profile.role as Role }
-}
-
 export async function createEmployee(formData: FormData) {
-  const { role } = await getAuthorizedClient('secretaria')
+  const { role } = await getAuthorizedClient()
 
   const raw = Object.fromEntries(formData)
   const parsed = employeeSchema.safeParse(raw)
@@ -104,7 +83,7 @@ export async function createEmployee(formData: FormData) {
 }
 
 export async function updateEmployee(id: string, formData: FormData) {
-  const { role } = await getAuthorizedClient('secretaria')
+  const { role } = await getAuthorizedClient()
 
   const raw = Object.fromEntries(formData)
   const parsed = employeeSchema.safeParse(raw)
@@ -138,7 +117,7 @@ export async function updateEmployee(id: string, formData: FormData) {
 }
 
 export async function deleteEmployee(id: string) {
-  await getAuthorizedClient('admin')
+  await getAuthorizedClient(['admin'])
 
   const adminClient = createAdminClient()
   const { error } = await adminClient.auth.admin.deleteUser(id)

@@ -1,8 +1,6 @@
 'use server'
 
-import { redirect } from 'next/navigation'
-import { createClient } from '@/utils/supabase/server'
-import type { Role } from '@/lib/types/database'
+import { getAuthorizedClient } from '@/lib/server/authz'
 
 export type PayableRow = {
   employee_id: string
@@ -58,27 +56,8 @@ export type PayableDetailRow = {
   os_total: number | null
 }
 
-async function getAuthorizedClient(minRole: 'secretaria' | 'admin' = 'secretaria') {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  const allowed: Role[] = minRole === 'admin' ? ['admin'] : ['admin', 'secretaria']
-  if (!profile || !allowed.includes(profile.role as Role)) {
-    throw new Error('Sem permissão')
-  }
-
-  return { supabase, role: profile.role as Role }
-}
-
 export async function fetchEmployees(): Promise<EmployeeOption[]> {
-  const { supabase } = await getAuthorizedClient('admin')
+  const { supabase } = await getAuthorizedClient(['admin'])
   const { data } = await supabase
     .from('profiles')
     .select('id, full_name')
@@ -92,7 +71,7 @@ export async function fetchPayableData(
   endDate: string,
   employeeId?: string,
 ): Promise<PayableRow[]> {
-  const { supabase } = await getAuthorizedClient('admin')
+  const { supabase } = await getAuthorizedClient(['admin'])
 
   // Buscar OSs finalizadas no período com horas do imóvel
   let query = supabase
@@ -170,7 +149,7 @@ export async function fetchPayableData(
 }
 
 export async function fetchAgencies(): Promise<ClientOption[]> {
-  const { supabase } = await getAuthorizedClient('secretaria')
+  const { supabase } = await getAuthorizedClient()
   const { data } = await supabase
     .from('agencies')
     .select('id, name')
@@ -179,7 +158,7 @@ export async function fetchAgencies(): Promise<ClientOption[]> {
 }
 
 export async function fetchOwners(): Promise<ClientOption[]> {
-  const { supabase } = await getAuthorizedClient('secretaria')
+  const { supabase } = await getAuthorizedClient()
   const { data } = await supabase
     .from('owners')
     .select('id, name')
@@ -193,7 +172,7 @@ export async function fetchReceivableData(
   clientType?: 'rental' | 'particular' | 'all',
   clientId?: string,
 ): Promise<ReceivableRow[]> {
-  const { supabase } = await getAuthorizedClient('secretaria')
+  const { supabase } = await getAuthorizedClient()
 
   const { data: orders } = await supabase
     .from('service_orders')
@@ -268,7 +247,7 @@ export async function fetchReceivableDetail(
   clientType?: 'rental' | 'particular' | 'all',
   clientId?: string,
 ): Promise<ReceivableDetailRow[]> {
-  const { supabase } = await getAuthorizedClient('secretaria')
+  const { supabase } = await getAuthorizedClient()
 
   const { data: orders } = await supabase
     .from('service_orders')
@@ -345,7 +324,7 @@ export async function fetchPayableDetail(
   endDate: string,
   employeeId?: string,
 ): Promise<PayableDetailRow[]> {
-  const { supabase } = await getAuthorizedClient('admin')
+  const { supabase } = await getAuthorizedClient(['admin'])
 
   let query = supabase
     .from('service_orders')

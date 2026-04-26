@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
+import { getAuthorizedClient } from '@/lib/server/authz'
 
 const ZONES = [
   'Saint Peter', 'Piazza Navona', 'Trastevere Area', 'Colosseum',
@@ -57,24 +58,6 @@ const propertySchema = z.object({
   // notas
   notes: optStr,
 })
-
-async function getAuthorizedClient() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  if (!profile || !['admin', 'secretaria'].includes(profile.role)) {
-    throw new Error('Sem permissão')
-  }
-
-  return { supabase, role: profile.role as 'admin' | 'secretaria' }
-}
 
 async function resolveRelations(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -188,9 +171,7 @@ export async function updateProperty(id: string, formData: FormData) {
 }
 
 export async function deleteProperty(id: string) {
-  const { supabase, role } = await getAuthorizedClient()
-
-  if (role !== 'admin') return { success: false as const, error: 'Apenas admin pode excluir' }
+  const { supabase } = await getAuthorizedClient(['admin'])
 
   const { error } = await supabase.from('properties').delete().eq('id', id)
   if (error) return { success: false as const, error: error.message }

@@ -3,11 +3,9 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
-import { createClient } from '@/utils/supabase/server'
+import { getAuthorizedClient } from '@/lib/server/authz'
+import { calculateTotalPrice, recalculateOrderPricing } from '@/lib/server/pricing'
 import type { OSStatus, PricingMode } from '@/lib/types/database'
-
-const RIPASSO_RATE = 0.6
-const OUT_LONG_STAY_HOURLY_RATE = 25
 
 const optStr = z.preprocess(v => (v === '' ? undefined : v), z.string().optional())
 const optNum = z.preprocess(
@@ -37,52 +35,6 @@ const serviceOrderSchema = z.object({
   extra_services_price: optNum,
   pricing_mode: z.enum(['standard', 'ripasso', 'out_long_stay']).default('standard'),
 })
-
-async function getAuthorizedClient() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  if (!profile || !['admin', 'secretaria'].includes(profile.role)) {
-    throw new Error('Sem permissão')
-  }
-
-  return { supabase, role: profile.role as 'admin' | 'secretaria' }
-}
-
-function calculateTotalPrice(
-  pricingMode: PricingMode,
-  basePrice: number | null,
-  extraPerPerson: number | null,
-  realGuests: number | null,
-  minGuests: number | null,
-  extraServicesPrice: number | null = null,
-  workedMinutes: number | null = null,
-): number | null {
-  const extras = extraServicesPrice ?? 0
-
-  if (pricingMode === 'ripasso') {
-    if (basePrice == null) return null
-    return basePrice * RIPASSO_RATE + extras
-  }
-
-  if (pricingMode === 'out_long_stay') {
-    if (workedMinutes == null) return null
-    return (workedMinutes / 60) * OUT_LONG_STAY_HOURLY_RATE + extras
-  }
-
-  if (basePrice == null) return null
-  const extra = extraPerPerson ?? 0
-  const guests = realGuests ?? 0
-  const min = minGuests ?? 0
-  return basePrice + extra * Math.max(0, guests - min) + extras
-}
 
 export async function createServiceOrder(formData: FormData) {
   const { supabase } = await getAuthorizedClient()
@@ -221,19 +173,7 @@ export async function updateServiceOrderStatus(id: string, status: OSStatus) {
 }
 
 export async function startCleaning(id: string) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  if (!profile || !['admin', 'secretaria', 'limpeza'].includes(profile.role)) {
-    return { success: false as const, error: 'Sem permissão' }
-  }
+  const { supabase } = await getAuthorizedClient(['admin', 'secretaria', 'limpeza'])
 
   const { error } = await supabase
     .from('service_orders')
@@ -251,19 +191,7 @@ export async function startCleaning(id: string) {
 }
 
 export async function finishCleaning(id: string, notes: string) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  if (!profile || !['admin', 'secretaria', 'limpeza'].includes(profile.role)) {
-    return { success: false as const, error: 'Sem permissão' }
-  }
+  const { supabase } = await getAuthorizedClient(['admin', 'secretaria', 'limpeza'])
 
   const { error } = await supabase
     .from('service_orders')
@@ -276,25 +204,7 @@ export async function finishCleaning(id: string, notes: string) {
 
   if (error) return { success: false as const, error: error.message }
 
-  // Out Long Stay: recalcula total_price agora que worked_minutes está disponível.
-  const { data: finished } = await supabase
-    .from('service_orders')
-    .select('pricing_mode, worked_minutes, extra_services_price')
-    .eq('id', id)
-    .single()
-
-  if (finished?.pricing_mode === 'out_long_stay') {
-    const total_price = calculateTotalPrice(
-      'out_long_stay',
-      null,
-      null,
-      null,
-      null,
-      finished.extra_services_price ?? null,
-      finished.worked_minutes ?? null,
-    )
-    await supabase.from('service_orders').update({ total_price }).eq('id', id)
-  }
+  await recalculateOrderPricing(supabase, id)
 
   revalidatePath('/service-orders')
   revalidatePath(`/service-orders/${id}`)
