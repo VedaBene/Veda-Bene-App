@@ -110,7 +110,7 @@ export async function createServiceOrder(formData: FormData) {
       )
     : null
 
-  const { data: os, error } = await supabase
+  const { error } = await supabase
     .from('service_orders')
     .insert({
       property_id: data.property_id,
@@ -134,13 +134,11 @@ export async function createServiceOrder(formData: FormData) {
       pricing_mode: data.pricing_mode,
       total_price,
     })
-    .select('id')
-    .single()
 
   if (error) return { success: false as const, error: error.message }
 
   revalidatePath('/service-orders')
-  redirect(`/service-orders/${os.id}`)
+  redirect('/service-orders')
 }
 
 export async function updateServiceOrder(id: string, formData: FormData) {

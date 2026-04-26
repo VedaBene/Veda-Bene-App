@@ -31,12 +31,10 @@ const propertySchema = z.object({
   agency_id: optStr,
   new_agency_name: optStr,
   new_agency_email: optStr,
-  new_agency_phone: optStr,
   // particular
   owner_id: optStr,
   new_owner_name: optStr,
   new_owner_email: optStr,
-  new_owner_phone: optStr,
   // metragem
   sqm_interior: optNum,
   sqm_exterior: optNum,
@@ -91,7 +89,6 @@ async function resolveRelations(
       .insert({
         name: data.new_agency_name,
         email: data.new_agency_email ?? null,
-        phone: data.new_agency_phone ?? null,
       })
       .select('id')
       .single()
@@ -105,7 +102,6 @@ async function resolveRelations(
       .insert({
         name: data.new_owner_name,
         email: data.new_owner_email ?? null,
-        phone: data.new_owner_phone ?? null,
       })
       .select('id')
       .single()
@@ -168,7 +164,7 @@ export async function createProperty(formData: FormData) {
   if (error) return { success: false as const, error: error.message }
 
   revalidatePath('/properties')
-  redirect(`/properties/${property.id}`)
+  redirect('/properties')
 }
 
 export async function updateProperty(id: string, formData: FormData) {

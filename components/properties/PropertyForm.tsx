@@ -9,6 +9,16 @@ import { Building2, Ruler, BedDouble, Euro, MessageSquare, CheckCircle, AlertCir
 import type { Role, Zone } from '@/lib/types/database'
 import type { PropertyFormData } from '@/lib/types/view-models'
 
+function applyItalianPhoneMask(raw: string): string {
+  const digits = raw.replace(/\D/g, '')
+  const national = digits.startsWith('39') ? digits.slice(2) : digits
+  const capped = national.slice(0, 10)
+  if (!capped) return ''
+  if (capped.length <= 3) return `+39 ${capped}`
+  if (capped.length <= 6) return `+39 ${capped.slice(0, 3)} ${capped.slice(3)}`
+  return `+39 ${capped.slice(0, 3)} ${capped.slice(3, 6)} ${capped.slice(6)}`
+}
+
 const ZONES: Zone[] = [
   'Saint Peter', 'Piazza Navona', 'Trastevere Area', 'Colosseum',
   'Spanish Steps', 'Trevi Fountain', "Campo de'Fiori", 'Parioli',
@@ -128,7 +138,6 @@ export function PropertyForm({
   const [agencyId, setAgencyId] = useState(property?.agency_id ?? agencies[0]?.id ?? '')
   const [newAgencyName, setNewAgencyName] = useState('')
   const [newAgencyEmail, setNewAgencyEmail] = useState('')
-  const [newAgencyPhone, setNewAgencyPhone] = useState('')
 
   const [ownerMode, setOwnerMode] = useState<'existing' | 'new'>(
     property?.owner_id ? 'existing' : owners.length === 0 ? 'new' : 'existing',
@@ -136,7 +145,6 @@ export function PropertyForm({
   const [ownerId, setOwnerId] = useState(property?.owner_id ?? owners[0]?.id ?? '')
   const [newOwnerName, setNewOwnerName] = useState('')
   const [newOwnerEmail, setNewOwnerEmail] = useState('')
-  const [newOwnerPhone, setNewOwnerPhone] = useState('')
 
   const [sqmInterior, setSqmInterior] = useState(property?.sqm_interior?.toString() ?? '')
   const [sqmExterior, setSqmExterior] = useState(property?.sqm_exterior?.toString() ?? '')
@@ -185,7 +193,6 @@ export function PropertyForm({
       } else {
         fd.set('new_agency_name', newAgencyName)
         fd.set('new_agency_email', newAgencyEmail)
-        fd.set('new_agency_phone', newAgencyPhone)
       }
     } else {
       if (ownerMode === 'existing') {
@@ -193,7 +200,6 @@ export function PropertyForm({
       } else {
         fd.set('new_owner_name', newOwnerName)
         fd.set('new_owner_email', newOwnerEmail)
-        fd.set('new_owner_phone', newOwnerPhone)
       }
     }
 
@@ -301,7 +307,6 @@ export function PropertyForm({
               <div className="space-y-2">
                 <input type="text" value={newAgencyName} onChange={(e) => setNewAgencyName(e.target.value)} placeholder="Nome da agência *" className={inputCls} disabled={readOnly} />
                 <input type="email" value={newAgencyEmail} onChange={(e) => setNewAgencyEmail(e.target.value)} placeholder="Email" className={inputCls} disabled={readOnly} />
-                <input type="text" value={newAgencyPhone} onChange={(e) => setNewAgencyPhone(e.target.value)} placeholder="Telefone" className={inputCls} disabled={readOnly} />
               </div>
             )}
           </Field>
@@ -328,7 +333,6 @@ export function PropertyForm({
               <div className="space-y-2">
                 <input type="text" value={newOwnerName} onChange={(e) => setNewOwnerName(e.target.value)} placeholder="Nome do proprietário *" className={inputCls} disabled={readOnly} />
                 <input type="email" value={newOwnerEmail} onChange={(e) => setNewOwnerEmail(e.target.value)} placeholder="Email" className={inputCls} disabled={readOnly} />
-                <input type="text" value={newOwnerPhone} onChange={(e) => setNewOwnerPhone(e.target.value)} placeholder="Telefone" className={inputCls} disabled={readOnly} />
               </div>
             )}
           </Field>
@@ -342,7 +346,7 @@ export function PropertyForm({
 
         {showSensitiveInfo && (
           <Field label="Telefone">
-            <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} disabled={readOnly} className={inputCls} placeholder="+39 000 0000000" />
+            <input type="text" value={phone} onChange={(e) => setPhone(applyItalianPhoneMask(e.target.value))} disabled={readOnly} className={inputCls} placeholder="+39 000 000 0000" />
           </Field>
         )}
 
