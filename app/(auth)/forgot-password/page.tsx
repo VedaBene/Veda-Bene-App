@@ -18,13 +18,19 @@ export default function ForgotPasswordPage() {
     setError(null)
     setIsLoading(true)
 
+    const normalizedEmail = email.trim().toLowerCase()
     const supabase = createClient()
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/callback?type=recovery`,
+    const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+      redirectTo: `${window.location.origin}/auth/callback`,
     })
 
     if (error) {
-      setError('Erro ao enviar o email. Tente novamente.')
+      const isRateLimited = error.status === 429 || error.message.toLowerCase().includes('rate limit')
+      setError(
+        isRateLimited
+          ? 'Limite de envio de emails atingido. Aguarde alguns minutos antes de tentar novamente.'
+          : 'Erro ao enviar o email. Tente novamente.',
+      )
       setIsLoading(false)
       return
     }

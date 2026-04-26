@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
+import { getAuthErrorFromUrl } from '@/utils/supabase/auth-errors'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { Lock, AlertCircle, Mail } from 'lucide-react'
@@ -15,13 +16,26 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
+  useEffect(() => {
+    const authError = getAuthErrorFromUrl(window.location.search, window.location.hash)
+    if (!authError) return
+
+    window.history.replaceState(null, '', window.location.pathname)
+    const timeoutId = window.setTimeout(() => setError(authError.message), 0)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [])
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
     setIsLoading(true)
 
     const supabase = createClient()
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const { error } = await supabase.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
+      password,
+    })
 
     if (error) {
       setError('Email ou senha incorretos.')
@@ -29,7 +43,8 @@ export default function LoginPage() {
       return
     }
 
-    router.push('/service-orders')
+    router.replace('/service-orders')
+    router.refresh()
   }
 
   return (

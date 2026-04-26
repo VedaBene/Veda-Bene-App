@@ -233,7 +233,7 @@ export async function startCleaning(id: string) {
     .eq('id', user.id)
     .single()
 
-  if (!profile || !['admin', 'secretaria', 'limpeza', 'consegna'].includes(profile.role)) {
+  if (!profile || !['admin', 'secretaria', 'limpeza'].includes(profile.role)) {
     return { success: false as const, error: 'Sem permissão' }
   }
 
@@ -263,7 +263,7 @@ export async function finishCleaning(id: string, notes: string) {
     .eq('id', user.id)
     .single()
 
-  if (!profile || !['admin', 'secretaria', 'limpeza', 'consegna'].includes(profile.role)) {
+  if (!profile || !['admin', 'secretaria', 'limpeza'].includes(profile.role)) {
     return { success: false as const, error: 'Sem permissão' }
   }
 

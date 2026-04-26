@@ -169,7 +169,6 @@ function generatePDF(orders: ServiceOrderListItem[], date: string) {
 function isAssignedWorker(o: ServiceOrderListItem, role: Role, userId?: string): boolean {
   if (!userId) return false
   if (role === 'limpeza' && o.cleaning_staff_id === userId) return true
-  if (role === 'consegna' && o.consegna_staff_id === userId) return true
   return false
 }
 
@@ -202,7 +201,8 @@ function OSTable({
   onFinish?: (o: ServiceOrderListItem) => void
 }) {
   const isCliente = role === 'cliente'
-  const isWorker = role === 'limpeza' || role === 'consegna'
+  // Apenas a limpeza inicia/finaliza a OS — consegna é read-only.
+  const isWorker = role === 'limpeza'
 
   if (orders.length === 0) {
     return <EmptyList text={emptyText} />
@@ -279,7 +279,7 @@ function OSTable({
                     <span className="font-medium">{formatDateTime(os.checkin_at)}</span>
                   </div>
 
-                  {os.status === 'in_progress' && os.started_at && (
+                  {!isCliente && os.status === 'in_progress' && os.started_at && (
                     <div className="col-span-2">
                       <span className="block text-[10px] font-bold uppercase tracking-wider mb-0.5 text-muted-foreground/60">
                         Tempo em execução
@@ -291,7 +291,7 @@ function OSTable({
                     </div>
                   )}
 
-                  {os.status === 'done' && os.worked_minutes != null && (
+                  {!isCliente && os.status === 'done' && os.worked_minutes != null && (
                     <div className="col-span-2">
                       <span className="block text-[10px] font-bold uppercase tracking-wider mb-0.5 text-muted-foreground/60">
                         Tempo total
@@ -394,13 +394,13 @@ function OSTable({
                         label={STATUS_LABEL[os.status] ?? os.status}
                         dot
                       />
-                      {os.status === 'in_progress' && os.started_at && (
+                      {!isCliente && os.status === 'in_progress' && os.started_at && (
                         <div className="flex items-center gap-1">
                           <Timer size={13} className="text-info" />
                           <LiveTimer startedAt={os.started_at} />
                         </div>
                       )}
-                      {os.status === 'done' && os.worked_minutes != null && (
+                      {!isCliente && os.status === 'done' && os.worked_minutes != null && (
                         <span className="text-xs text-muted-foreground">
                           {formatWorkedTime(os.worked_minutes)}
                         </span>

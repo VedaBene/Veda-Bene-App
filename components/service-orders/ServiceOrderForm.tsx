@@ -131,10 +131,8 @@ export function ServiceOrderForm({
   const isCliente = role === 'cliente'
   const canEdit = ['admin', 'secretaria'].includes(role) && !readOnly
 
-  // Determines if current user is the assigned worker for this order
-  const isAssignedLimpeza = role === 'limpeza' && !!userId && order?.cleaning_staff_id === userId
-  const isAssignedConsegna = role === 'consegna' && !!userId && order?.consegna_staff_id === userId
-  const isAssignedWorker = isAssignedLimpeza || isAssignedConsegna
+  // Apenas o responsável de limpeza vê o painel de tempo (consegna é read-only).
+  const isAssignedWorker = role === 'limpeza' && !!userId && order?.cleaning_staff_id === userId
 
   const [propertyId, setPropertyId] = useState(order?.property_id ?? properties[0]?.id ?? '')
   const [cleaningStaffId, setCleaningStaffId] = useState(order?.cleaning_staff_id ?? '')

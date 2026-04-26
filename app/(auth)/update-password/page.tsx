@@ -1,11 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
+import { getAuthErrorFromUrl } from '@/utils/supabase/auth-errors'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
-import { Lock, AlertCircle, CheckCircle } from 'lucide-react'
+import { Lock, AlertCircle, CheckCircle, Loader2 } from 'lucide-react'
 
 export default function UpdatePasswordPage() {
   const router = useRouter()
@@ -14,6 +16,47 @@ export default function UpdatePasswordPage() {
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [isCheckingSession, setIsCheckingSession] = useState(true)
+  const [hasSession, setHasSession] = useState(false)
+
+  useEffect(() => {
+    let isMounted = true
+
+    async function checkSession() {
+      const authError = getAuthErrorFromUrl(window.location.search, window.location.hash)
+
+      if (authError) {
+        setError(authError.message)
+        setIsCheckingSession(false)
+        window.history.replaceState(null, '', window.location.pathname)
+        return
+      }
+
+      const supabase = createClient()
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      if (!isMounted) return
+
+      setHasSession(Boolean(session))
+      if (!session) {
+        setError('Link inválido ou expirado. Solicite um novo link de acesso e tente novamente.')
+      }
+      setIsCheckingSession(false)
+    }
+
+    checkSession().catch(() => {
+      if (!isMounted) return
+
+      setError('Não foi possível validar sua sessão. Solicite um novo link e tente novamente.')
+      setIsCheckingSession(false)
+    })
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -35,7 +78,12 @@ export default function UpdatePasswordPage() {
     const { error } = await supabase.auth.updateUser({ password })
 
     if (error) {
-      setError(error.message)
+      const hasMissingSession = error.message.toLowerCase().includes('session')
+      setError(
+        hasMissingSession
+          ? 'A sessão do link expirou. Solicite um novo link e tente novamente.'
+          : error.message,
+      )
       setIsLoading(false)
       return
     }
@@ -57,10 +105,25 @@ export default function UpdatePasswordPage() {
           </div>
         </div>
 
-        {success ? (
+        {isCheckingSession ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted px-4 py-3 rounded-lg">
+            <Loader2 size={16} className="shrink-0 animate-spin" />
+            Validando link de acesso…
+          </div>
+        ) : success ? (
           <div className="flex items-center gap-2 text-sm text-success bg-success/10 px-4 py-3 rounded-lg">
             <CheckCircle size={16} className="shrink-0" />
             Password definita con successo! Reindirizzamento…
+          </div>
+        ) : !hasSession ? (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-sm text-danger bg-danger-bg px-4 py-3 rounded-lg">
+              <AlertCircle size={16} className="shrink-0" />
+              {error}
+            </div>
+            <Link href="/forgot-password" className="text-sm text-accent hover:underline">
+              Solicitar novo link
+            </Link>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">

@@ -62,10 +62,15 @@ export default async function ServiceOrderDetailPage({
         .from('properties')
         .select('id, name, avg_cleaning_hours, min_guests, max_guests, double_beds, single_beds, sofa_beds, armchair_beds, bathrooms, bidets, cribs, base_price')
         .order('name')
-    : supabase
-        .from('properties')
-        .select('id, name, avg_cleaning_hours, min_guests, max_guests, double_beds, single_beds, sofa_beds, armchair_beds, bathrooms, bidets, cribs')
-        .order('name')
+    : role === 'cliente'
+      ? supabase
+          .from('properties')
+          .select('id, name, min_guests, max_guests, double_beds, single_beds, sofa_beds, armchair_beds, bathrooms, bidets, cribs')
+          .order('name')
+      : supabase
+          .from('properties')
+          .select('id, name, avg_cleaning_hours, min_guests, max_guests, double_beds, single_beds, sofa_beds, armchair_beds, bathrooms, bidets, cribs')
+          .order('name')
 
   const [{ data: order }, { data: properties }, { data: staffData }] = await Promise.all([
     supabase
