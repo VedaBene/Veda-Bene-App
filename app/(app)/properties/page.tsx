@@ -8,7 +8,14 @@ import { toPropertyListItem } from '@/lib/server/view-models'
 import type { Role } from '@/lib/types/database'
 import type { PropertyListItem } from '@/lib/types/view-models'
 
-export default async function PropertiesPage() {
+const PAGE_SIZE = 20
+
+export default async function PropertiesPage(props: PageProps<never>) {
+  const { page: pageParam, q } = await props.searchParams as { page?: string; q?: string }
+  const page = Math.max(1, parseInt(pageParam ?? '1', 10) || 1)
+  const from = (page - 1) * PAGE_SIZE
+  const to = from + PAGE_SIZE - 1
+
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -25,12 +32,21 @@ export default async function PropertiesPage() {
       ? 'id, name, zone, address, client_type, base_price'
       : 'id, name, zone, address'
 
-  const { data: properties } = await supabase
+  let query = supabase
     .from('properties')
-    .select(propertiesSelect)
+    .select(propertiesSelect, { count: 'exact' })
     .order('created_at', { ascending: false })
+    .range(from, to)
 
-  const items = ((properties ?? []) as PropertyListItem[]).map(property =>
+  if (q) {
+    query = query.ilike('name', `%${q}%`)
+  }
+
+  const { data: properties, count } = await query
+
+  const totalPages = Math.ceil((count ?? 0) / PAGE_SIZE)
+
+  const items = ((properties ?? []) as unknown as PropertyListItem[]).map(property =>
     toPropertyListItem(property, role),
   )
 
@@ -50,6 +66,9 @@ export default async function PropertiesPage() {
       <PropertyList
         properties={items}
         role={role}
+        currentPage={page}
+        totalPages={totalPages}
+        q={q ?? ''}
       />
     </div>
   )

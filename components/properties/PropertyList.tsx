@@ -1,12 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import type { Role } from '@/lib/types/database'
 import type { PropertyListItem } from '@/lib/types/view-models'
 import { Search, Building2 } from 'lucide-react'
 import { Input } from '@/components/ui/Input'
 import { Card } from '@/components/ui/Card'
+import { Pagination } from '@/components/ui/Pagination'
 
 const CLIENT_TYPE_LABEL: Record<string, string> = {
   rental: 'Rental',
@@ -16,18 +18,45 @@ const CLIENT_TYPE_LABEL: Record<string, string> = {
 export function PropertyList({
   properties,
   role,
+  currentPage,
+  totalPages,
+  q,
 }: {
   properties: PropertyListItem[]
   role: Role
+  currentPage: number
+  totalPages: number
+  q: string
 }) {
-  const [search, setSearch] = useState('')
+  const router = useRouter()
+  const pathname = usePathname()
+  const [search, setSearch] = useState(q)
+
+  useEffect(() => {
+    setSearch(q)
+  }, [q])
+
+  const pushSearch = useCallback(
+    (value: string) => {
+      const params = new URLSearchParams()
+      if (value) params.set('q', value)
+      params.set('page', '1')
+      router.replace(`${pathname}?${params.toString()}`)
+    },
+    [router, pathname],
+  )
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (search !== q) pushSearch(search)
+    }, 300)
+    return () => clearTimeout(t)
+  }, [search, q, pushSearch])
 
   const showPrice = role === 'admin' || role === 'secretaria'
   const showType = role === 'admin' || role === 'secretaria'
 
-  const filtered = properties.filter((p) =>
-    p.name.toLowerCase().includes(search.toLowerCase())
-  )
+  const searchParams = q ? { q } : {}
 
   return (
     <Card>
@@ -44,20 +73,20 @@ export function PropertyList({
 
       {/* Mobile View (Cards) */}
       <div className="md:hidden">
-        {filtered.length === 0 ? (
+        {properties.length === 0 ? (
           <div className="px-5 py-12 text-center">
             <div className="flex flex-col items-center gap-2">
               <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
                 <Building2 size={20} className="text-muted-foreground/50" />
               </div>
               <p className="text-sm text-muted-foreground font-medium">
-                {search ? 'Nenhum imóvel encontrado.' : 'Nenhum imóvel cadastrado.'}
+                {q ? 'Nenhum imóvel encontrado.' : 'Nenhum imóvel cadastrado.'}
               </p>
             </div>
           </div>
         ) : (
           <div className="flex flex-col px-3 py-3 gap-3">
-            {filtered.map((p) => (
+            {properties.map((p) => (
               <Link
                 key={p.id}
                 href={`/properties/${p.id}`}
@@ -73,11 +102,11 @@ export function PropertyList({
                         ? 'bg-accent-light text-accent'
                         : 'bg-purple-50 text-purple-700'
                     }`}>
-                      {CLIENT_TYPE_LABEL[p.client_type] ?? p.client_type}
+                      {CLIENT_TYPE_LABEL[p.client_type ?? ''] ?? p.client_type}
                     </span>
                   )}
                 </div>
-                
+
                 <div className="flex flex-col gap-1.5 mt-3">
                   <div className="flex items-center gap-2 text-sm">
                     <span className="font-medium text-foreground">{p.zone}</span>
@@ -118,7 +147,7 @@ export function PropertyList({
             </tr>
           </thead>
           <tbody className="divide-y divide-border/30">
-            {filtered.length === 0 ? (
+            {properties.length === 0 ? (
               <tr>
                 <td
                   colSpan={3 + (showType ? 1 : 0) + (showPrice ? 1 : 0)}
@@ -129,13 +158,13 @@ export function PropertyList({
                       <Building2 size={20} className="text-muted-foreground/50" />
                     </div>
                     <p className="text-sm text-muted-foreground font-medium">
-                      {search ? 'Nenhum imóvel encontrado.' : 'Nenhum imóvel cadastrado.'}
+                      {q ? 'Nenhum imóvel encontrado.' : 'Nenhum imóvel cadastrado.'}
                     </p>
                   </div>
                 </td>
               </tr>
             ) : (
-              filtered.map((p) => (
+              properties.map((p) => (
                 <tr
                   key={p.id}
                   className="transition-colors hover:bg-muted/30"
@@ -155,7 +184,7 @@ export function PropertyList({
                           ? 'bg-accent-light text-accent'
                           : 'bg-purple-50 text-purple-700'
                       }`}>
-                        {CLIENT_TYPE_LABEL[p.client_type] ?? p.client_type}
+                        {CLIENT_TYPE_LABEL[p.client_type ?? ''] ?? p.client_type}
                       </span>
                     </td>
                   )}
@@ -172,6 +201,13 @@ export function PropertyList({
           </tbody>
         </table>
       </div>
+
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        basePath="/properties"
+        searchParams={searchParams}
+      />
     </Card>
   )
 }

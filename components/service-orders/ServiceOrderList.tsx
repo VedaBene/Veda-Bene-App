@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useTransition, useEffect, useCallback } from 'react'
+import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { startCleaning, finishCleaning } from '@/app/(app)/service-orders/actions'
 import { LiveTimer, formatWorkedTime } from './LiveTimer'
@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/Button'
 import { ClipboardList, Search, FileDown, X, Play, Flag, Timer } from 'lucide-react'
 import type { Role } from '@/lib/types/database'
 import type { ServiceOrderListItem } from '@/lib/types/view-models'
+import { Pagination } from '@/components/ui/Pagination'
 
 const STATUS_LABEL: Record<string, string> = {
   open: 'Aberta',
@@ -452,16 +453,46 @@ export function ServiceOrderList({
   done,
   role,
   userId,
+  donePage,
+  doneTotalPages,
+  initialQ,
+  initialDate,
 }: {
   active: ServiceOrderListItem[]
   done: ServiceOrderListItem[]
   role: Role
   userId?: string
+  donePage: number
+  doneTotalPages: number
+  initialQ: string
+  initialDate: string
 }) {
   const router = useRouter()
+  const pathname = usePathname()
   const [, startTransition] = useTransition()
-  const [search, setSearch] = useState('')
-  const [date, setDate] = useState('')
+  const [search, setSearch] = useState(initialQ)
+  const [date, setDate] = useState(initialDate)
+
+  useEffect(() => { setSearch(initialQ) }, [initialQ])
+  useEffect(() => { setDate(initialDate) }, [initialDate])
+
+  const pushFilters = useCallback(
+    (q: string, d: string) => {
+      const params = new URLSearchParams()
+      if (q) params.set('q', q)
+      if (d) params.set('date', d)
+      params.set('donePage', '1')
+      router.replace(`${pathname}?${params.toString()}`)
+    },
+    [router, pathname],
+  )
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (search !== initialQ || date !== initialDate) pushFilters(search, date)
+    }, 300)
+    return () => clearTimeout(t)
+  }, [search, date, initialQ, initialDate, pushFilters])
 
   const [startModalOrder, setStartModalOrder] = useState<ServiceOrderListItem | null>(null)
   const [finishModalOrder, setFinishModalOrder] = useState<ServiceOrderListItem | null>(null)
@@ -477,8 +508,11 @@ export function ServiceOrderList({
   const allActive = active.filter(filterOrder)
   const inProgress = allActive.filter(o => o.status === 'in_progress')
   const open = allActive.filter(o => o.status === 'open')
-  const filteredDone = done.filter(filterOrder)
   const hasFilter = search !== '' || date !== ''
+
+  const doneSearchParams: Record<string, string> = {}
+  if (search) doneSearchParams.q = search
+  if (date) doneSearchParams.date = date
 
   async function handleStartCleaning() {
     if (!startModalOrder) return
@@ -593,17 +627,23 @@ export function ServiceOrderList({
       <Card>
         <div className="px-5 py-3.5 border-b border-border/50 flex items-center gap-2.5">
           <h2 className="text-sm font-semibold text-foreground">Finalizadas</h2>
-          {filteredDone.length > 0 && (
+          {done.length > 0 && (
             <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-success-bg text-success text-[11px] font-bold">
-              {filteredDone.length}
+              {done.length}
             </span>
           )}
         </div>
         <OSTable
-          orders={filteredDone}
+          orders={done}
           role={role}
           emptyText="Nenhuma OS finalizada."
           userId={userId}
+        />
+        <Pagination
+          currentPage={donePage}
+          totalPages={doneTotalPages}
+          basePath="/service-orders"
+          searchParams={doneSearchParams}
         />
       </Card>
 
