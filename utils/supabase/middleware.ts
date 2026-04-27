@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextRequest, NextResponse } from 'next/server'
+import * as Sentry from '@sentry/nextjs'
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
@@ -27,7 +28,12 @@ export async function updateSession(request: NextRequest) {
 
   // Não remova: refresca o token de sessão se expirado
   // É importante chamar getUser() e não getSession() para validar com o servidor
-  await supabase.auth.getUser()
+  try {
+    await supabase.auth.getUser()
+  } catch (err) {
+    console.error('[middleware] supabase.auth.getUser failed', err)
+    Sentry.captureException(err, { tags: { area: 'middleware-auth' } })
+  }
 
   return supabaseResponse
 }

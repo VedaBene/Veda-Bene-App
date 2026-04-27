@@ -8,6 +8,7 @@ import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { getSiteOrigin } from '@/utils/site-url'
 import { getAuthorizedClient } from '@/lib/server/authz'
+import { withLogging } from '@/lib/server/logger'
 
 const optStr = z.preprocess(v => (v === '' ? undefined : v), z.string().optional())
 const optNum = z.preprocess(
@@ -30,7 +31,7 @@ const employeeSchema = z.object({
   overtime_rate: optNum,
 })
 
-export async function createEmployee(formData: FormData) {
+async function createEmployeeImpl(formData: FormData) {
   const { role } = await getAuthorizedClient()
 
   const raw = Object.fromEntries(formData)
@@ -82,7 +83,7 @@ export async function createEmployee(formData: FormData) {
   redirect(`/employees/${authUser.user.id}`)
 }
 
-export async function updateEmployee(id: string, formData: FormData) {
+async function updateEmployeeImpl(id: string, formData: FormData) {
   const { role } = await getAuthorizedClient()
 
   const raw = Object.fromEntries(formData)
@@ -116,7 +117,7 @@ export async function updateEmployee(id: string, formData: FormData) {
   return { success: true as const }
 }
 
-export async function deleteEmployee(id: string) {
+async function deleteEmployeeImpl(id: string) {
   await getAuthorizedClient(['admin'])
 
   const adminClient = createAdminClient()
@@ -125,4 +126,16 @@ export async function deleteEmployee(id: string) {
 
   revalidatePath('/employees')
   redirect('/employees')
+}
+
+export async function createEmployee(formData: FormData) {
+  return withLogging('createEmployee', () => createEmployeeImpl(formData))
+}
+
+export async function updateEmployee(id: string, formData: FormData) {
+  return withLogging('updateEmployee', () => updateEmployeeImpl(id, formData))
+}
+
+export async function deleteEmployee(id: string) {
+  return withLogging('deleteEmployee', () => deleteEmployeeImpl(id))
 }

@@ -2,7 +2,23 @@
 
 import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
+import { captureQueryError } from '@/lib/server/logger'
 import type { Role } from '@/lib/types/database'
+
+function unwrap<T>(
+  res: PromiseSettledResult<{ data: T[] | null; error: unknown }>,
+  query: string,
+): T[] {
+  if (res.status === 'rejected') {
+    captureQueryError('dashboard', query, res.reason)
+    return []
+  }
+  if (res.value.error) {
+    captureQueryError('dashboard', query, res.value.error)
+    return []
+  }
+  return res.value.data ?? []
+}
 
 export type TopProperty = {
   property_id: string
@@ -104,11 +120,11 @@ export async function fetchDashboardData(): Promise<{ data: DashboardData; role:
   ])
 
   // Imóveis atendidos no mês
-  const propertiesData = propertiesRes.status === 'fulfilled' ? propertiesRes.value.data ?? [] : []
+  const propertiesData = unwrap<{ property_id: string }>(propertiesRes, 'properties_this_month')
   const propertiesThisMonth = new Set(propertiesData.map(o => o.property_id)).size
 
   // Horas trabalhadas no mês
-  const hoursData = hoursRes.status === 'fulfilled' ? hoursRes.value.data ?? [] : []
+  const hoursData = unwrap<{ worked_minutes: number | null; property: { avg_cleaning_hours: number | null } | null }>(hoursRes, 'hours_this_month')
   const hoursThisMonth = Math.round(
     hoursData.reduce((sum, o) => {
       const wm = (o as { worked_minutes?: number | null }).worked_minutes
@@ -120,14 +136,14 @@ export async function fetchDashboardData(): Promise<{ data: DashboardData; role:
   ) / 100
 
   // Receita do mês
-  const revenueData = revenueRes.status === 'fulfilled' ? revenueRes.value.data ?? [] : []
+  const revenueData = unwrap<{ total_price: number | null }>(revenueRes, 'revenue_this_month')
   const revenueThisMonth = Math.round(
     revenueData.reduce((sum, o) => sum + (o.total_price ?? 0), 0) * 100
   ) / 100
 
   // Top imóveis
-  const topMonthRaw = topMonthRes.status === 'fulfilled' ? topMonthRes.value.data ?? [] : []
-  const topYearRaw = topYearRes.status === 'fulfilled' ? topYearRes.value.data ?? [] : []
+  const topMonthRaw = unwrap<{ property_id: string; property_name: string; os_count: number }>(topMonthRes, 'top_month_rpc')
+  const topYearRaw = unwrap<{ property_id: string; property_name: string; os_count: number }>(topYearRes, 'top_year_rpc')
 
   const topMonth: TopProperty[] = topMonthRaw.map((r: { property_id: string; property_name: string; os_count: number }) => ({
     property_id: r.property_id,
@@ -142,7 +158,14 @@ export async function fetchDashboardData(): Promise<{ data: DashboardData; role:
   }))
 
   // Agregação mensal (últimos 3 meses)
-  const recentOrders = recentOrdersRes.status === 'fulfilled' ? recentOrdersRes.value.data ?? [] : []
+  const recentOrders = unwrap<{
+    completed_at: string | null
+    total_price: number | null
+    cleaning_staff_id: string | null
+    consegna_staff_id: string | null
+    worked_minutes: number | null
+    property: { avg_cleaning_hours: number | null } | null
+  }>(recentOrdersRes, 'recent_orders')
 
   const months = Array.from({ length: 3 }, (_, i) => {
     const d = new Date(now.getFullYear(), now.getMonth() - (2 - i), 1)
@@ -167,10 +190,14 @@ export async function fetchDashboardData(): Promise<{ data: DashboardData; role:
 
   const profilesMap = new Map<string, { hourly_rate: number | null; monthly_salary: number | null }>()
   if (staffIds.size > 0) {
-    const { data: profiles } = await supabase
+    const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
       .select('id, hourly_rate, monthly_salary')
       .in('id', [...staffIds])
+
+    if (profilesError) {
+      captureQueryError('dashboard', 'staff_profiles', profilesError)
+    }
 
     for (const p of profiles ?? []) {
       profilesMap.set(p.id, { hourly_rate: p.hourly_rate ?? null, monthly_salary: p.monthly_salary ?? null })

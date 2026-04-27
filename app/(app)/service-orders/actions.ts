@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { getAuthorizedClient } from '@/lib/server/authz'
 import { calculateTotalPrice, recalculateOrderPricing } from '@/lib/server/pricing'
+import { withLogging } from '@/lib/server/logger'
 import type { OSStatus, PricingMode } from '@/lib/types/database'
 
 const optStr = z.preprocess(v => (v === '' ? undefined : v), z.string().optional())
@@ -36,7 +37,7 @@ const serviceOrderSchema = z.object({
   pricing_mode: z.enum(['standard', 'ripasso', 'out_long_stay']).default('standard'),
 })
 
-export async function createServiceOrder(formData: FormData) {
+async function createServiceOrderImpl(formData: FormData) {
   const { supabase } = await getAuthorizedClient()
 
   const parsed = serviceOrderSchema.safeParse(Object.fromEntries(formData))
@@ -93,7 +94,7 @@ export async function createServiceOrder(formData: FormData) {
   redirect('/service-orders')
 }
 
-export async function updateServiceOrder(id: string, formData: FormData) {
+async function updateServiceOrderImpl(id: string, formData: FormData) {
   const { supabase } = await getAuthorizedClient()
 
   const parsed = serviceOrderSchema.safeParse(Object.fromEntries(formData))
@@ -154,7 +155,7 @@ export async function updateServiceOrder(id: string, formData: FormData) {
   return { success: true as const }
 }
 
-export async function updateServiceOrderStatus(id: string, status: OSStatus) {
+async function updateServiceOrderStatusImpl(id: string, status: OSStatus) {
   const { supabase } = await getAuthorizedClient()
 
   const { error } = await supabase
@@ -172,7 +173,7 @@ export async function updateServiceOrderStatus(id: string, status: OSStatus) {
   return { success: true as const }
 }
 
-export async function startCleaning(id: string) {
+async function startCleaningImpl(id: string) {
   const { supabase } = await getAuthorizedClient(['admin', 'secretaria', 'limpeza'])
 
   const { error } = await supabase
@@ -190,7 +191,7 @@ export async function startCleaning(id: string) {
   return { success: true as const }
 }
 
-export async function finishCleaning(id: string, notes: string) {
+async function finishCleaningImpl(id: string, notes: string) {
   const { supabase } = await getAuthorizedClient(['admin', 'secretaria', 'limpeza'])
 
   const { error } = await supabase
@@ -212,7 +213,7 @@ export async function finishCleaning(id: string, notes: string) {
   return { success: true as const }
 }
 
-export async function updateExtraServices(
+async function updateExtraServicesImpl(
   id: string,
   description: string,
   price: number,
@@ -265,7 +266,7 @@ export async function updateExtraServices(
   return { success: true as const }
 }
 
-export async function deleteServiceOrder(id: string) {
+async function deleteServiceOrderImpl(id: string) {
   const { supabase } = await getAuthorizedClient()
 
   const { error } = await supabase.from('service_orders').delete().eq('id', id)
@@ -273,4 +274,39 @@ export async function deleteServiceOrder(id: string) {
 
   revalidatePath('/service-orders')
   redirect('/service-orders')
+}
+
+export async function createServiceOrder(formData: FormData) {
+  return withLogging('createServiceOrder', () => createServiceOrderImpl(formData))
+}
+
+export async function updateServiceOrder(id: string, formData: FormData) {
+  return withLogging('updateServiceOrder', () => updateServiceOrderImpl(id, formData))
+}
+
+export async function updateServiceOrderStatus(id: string, status: OSStatus) {
+  return withLogging('updateServiceOrderStatus', () => updateServiceOrderStatusImpl(id, status))
+}
+
+export async function startCleaning(id: string) {
+  return withLogging('startCleaning', () => startCleaningImpl(id))
+}
+
+export async function finishCleaning(id: string, notes: string) {
+  return withLogging('finishCleaning', () => finishCleaningImpl(id, notes))
+}
+
+export async function updateExtraServices(
+  id: string,
+  description: string,
+  price: number,
+  pricingMode: PricingMode = 'standard',
+) {
+  return withLogging('updateExtraServices', () =>
+    updateExtraServicesImpl(id, description, price, pricingMode),
+  )
+}
+
+export async function deleteServiceOrder(id: string) {
+  return withLogging('deleteServiceOrder', () => deleteServiceOrderImpl(id))
 }

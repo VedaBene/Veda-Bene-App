@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { getAuthorizedClient } from '@/lib/server/authz'
+import { withLogging } from '@/lib/server/logger'
 
 const ZONES = [
   'Saint Peter', 'Piazza Navona', 'Trastevere Area', 'Colosseum',
@@ -130,7 +131,7 @@ function buildRecord(
   }
 }
 
-export async function createProperty(formData: FormData) {
+async function createPropertyImpl(formData: FormData) {
   const { supabase } = await getAuthorizedClient()
 
   const parsed = propertySchema.safeParse(Object.fromEntries(formData))
@@ -150,7 +151,7 @@ export async function createProperty(formData: FormData) {
   redirect('/properties')
 }
 
-export async function updateProperty(id: string, formData: FormData) {
+async function updatePropertyImpl(id: string, formData: FormData) {
   const { supabase } = await getAuthorizedClient()
 
   const parsed = propertySchema.safeParse(Object.fromEntries(formData))
@@ -170,7 +171,7 @@ export async function updateProperty(id: string, formData: FormData) {
   return { success: true as const }
 }
 
-export async function deleteProperty(id: string) {
+async function deletePropertyImpl(id: string) {
   const { supabase } = await getAuthorizedClient(['admin'])
 
   const { error } = await supabase.from('properties').delete().eq('id', id)
@@ -178,4 +179,16 @@ export async function deleteProperty(id: string) {
 
   revalidatePath('/properties')
   redirect('/properties')
+}
+
+export async function createProperty(formData: FormData) {
+  return withLogging('createProperty', () => createPropertyImpl(formData))
+}
+
+export async function updateProperty(id: string, formData: FormData) {
+  return withLogging('updateProperty', () => updatePropertyImpl(id, formData))
+}
+
+export async function deleteProperty(id: string) {
+  return withLogging('deleteProperty', () => deletePropertyImpl(id))
 }
