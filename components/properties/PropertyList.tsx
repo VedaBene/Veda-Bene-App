@@ -53,7 +53,7 @@ export function PropertyList({
     return () => clearTimeout(t)
   }, [search, q, pushSearch])
 
-  const showPrice = role === 'admin' || role === 'secretaria'
+  const showPrice = role === 'admin'
   const showType = role === 'admin' || role === 'secretaria'
 
   const searchParams = q ? { q } : {}

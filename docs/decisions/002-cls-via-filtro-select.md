@@ -45,15 +45,22 @@ explicitamente as colunas no `select()` baseado no role:
 
 ```ts
 const propertiesSelect =
-  role === 'admin' || role === 'secretaria'
+  role === 'admin'
     ? 'id, name, zone, address, client_type, base_price'
-    : 'id, name, zone, address'
+    : role === 'secretaria'
+      ? 'id, name, zone, address, client_type'
+      : 'id, name, zone, address'
 
 const { data } = await supabase.from('properties').select(propertiesSelect)
 ```
 
 E view-models em `lib/server/view-models.ts` reforçam removendo campos sensíveis
 do DTO antes de mandar para o cliente.
+
+Para Ordens de Serviço, `secretaria` pode escolher `pricing_mode`, mas não deve
+receber `base_price` nem valores calculados no navegador. O cálculo financeiro
+fica no Server Action, que busca os campos sensíveis no servidor e grava
+`total_price`.
 
 ## Consequências
 

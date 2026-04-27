@@ -31,10 +31,30 @@ const STATUS_VARIANT: Record<OSStatus, 'warning' | 'info' | 'success'> = {
   done: 'success',
 }
 
-const PRICING_MODE_OPTIONS: { value: PricingMode; label: string; hint: string }[] = [
-  { value: 'standard', label: 'Padrão', hint: 'Preço base + adicional por pessoa' },
-  { value: 'ripasso', label: 'Ripasso', hint: '60% do preço base do imóvel' },
-  { value: 'out_long_stay', label: 'Out Long Stay', hint: 'Tempo trabalhado × €25/h' },
+const PRICING_MODE_OPTIONS: {
+  value: PricingMode
+  label: string
+  adminHint: string
+  restrictedHint: string
+}[] = [
+  {
+    value: 'standard',
+    label: 'Padrão',
+    adminHint: 'Preço base + adicional por pessoa',
+    restrictedHint: 'Cálculo automático pela tabela interna do imóvel',
+  },
+  {
+    value: 'ripasso',
+    label: 'Ripasso',
+    adminHint: '60% do preço base do imóvel',
+    restrictedHint: 'Cálculo automático pela regra de ripasso',
+  },
+  {
+    value: 'out_long_stay',
+    label: 'Out Long Stay',
+    adminHint: 'Tempo trabalhado por tarifa interna',
+    restrictedHint: 'Cálculo automático pelo tempo trabalhado',
+  },
 ]
 
 function PricingModeSelector({
@@ -42,11 +62,13 @@ function PricingModeSelector({
   onChange,
   disabled,
   basePrice,
+  canViewPricing,
 }: {
   value: PricingMode
   onChange: (v: PricingMode) => void
   disabled: boolean
   basePrice: number | null
+  canViewPricing: boolean
 }) {
   return (
     <div className="space-y-2">
@@ -66,21 +88,27 @@ function PricingModeSelector({
               } ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
             >
               <div className="text-sm font-semibold text-foreground">{opt.label}</div>
-              <div className="text-xs text-muted-foreground mt-0.5">{opt.hint}</div>
+              <div className="text-xs text-muted-foreground mt-0.5">
+                {canViewPricing ? opt.adminHint : opt.restrictedHint}
+              </div>
             </button>
           )
         })}
       </div>
       {value === 'ripasso' && (
         <p className="text-xs text-muted-foreground">
-          {basePrice != null
+          {canViewPricing && basePrice != null
             ? <>Valor calculado: <strong className="text-foreground">€{(basePrice * 0.6).toFixed(2)}</strong> (60% de €{basePrice.toFixed(2)})</>
-            : 'Defina o preço base no cadastro do imóvel para que o cálculo funcione.'}
+            : canViewPricing
+              ? 'Defina o preço base no cadastro do imóvel para que o cálculo funcione.'
+              : 'Calculado automaticamente com base na regra interna.'}
         </p>
       )}
       {value === 'out_long_stay' && (
         <p className="text-xs text-muted-foreground">
-          Valor será calculado ao finalizar a limpeza (tempo trabalhado × €25/h).
+          {canViewPricing
+            ? 'Valor será calculado ao finalizar a limpeza pela tarifa interna.'
+            : 'Valor será calculado automaticamente ao finalizar a limpeza.'}
         </p>
       )}
     </div>
@@ -631,7 +659,8 @@ export function ServiceOrderForm({
               value={pricingMode}
               onChange={setPricingMode}
               disabled={!canEdit && !canEditExtras}
-              basePrice={selectedProperty?.base_price ?? null}
+              basePrice={role === 'admin' ? selectedProperty?.base_price ?? null : null}
+              canViewPricing={role === 'admin'}
             />
           </Field>
           <Field label="Descrição dos serviços" full>

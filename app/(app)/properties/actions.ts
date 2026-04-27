@@ -132,7 +132,7 @@ function buildRecord(
 }
 
 async function createPropertyImpl(formData: FormData) {
-  const { supabase } = await getAuthorizedClient()
+  const { supabase } = await getAuthorizedClient(['admin'])
 
   const parsed = propertySchema.safeParse(Object.fromEntries(formData))
   if (!parsed.success) return { success: false as const, error: parsed.error.issues[0].message }
@@ -150,7 +150,7 @@ async function createPropertyImpl(formData: FormData) {
 }
 
 async function updatePropertyImpl(id: string, formData: FormData) {
-  const { supabase } = await getAuthorizedClient()
+  const { supabase } = await getAuthorizedClient(['admin'])
 
   const parsed = propertySchema.safeParse(Object.fromEntries(formData))
   if (!parsed.success) return { success: false as const, error: parsed.error.issues[0].message }

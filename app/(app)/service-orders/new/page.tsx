@@ -21,10 +21,14 @@ export default async function NewServiceOrderPage() {
 
   if (!['admin', 'secretaria'].includes(role)) redirect('/service-orders')
 
+  const propertySelect = role === 'admin'
+    ? 'id, name, avg_cleaning_hours, min_guests, max_guests, double_beds, single_beds, sofa_beds, armchair_beds, bathrooms, bidets, cribs, base_price'
+    : 'id, name, avg_cleaning_hours, min_guests, max_guests, double_beds, single_beds, sofa_beds, armchair_beds, bathrooms, bidets, cribs'
+
   const [{ data: properties }, { data: staffData }] = await Promise.all([
     supabase
       .from('properties')
-      .select('id, name, avg_cleaning_hours, min_guests, max_guests, double_beds, single_beds, sofa_beds, armchair_beds, bathrooms, bidets, cribs, base_price')
+      .select(propertySelect)
       .order('name'),
     supabase
       .from('profiles')
@@ -37,7 +41,7 @@ export default async function NewServiceOrderPage() {
     <div className="animate-fade-in-up">
       <PageHeader title="Nova Ordem de Serviço" />
       <ServiceOrderForm
-        properties={(properties ?? []) as ServiceOrderPropertyOption[]}
+        properties={(properties ?? []) as unknown as ServiceOrderPropertyOption[]}
         staff={(staffData ?? []) as StaffOption[]}
         role={role}
       />

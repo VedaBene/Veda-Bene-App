@@ -29,7 +29,7 @@ As decisões com maior peso e nuance estão registradas em [`docs/decisions/`](d
 Outras convenções importantes:
 - **`is_urgent`** na tabela `service_orders`: coluna `GENERATED ALWAYS AS STORED` — não pode ser inserida manualmente. É `true` quando `(checkin_at - checkout_at) < 4h`.
 - **Supabase clients**: `utils/supabase/{client,server,middleware}.ts` + `utils/supabase/admin.ts` (service role, apenas para Server Actions administrativas). O `middleware.ts` aqui é convenção do `@supabase/ssr`, não do Next.js — o arquivo de proxy do Next.js está na raiz como `proxy.ts` (ver ADR 004).
-- **Preço da OS**: calculado no Server Action ao criar (busca `base_price` + `extra_per_person` do imóvel), nunca pelo cliente.
+- **Preço da OS**: calculado no Server Action ao criar/atualizar (busca `base_price` + `extra_per_person` do imóvel), nunca pelo cliente. `secretaria` pode escolher `pricing_mode`, mas não recebe `base_price` nem valores calculados no navegador.
 
 ## Documentos de referência
 - `~/Downloads/prd-veda-bene.md` — PRD completo (schema SQL, RLS, padrões de código)

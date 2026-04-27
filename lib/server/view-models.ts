@@ -50,6 +50,10 @@ export function toPropertyListItem(
     ...(role === 'admin' || role === 'secretaria'
       ? {
           client_type: property.client_type,
+        }
+      : {}),
+    ...(role === 'admin'
+      ? {
           base_price: property.base_price ?? null,
         }
       : {}),

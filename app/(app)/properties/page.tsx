@@ -31,9 +31,11 @@ export default async function PropertiesPage(props: PageProps<never>) {
   const role = (profile?.role ?? 'cliente') as Role
 
   const propertiesSelect =
-    role === 'admin' || role === 'secretaria'
+    role === 'admin'
       ? 'id, name, zone, address, client_type, base_price'
-      : 'id, name, zone, address'
+      : role === 'secretaria'
+        ? 'id, name, zone, address, client_type'
+        : 'id, name, zone, address'
 
   let query = supabase
     .from('properties')
