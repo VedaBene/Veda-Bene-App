@@ -24,6 +24,8 @@ Isso preserva o histórico de **por que** o sistema chegou no estado atual.
 | [002](002-cls-via-filtro-select.md) | CLS via filtro de `select()` (após remoção das views) | Aceita |
 | [003](003-cliente-b2c-via-email-match.md) | Identificação de cliente B2C via match de email | Aceita |
 | [004](004-proxy-ts-em-vez-de-middleware-ts.md) | `proxy.ts` em vez de `middleware.ts` | Aceita |
+| [005](005-rls-helpers-em-schema-privado.md) | Helpers privilegiados de RLS em schema privado | Aceita |
+| [006](006-rpcs-privilegiadas-sem-execucao-direta.md) | RPCs privilegiadas sem execução direta | Aceita |
 
 ## Formato
 

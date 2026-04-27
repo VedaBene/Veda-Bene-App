@@ -1,8 +1,3 @@
--- ============================================================
--- 01_create_tables.sql
--- Cria as 4 tabelas principais na ordem correta (respeitando FK)
--- ============================================================
-
 -- 1. profiles (vinculada a auth.users)
 CREATE TABLE public.profiles (
   id              UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -61,11 +56,9 @@ CREATE TABLE public.properties (
   email               TEXT,
   address             TEXT,
   zip_code            TEXT,
-  -- Metragem
   sqm_interior        NUMERIC(8, 2),
   sqm_exterior        NUMERIC(8, 2),
   sqm_total           NUMERIC(8, 2),
-  -- Capacidade e Estrutura
   min_guests          INTEGER,
   max_guests          INTEGER,
   double_beds         INTEGER DEFAULT 0,
@@ -74,11 +67,9 @@ CREATE TABLE public.properties (
   bathrooms           INTEGER DEFAULT 0,
   bidets              INTEGER DEFAULT 0,
   cribs               INTEGER DEFAULT 0,
-  -- Precificação e Tempo
   base_price          NUMERIC(10, 2),
   extra_per_person    NUMERIC(10, 2),
   avg_cleaning_hours  NUMERIC(4, 2),
-  -- Observações
   notes               TEXT,
   created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -94,7 +85,6 @@ CREATE TABLE public.service_orders (
   checkin_at          TIMESTAMPTZ,
   status              TEXT NOT NULL DEFAULT 'open'
                       CHECK (status IN ('open', 'in_progress', 'done')),
-  -- Ocupação Real
   real_guests         INTEGER,
   double_beds         INTEGER DEFAULT 0,
   single_beds         INTEGER DEFAULT 0,
@@ -102,9 +92,7 @@ CREATE TABLE public.service_orders (
   bathrooms           INTEGER DEFAULT 0,
   bidets              INTEGER DEFAULT 0,
   cribs               INTEGER DEFAULT 0,
-  -- Financeiro
   total_price         NUMERIC(10, 2),
-  -- Urgência: calculada se intervalo checkout→checkin < 4h
   is_urgent           BOOLEAN GENERATED ALWAYS AS (
                         CASE
                           WHEN checkin_at IS NOT NULL AND checkout_at IS NOT NULL
@@ -114,4 +102,4 @@ CREATE TABLE public.service_orders (
                       ) STORED,
   completed_at        TIMESTAMPTZ,
   created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
+);;

@@ -6,4 +6,4 @@ ALTER TABLE public.service_orders ADD COLUMN is_urgent BOOLEAN GENERATED ALWAYS 
     THEN EXTRACT(EPOCH FROM (checkin_at - checkout_at)) / 3600 <= 3
     ELSE FALSE
   END
-) STORED;
+) STORED;;

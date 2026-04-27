@@ -1,24 +1,19 @@
--- Restrict staff property visibility to properties linked to their assigned service orders.
 
-CREATE OR REPLACE FUNCTION public.staff_property_ids(uid UUID)
-RETURNS SETOF UUID
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path TO 'public'
-AS $function$
-  SELECT DISTINCT property_id
-  FROM public.service_orders
-  WHERE cleaning_staff_id = uid OR consegna_staff_id = uid;
-$function$;
+-- 1. Corrigir policy de properties para limpeza/consegna:
+--    restringir às linhas cujas OS foram atribuídas ao funcionário
+DROP POLICY IF EXISTS "properties_limpeza_consegna_select" ON properties;
+CREATE POLICY "properties_limpeza_consegna_select" ON properties
+FOR SELECT TO authenticated
+USING (
+  get_my_role() = ANY (ARRAY['"limpeza"'::text, '"consegna"'::text])
+  AND id IN (
+    SELECT property_id FROM service_orders
+    WHERE cleaning_staff_id = auth.uid() OR consegna_staff_id = auth.uid()
+  )
+);
 
-DROP POLICY IF EXISTS "properties_limpeza_consegna_select" ON public.properties;
-
-CREATE POLICY "properties_limpeza_consegna_select"
-  ON public.properties FOR SELECT
-  USING (
-    public.get_my_role() IN ('"limpeza"', '"consegna"')
-    AND id IN (
-      SELECT public.staff_property_ids(auth.uid()) AS staff_property_ids
-    )
-  );
+-- 2. Remover acesso de limpeza/consegna a agencies e owners
+--    (eles não precisam ver nome, email ou telefone do cliente)
+DROP POLICY IF EXISTS "agencies_others_select" ON agencies;
+DROP POLICY IF EXISTS "owners_others_select" ON owners;
+;

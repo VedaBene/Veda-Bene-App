@@ -25,10 +25,13 @@ As decisões com maior peso e nuance estão registradas em [`docs/decisions/`](d
 - [ADR 002](docs/decisions/002-cls-via-filtro-select.md) — CLS via filtro de `select()` na aplicação (as views `properties_public`/`profiles_public` foram removidas)
 - [ADR 003](docs/decisions/003-cliente-b2c-via-email-match.md) — Identificação de cliente B2C via match de email (função `client_property_ids` SECURITY DEFINER)
 - [ADR 004](docs/decisions/004-proxy-ts-em-vez-de-middleware-ts.md) — `proxy.ts` em vez de `middleware.ts` (convenção do Next.js 16)
+- [ADR 005](docs/decisions/005-rls-helpers-em-schema-privado.md) — Helpers privilegiados de RLS ficam em schema privado, não em `public`
+- [ADR 006](docs/decisions/006-rpcs-privilegiadas-sem-execucao-direta.md) — RPCs `SECURITY DEFINER` em `public` não ficam executáveis diretamente por `anon`/`authenticated`
 
 Outras convenções importantes:
 - **`is_urgent`** na tabela `service_orders`: coluna `GENERATED ALWAYS AS STORED` — não pode ser inserida manualmente. É `true` quando `(checkin_at - checkout_at) < 4h`.
 - **Supabase clients**: `utils/supabase/{client,server,middleware}.ts` + `utils/supabase/admin.ts` (service role, apenas para Server Actions administrativas). O `middleware.ts` aqui é convenção do `@supabase/ssr`, não do Next.js — o arquivo de proxy do Next.js está na raiz como `proxy.ts` (ver ADR 004).
+- **Funções privilegiadas**: helpers de RLS com `SECURITY DEFINER` devem ficar em schema privado; RPCs privilegiadas em `public` não devem conceder `EXECUTE` direto a `anon`/`authenticated` sem ADR/revisão explícita.
 - **Preço da OS**: calculado no Server Action ao criar/atualizar (busca `base_price` + `extra_per_person` do imóvel), nunca pelo cliente. `secretaria` pode escolher `pricing_mode`, mas não recebe `base_price` nem valores calculados no navegador.
 
 ## Documentos de referência

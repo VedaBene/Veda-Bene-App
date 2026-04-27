@@ -1,27 +1,37 @@
 # Supabase Baseline Sync
 
-This repository was aligned to the remote migration history observed through the
-Supabase MCP on 2026-04-22.
+This repository was reconciled against the remote migration history observed via
+the Supabase CLI on 2026-04-27.
 
 ## What was synchronized
 
-- Existing local migrations were renamed to timestamped filenames that match the
-  remote history order.
-- Missing remote entries were reconstructed locally:
-  - `20260410005606_fix_staff_properties_access.sql`
-  - `20260410022000_fix_role_permissions_v2.sql`
-  - `20260410233431_seed_mock_data.sql`
-  - `20260410234816_fix_rls_infinite_recursion.sql`
+- The remote migration files missing from this checkout were fetched locally:
+  - `20260423003950_harden_supabase_security_surface.sql`
+  - `20260426100434_fix_properties_cliente_select_use_helper.sql`
+  - `20260426111348_staff_peer_visibility_consegna_readonly.sql`
+- Earlier local copies with mismatched timestamps were removed:
+  - `20260422120000_harden_supabase_security_surface.sql`
+  - `20260426120000_fix_properties_cliente_select_use_helper.sql`
+  - `20260426130000_staff_peer_visibility_consegna_readonly.sql`
+- Historical migrations that had been reconstructed locally were replaced with
+  the canonical SQL fetched from remote history, including
+  `20260410233431_seed_mock_data.sql`.
 
-## Important caveat
+## Migration history repair
 
-`20260410233431_seed_mock_data.sql` is a no-op placeholder. The original seed
-statements were not recoverable from this repository and were intentionally not
-recreated from live project data.
+The production schema already contained the `pricing_mode` column on
+`public.service_orders`, but the migration history table did not list
+`20260419170913_add_pricing_mode.sql`.
 
-## Pending local migration
+This version was marked as `applied` in the remote migration history during the
+2026-04-27 reconciliation.
 
-The repository contains a local migration that is not yet present in the remote
-history:
+## Security hardening migrations
 
-- `20260419170913_add_pricing_mode.sql`
+The following security hardening migrations were applied after reconciliation:
+
+- `20260427100000_move_rls_helpers_to_private_schema.sql`
+- `20260427110000_revoke_remaining_public_security_definers.sql`
+
+After these migrations, the local and remote migration histories are aligned
+through `20260427110000`.

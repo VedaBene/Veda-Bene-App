@@ -52,6 +52,34 @@ function monthLabel(date: Date) {
   return date.toLocaleString('pt-BR', { month: 'short' }).replace('.', '')
 }
 
+function getTopProperties(
+  orders: {
+    property_id: string | null
+    property: { id: string; name: string | null } | null
+  }[],
+): TopProperty[] {
+  const counts = new Map<string, TopProperty>()
+
+  for (const order of orders) {
+    if (!order.property_id) continue
+    const current = counts.get(order.property_id)
+    if (current) {
+      current.os_count += 1
+      continue
+    }
+
+    counts.set(order.property_id, {
+      property_id: order.property_id,
+      property_name: order.property?.name ?? 'Imóvel sem nome',
+      os_count: 1,
+    })
+  }
+
+  return [...counts.values()]
+    .sort((a, b) => b.os_count - a.os_count)
+    .slice(0, 5)
+}
+
 export async function fetchDashboardData(): Promise<{ data: DashboardData; role: Role }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -101,17 +129,19 @@ export async function fetchDashboardData(): Promise<{ data: DashboardData; role:
       .gte('completed_at', monthStart)
       .lte('completed_at', today),
 
-    supabase.rpc('get_top_properties', {
-      start_date: monthStart,
-      end_date: today,
-      limit_count: 5,
-    }),
+    supabase
+      .from('service_orders')
+      .select('property_id, property:properties(id, name)')
+      .eq('status', 'done')
+      .gte('cleaning_date', monthStart)
+      .lte('cleaning_date', today),
 
-    supabase.rpc('get_top_properties', {
-      start_date: yearStart,
-      end_date: today,
-      limit_count: 5,
-    }),
+    supabase
+      .from('service_orders')
+      .select('property_id, property:properties(id, name)')
+      .eq('status', 'done')
+      .gte('cleaning_date', yearStart)
+      .lte('cleaning_date', today),
 
     supabase
       .from('service_orders')
@@ -144,20 +174,17 @@ export async function fetchDashboardData(): Promise<{ data: DashboardData; role:
   ) / 100
 
   // Top imóveis
-  const topMonthRaw = unwrap<{ property_id: string; property_name: string; os_count: number }>(topMonthRes, 'top_month_rpc')
-  const topYearRaw = unwrap<{ property_id: string; property_name: string; os_count: number }>(topYearRes, 'top_year_rpc')
+  const topMonthRaw = unwrap<{
+    property_id: string | null
+    property: { id: string; name: string | null } | null
+  }>(topMonthRes, 'top_month')
+  const topYearRaw = unwrap<{
+    property_id: string | null
+    property: { id: string; name: string | null } | null
+  }>(topYearRes, 'top_year')
 
-  const topMonth: TopProperty[] = topMonthRaw.map((r: { property_id: string; property_name: string; os_count: number }) => ({
-    property_id: r.property_id,
-    property_name: r.property_name,
-    os_count: Number(r.os_count),
-  }))
-
-  const topYear: TopProperty[] = topYearRaw.map((r: { property_id: string; property_name: string; os_count: number }) => ({
-    property_id: r.property_id,
-    property_name: r.property_name,
-    os_count: Number(r.os_count),
-  }))
+  const topMonth = getTopProperties(topMonthRaw)
+  const topYear = getTopProperties(topYearRaw)
 
   // Agregação mensal (últimos 3 meses)
   const recentOrders = unwrap<{
