@@ -194,7 +194,7 @@ export async function fetchReceivableData(
   const map = new Map<string, ReceivableRow>()
 
   for (const o of orders) {
-    const prop = o.property as {
+    const prop = o.property as unknown as {
       id: string
       name: string
       client_type: 'rental' | 'particular'

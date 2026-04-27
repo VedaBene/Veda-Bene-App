@@ -110,7 +110,7 @@ export async function exportReceivableCSV(
   const map = new Map<string, { client_name: string; client_type: string; property_name: string; os_count: number; total_value: number }>()
 
   for (const o of orders) {
-    const prop = o.property as { id: string; name: string; client_type: string; agency: { id: string; name: string } | null; owner: { id: string; name: string } | null } | null
+    const prop = o.property as unknown as { id: string; name: string; client_type: string; agency: { id: string; name: string } | null; owner: { id: string; name: string } | null } | null
     if (!prop) continue
     if (clientType && prop.client_type !== clientType) continue
 

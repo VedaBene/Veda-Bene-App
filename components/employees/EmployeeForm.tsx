@@ -27,7 +27,7 @@ export function EmployeeForm({
 }: {
   employee?: EmployeeFormData
   viewerRole: Role
-  deleteAction?: () => Promise<unknown>
+  deleteAction?: () => Promise<{ success: false; error: string } | void>
   readOnly?: boolean
 }) {
   const [isPending, startTransition] = useTransition()
@@ -103,8 +103,8 @@ export function EmployeeForm({
     if (!window.confirm('Tem certeza que deseja excluir este funcionário? Esta ação não pode ser desfeita.')) return
     setIsDeleting(true)
     const result = await deleteAction()
-    if (result && typeof result === 'object' && 'success' in result && !(result as { success: boolean }).success) {
-      setError((result as { error: string }).error)
+    if (result && !result.success) {
+      setError(result.error)
       setIsDeleting(false)
     }
   }

@@ -139,11 +139,9 @@ async function createPropertyImpl(formData: FormData) {
 
   const { agency_id, owner_id } = await resolveRelations(supabase, parsed.data)
 
-  const { data: property, error } = await supabase
+  const { error } = await supabase
     .from('properties')
     .insert(buildRecord(parsed.data, agency_id, owner_id))
-    .select('id')
-    .single()
 
   if (error) return { success: false as const, error: error.message }
 

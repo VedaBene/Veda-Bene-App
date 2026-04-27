@@ -108,7 +108,7 @@ export function ServiceOrderForm({
   staff: StaffOption[]
   role: Role
   userId?: string
-  deleteAction?: () => Promise<unknown>
+  deleteAction?: () => Promise<{ success: false; error: string } | void>
   readOnly?: boolean
 }) {
   const [isPending, startTransition] = useTransition()
@@ -228,8 +228,8 @@ export function ServiceOrderForm({
     if (!window.confirm('Tem certeza que deseja excluir esta OS? Esta ação não pode ser desfeita.')) return
     setIsDeleting(true)
     const result = await deleteAction()
-    if (result && typeof result === 'object' && 'success' in result && !(result as { success: boolean }).success) {
-      setError((result as { error: string }).error)
+    if (result && !result.success) {
+      setError(result.error)
       setIsDeleting(false)
     }
   }

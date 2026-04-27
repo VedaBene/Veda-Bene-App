@@ -51,13 +51,15 @@ export default async function PropertyDetailPage({
     ...(role === 'admin' ? ['base_price', 'extra_per_person', 'avg_cleaning_hours'] : []),
   ].join(', ')
 
-  const { data: property } = await supabase
+  const { data: rawProperty } = await supabase
     .from('properties')
     .select(propertySelect)
     .eq('id', id)
     .single()
 
-  if (!property) notFound()
+  if (!rawProperty) notFound()
+
+  const property = rawProperty as unknown as PropertyFormData
 
   let agencies: { id: string; name: string }[] = []
   let owners: { id: string; name: string }[] = []
@@ -76,7 +78,7 @@ export default async function PropertyDetailPage({
     <div className="animate-fade-in-up">
       <PageHeader title={property.name} />
       <PropertyForm
-        property={toPropertyFormData(property as PropertyFormData, role)}
+        property={toPropertyFormData(property, role)}
         agencies={agencies}
         owners={owners}
         role={role}

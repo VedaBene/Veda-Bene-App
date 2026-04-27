@@ -6,18 +6,20 @@ import { captureQueryError } from '@/lib/server/logger'
 import type { Role } from '@/lib/types/database'
 
 function unwrap<T>(
-  res: PromiseSettledResult<{ data: T[] | null; error: unknown }>,
+  res: PromiseSettledResult<unknown>,
   query: string,
 ): T[] {
   if (res.status === 'rejected') {
     captureQueryError('dashboard', query, res.reason)
     return []
   }
-  if (res.value.error) {
-    captureQueryError('dashboard', query, res.value.error)
+  const value = res.value as { data: T[] | null; error: unknown } | null
+  if (!value) return []
+  if (value.error) {
+    captureQueryError('dashboard', query, value.error)
     return []
   }
-  return res.value.data ?? []
+  return value.data ?? []
 }
 
 export type TopProperty = {

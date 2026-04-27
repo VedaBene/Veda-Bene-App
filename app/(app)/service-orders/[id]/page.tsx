@@ -96,7 +96,7 @@ export default async function ServiceOrderDetailPage({
     <div className="animate-fade-in-up">
       <PageHeader title="Ordem de Serviço" />
       <ServiceOrderForm
-        order={toServiceOrderFormData(order as ServiceOrderFormData, role, user.id)}
+        order={toServiceOrderFormData(order as unknown as ServiceOrderFormData, role, user.id)}
         properties={(properties ?? []) as ServiceOrderPropertyOption[]}
         staff={(staffData ?? []) as StaffOption[]}
         role={role}

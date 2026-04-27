@@ -104,7 +104,7 @@ export function PropertyForm({
   agencies: { id: string; name: string }[]
   owners: { id: string; name: string }[]
   role: Role
-  deleteAction?: () => Promise<unknown>
+  deleteAction?: () => Promise<{ success: false; error: string } | void>
   readOnly?: boolean
 }) {
   const [isPending, startTransition] = useTransition()
@@ -249,13 +249,8 @@ export function PropertyForm({
 
     setIsDeleting(true)
     const result = await deleteAction()
-    if (
-      result &&
-      typeof result === 'object' &&
-      'success' in result &&
-      !(result as { success: boolean }).success
-    ) {
-      setError((result as { error: string }).error)
+    if (result && !result.success) {
+      setError(result.error)
       setIsDeleting(false)
     }
   }

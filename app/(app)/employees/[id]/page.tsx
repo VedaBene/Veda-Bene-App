@@ -33,19 +33,21 @@ export default async function EmployeeDetailPage({
       ? 'id, full_name, email, phone, birth_date, nationality, address, role, hourly_rate, monthly_salary, overtime_rate'
       : 'id, full_name, email, phone, birth_date, nationality, address, role'
 
-  const { data: employee } = await supabase
+  const { data: rawEmployee } = await supabase
     .from('profiles')
     .select(employeeSelect)
     .eq('id', id)
     .single()
 
-  if (!employee) notFound()
+  if (!rawEmployee) notFound()
+
+  const employee = rawEmployee as unknown as EmployeeFormData
 
   return (
     <div className="animate-fade-in-up">
       <PageHeader title={employee.full_name} />
       <EmployeeForm
-        employee={toEmployeeFormData(employee as EmployeeFormData, role)}
+        employee={toEmployeeFormData(employee, role)}
         viewerRole={role}
         deleteAction={role === 'admin' ? deleteEmployee.bind(null, id) : undefined}
       />
