@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import { PropertyForm } from '@/components/properties/PropertyForm'
 import { PageHeader } from '@/components/ui/PageHeader'
@@ -16,10 +16,12 @@ export default async function PropertyDetailPage({
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
   const { data: profile } = await supabase
     .from('profiles')
     .select('role')
-    .eq('id', user!.id)
+    .eq('id', user.id)
     .single()
 
   const role = (profile?.role ?? 'cliente') as Role

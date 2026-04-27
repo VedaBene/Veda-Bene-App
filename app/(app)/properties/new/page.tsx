@@ -8,10 +8,12 @@ export default async function NewPropertyPage() {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
   const { data: profile } = await supabase
     .from('profiles')
     .select('role')
-    .eq('id', user!.id)
+    .eq('id', user.id)
     .single()
 
   const role = (profile?.role ?? 'cliente') as Role

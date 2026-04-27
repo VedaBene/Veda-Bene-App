@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import { ServiceOrderList } from '@/components/service-orders/ServiceOrderList'
 import { PageHeader } from '@/components/ui/PageHeader'
@@ -50,10 +51,12 @@ export default async function ServiceOrdersPage(props: PageProps<never>) {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
   const { data: profile } = await supabase
     .from('profiles')
     .select('role')
-    .eq('id', user!.id)
+    .eq('id', user.id)
     .single()
 
   const role = (profile?.role ?? 'cliente') as Role
@@ -123,7 +126,7 @@ export default async function ServiceOrdersPage(props: PageProps<never>) {
         active={active}
         done={done}
         role={role}
-        userId={user!.id}
+        userId={user.id}
         donePage={donePage}
         doneTotalPages={doneTotalPages}
         initialQ={q ?? ''}

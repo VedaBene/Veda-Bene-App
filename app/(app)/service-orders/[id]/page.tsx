@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import { ServiceOrderForm } from '@/components/service-orders/ServiceOrderForm'
 import { PageHeader } from '@/components/ui/PageHeader'
@@ -20,10 +20,12 @@ export default async function ServiceOrderDetailPage({
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
   const { data: profile } = await supabase
     .from('profiles')
     .select('role')
-    .eq('id', user!.id)
+    .eq('id', user.id)
     .single()
 
   const role = (profile?.role ?? 'cliente') as Role
@@ -94,11 +96,11 @@ export default async function ServiceOrderDetailPage({
     <div className="animate-fade-in-up">
       <PageHeader title="Ordem de Serviço" />
       <ServiceOrderForm
-        order={toServiceOrderFormData(order as ServiceOrderFormData, role, user!.id)}
+        order={toServiceOrderFormData(order as ServiceOrderFormData, role, user.id)}
         properties={(properties ?? []) as ServiceOrderPropertyOption[]}
         staff={(staffData ?? []) as StaffOption[]}
         role={role}
-        userId={user!.id}
+        userId={user.id}
         deleteAction={['admin', 'secretaria'].includes(role) ? deleteServiceOrder.bind(null, id) : undefined}
         readOnly={!canEdit}
       />
