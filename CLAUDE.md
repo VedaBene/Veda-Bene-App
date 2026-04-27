@@ -29,4 +29,4 @@
 - `~/Downloads/Spec_1.md` — Plano tático de implementação arquivo a arquivo (derivado do PRD)
 
 ## Estado atual
-Etapas 0–8 concluídas. Etapa 9 (componentes UI compartilhados) pendente.
+Etapas 0–9 concluídas. Componentes UI compartilhados em `components/ui/`.
