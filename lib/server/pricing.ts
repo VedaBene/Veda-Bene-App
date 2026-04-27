@@ -4,6 +4,33 @@ import type { SupabaseServerClient } from '@/lib/server/authz'
 const RIPASSO_RATE = 0.6
 const OUT_LONG_STAY_HOURLY_RATE = 25
 
+type PricingCtx = {
+  basePrice: number | null
+  extraPerPerson: number | null
+  realGuests: number | null
+  minGuests: number | null
+  extras: number
+  workedMinutes: number | null
+}
+
+const PRICING_STRATEGIES: Record<PricingMode, (ctx: PricingCtx) => number | null> = {
+  standard: ({ basePrice, extraPerPerson, realGuests, minGuests, extras }) => {
+    if (basePrice == null) return null
+    const extra = extraPerPerson ?? 0
+    const guests = realGuests ?? 0
+    const min = minGuests ?? 0
+    return basePrice + extra * Math.max(0, guests - min) + extras
+  },
+  ripasso: ({ basePrice, extras }) => {
+    if (basePrice == null) return null
+    return basePrice * RIPASSO_RATE + extras
+  },
+  out_long_stay: ({ workedMinutes, extras }) => {
+    if (workedMinutes == null) return null
+    return (workedMinutes / 60) * OUT_LONG_STAY_HOURLY_RATE + extras
+  },
+}
+
 export function calculateTotalPrice(
   pricingMode: PricingMode,
   basePrice: number | null,
@@ -14,22 +41,14 @@ export function calculateTotalPrice(
   workedMinutes: number | null = null,
 ): number | null {
   const extras = extraServicesPrice ?? 0
-
-  if (pricingMode === 'ripasso') {
-    if (basePrice == null) return null
-    return basePrice * RIPASSO_RATE + extras
-  }
-
-  if (pricingMode === 'out_long_stay') {
-    if (workedMinutes == null) return null
-    return (workedMinutes / 60) * OUT_LONG_STAY_HOURLY_RATE + extras
-  }
-
-  if (basePrice == null) return null
-  const extra = extraPerPerson ?? 0
-  const guests = realGuests ?? 0
-  const min = minGuests ?? 0
-  return basePrice + extra * Math.max(0, guests - min) + extras
+  return PRICING_STRATEGIES[pricingMode]({
+    basePrice,
+    extraPerPerson,
+    realGuests,
+    minGuests,
+    extras,
+    workedMinutes,
+  })
 }
 
 // Recalcula `total_price` da OS quando worked_minutes acabou de ficar disponível
