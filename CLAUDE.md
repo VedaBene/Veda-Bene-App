@@ -18,10 +18,17 @@
 | `cliente` | Seus imóveis + OSs abertas/finalizadas (sem nomes de responsáveis) |
 
 ## Decisões arquiteturais críticas
-- **RLS**: roles injetadas no JWT via `custom_access_token_hook` como `app_role`. A função `get_my_role()` lê o JWT como JSONB — retorna com aspas duplas embutidas (ex: `'"admin"'`), então policies usam `= '"admin"'`, não `= 'admin'`.
-- **Column Level Security**: implementado via views (`properties_public`, `profiles_public`) em vez de REVOKE/GRANT, pois o Supabase usa um único role DB `authenticated` para todos os usuários autenticados.
+
+As decisões com maior peso e nuance estão registradas em [`docs/decisions/`](docs/decisions/):
+
+- [ADR 001](docs/decisions/001-rls-via-app-role-no-jwt.md) — RLS via `app_role` no JWT (por que policies comparam `= '"admin"'` e não `= 'admin'`)
+- [ADR 002](docs/decisions/002-cls-via-filtro-select.md) — CLS via filtro de `select()` na aplicação (as views `properties_public`/`profiles_public` foram removidas)
+- [ADR 003](docs/decisions/003-cliente-b2c-via-email-match.md) — Identificação de cliente B2C via match de email (função `client_property_ids` SECURITY DEFINER)
+- [ADR 004](docs/decisions/004-proxy-ts-em-vez-de-middleware-ts.md) — `proxy.ts` em vez de `middleware.ts` (convenção do Next.js 16)
+
+Outras convenções importantes:
 - **`is_urgent`** na tabela `service_orders`: coluna `GENERATED ALWAYS AS STORED` — não pode ser inserida manualmente. É `true` quando `(checkin_at - checkout_at) < 4h`.
-- **Supabase clients**: `utils/supabase/{client,server,middleware}.ts` + `utils/supabase/admin.ts` (service role, apenas para Server Actions administrativas).
+- **Supabase clients**: `utils/supabase/{client,server,middleware}.ts` + `utils/supabase/admin.ts` (service role, apenas para Server Actions administrativas). O `middleware.ts` aqui é convenção do `@supabase/ssr`, não do Next.js — o arquivo de proxy do Next.js está na raiz como `proxy.ts` (ver ADR 004).
 - **Preço da OS**: calculado no Server Action ao criar (busca `base_price` + `extra_per_person` do imóvel), nunca pelo cliente.
 
 ## Documentos de referência
