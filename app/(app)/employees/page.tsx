@@ -5,6 +5,7 @@ import { EmployeeList } from '@/components/employees/EmployeeList'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Button } from '@/components/ui/Button'
 import { Plus } from 'lucide-react'
+import { canManageEmployees } from '@/lib/employee-permissions'
 import type { Role } from '@/lib/types/database'
 import type { EmployeeListItem } from '@/lib/types/view-models'
 
@@ -22,7 +23,7 @@ export default async function EmployeesPage() {
 
   const role = (profile?.role ?? 'cliente') as Role
 
-  if (role !== 'admin') redirect('/service-orders')
+  if (!canManageEmployees(role)) redirect('/service-orders')
 
   const { data: employees } = await supabase
     .from('profiles')
@@ -35,7 +36,7 @@ export default async function EmployeesPage() {
       <PageHeader
         title="Funcionários"
         action={
-          role === 'admin' ? (
+          canManageEmployees(role) ? (
             <Link href="/employees/new">
               <Button variant="accent" icon={<Plus size={16} />}>Novo Funcionário</Button>
             </Link>

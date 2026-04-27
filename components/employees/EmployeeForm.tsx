@@ -6,18 +6,20 @@ import { Section } from '@/components/ui/Section'
 import { Field } from '@/components/ui/Field'
 import { Button } from '@/components/ui/Button'
 import { User, Wallet, CheckCircle, AlertCircle } from 'lucide-react'
+import { canManageEmployees, getAssignableEmployeeRoles } from '@/lib/employee-permissions'
 import type { Role } from '@/lib/types/database'
 import type { EmployeeFormData } from '@/lib/types/view-models'
 
 const inputCls =
   'w-full px-3 py-2.5 border border-input-border rounded-lg text-sm text-foreground bg-white transition-all duration-200 focus:ring-2 focus:ring-input-focus/20 focus:border-input-focus disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed outline-none placeholder:text-muted-foreground/50'
 
-const EMPLOYEE_ROLES: { value: string; label: string }[] = [
-  { value: 'limpeza', label: 'Limpeza' },
-  { value: 'consegna', label: 'Consegna' },
-  { value: 'secretaria', label: 'Secretaria' },
-  { value: 'admin', label: 'Admin' },
-]
+const ROLE_LABELS: Record<Role, string> = {
+  admin: 'Admin',
+  secretaria: 'Secretaria',
+  limpeza: 'Limpeza',
+  consegna: 'Consegna',
+  cliente: 'Cliente',
+}
 
 export function EmployeeForm({
   employee,
@@ -41,7 +43,9 @@ export function EmployeeForm({
   }
 
   const isAdmin = viewerRole === 'admin'
-  const canEdit = ['admin', 'secretaria'].includes(viewerRole) && !readOnly
+  const canManage = canManageEmployees(viewerRole)
+  const assignableRoles = getAssignableEmployeeRoles(viewerRole)
+  const canEdit = canManage && !readOnly
 
   const [fullName, setFullName] = useState(employee?.full_name ?? '')
   const [email, setEmail] = useState(employee?.email ?? '')
@@ -49,7 +53,8 @@ export function EmployeeForm({
   const [birthDate, setBirthDate] = useState(employee?.birth_date ?? '')
   const [nationality, setNationality] = useState(employee?.nationality ?? '')
   const [address, setAddress] = useState(employee?.address ?? '')
-  const [role, setRole] = useState<string>(employee?.role ?? 'limpeza')
+  const [role, setRole] = useState<string>(employee?.role ?? assignableRoles[0] ?? '')
+  const roleOptions = canManage ? assignableRoles : employee?.role ? [employee.role] : []
 
   const [hourlyRate, setHourlyRate] = useState(employee?.hourly_rate?.toString() ?? '')
   const [hasFixedSalary, setHasFixedSalary] = useState(
@@ -137,7 +142,11 @@ export function EmployeeForm({
 
         <Field label="Tipo de Funcionário" required>
           <select value={role} onChange={e => setRole(e.target.value)} required={canEdit} disabled={!canEdit} className={inputCls}>
-            {EMPLOYEE_ROLES.map(r => (<option key={r.value} value={r.value}>{r.label}</option>))}
+            {roleOptions.map(option => (
+              <option key={option} value={option}>
+                {ROLE_LABELS[option]}
+              </option>
+            ))}
           </select>
         </Field>
 

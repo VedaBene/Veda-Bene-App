@@ -3,6 +3,7 @@ import { createClient } from '@/utils/supabase/server'
 import { EmployeeForm } from '@/components/employees/EmployeeForm'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { deleteEmployee } from '../actions'
+import { canManageEmployees } from '@/lib/employee-permissions'
 import { toEmployeeFormData } from '@/lib/server/view-models'
 import type { Role } from '@/lib/types/database'
 import type { EmployeeFormData } from '@/lib/types/view-models'
@@ -26,12 +27,10 @@ export default async function EmployeeDetailPage({
 
   const role = (profile?.role ?? 'cliente') as Role
 
-  if (!['admin', 'secretaria'].includes(role)) redirect('/dashboard')
+  if (!canManageEmployees(role)) redirect('/service-orders')
 
   const employeeSelect =
-    role === 'admin'
-      ? 'id, full_name, email, phone, birth_date, nationality, address, role, hourly_rate, monthly_salary, overtime_rate'
-      : 'id, full_name, email, phone, birth_date, nationality, address, role'
+    'id, full_name, email, phone, birth_date, nationality, address, role, hourly_rate, monthly_salary, overtime_rate'
 
   const { data: rawEmployee } = await supabase
     .from('profiles')
@@ -49,7 +48,7 @@ export default async function EmployeeDetailPage({
       <EmployeeForm
         employee={toEmployeeFormData(employee, role)}
         viewerRole={role}
-        deleteAction={role === 'admin' ? deleteEmployee.bind(null, id) : undefined}
+        deleteAction={canManageEmployees(role) ? deleteEmployee.bind(null, id) : undefined}
       />
     </div>
   )

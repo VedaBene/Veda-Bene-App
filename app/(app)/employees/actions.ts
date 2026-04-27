@@ -4,9 +4,9 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { z } from 'zod'
-import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { getSiteOrigin } from '@/utils/site-url'
+import { getAssignableEmployeeRoles } from '@/lib/employee-permissions'
 import { getAuthorizedClient } from '@/lib/server/authz'
 import { withLogging } from '@/lib/server/logger'
 
@@ -32,13 +32,17 @@ const employeeSchema = z.object({
 })
 
 async function createEmployeeImpl(formData: FormData) {
-  const { role } = await getAuthorizedClient()
+  const { supabase, role } = await getAuthorizedClient(['admin'])
 
   const raw = Object.fromEntries(formData)
   const parsed = employeeSchema.safeParse(raw)
   if (!parsed.success) return { success: false as const, error: parsed.error.issues[0].message }
 
   const { data } = parsed
+  const assignableRoles = getAssignableEmployeeRoles(role)
+  if (!assignableRoles.includes(data.role)) {
+    return { success: false as const, error: 'Sem permissão' }
+  }
 
   const adminClient = createAdminClient()
 
@@ -59,8 +63,9 @@ async function createEmployeeImpl(formData: FormData) {
 
   if (authError) return { success: false as const, error: authError.message }
 
-  // O trigger `handle_new_user` já cria o perfil; aqui atualizamos com os dados completos
-  const { error: profileError } = await adminClient
+  // O trigger `handle_new_user` já cria o perfil; aqui o admin autenticado
+  // atualiza o perfil via RLS normal em vez de usar service_role.
+  const { error: profileError } = await supabase
     .from('profiles')
     .update({
       full_name: data.full_name,
@@ -69,11 +74,9 @@ async function createEmployeeImpl(formData: FormData) {
       nationality: data.nationality ?? null,
       address: data.address ?? null,
       role: data.role,
-      ...(role === 'admin' && {
-        hourly_rate: data.hourly_rate ?? null,
-        monthly_salary: data.has_fixed_salary ? (data.monthly_salary ?? null) : null,
-        overtime_rate: data.has_fixed_salary ? (data.overtime_rate ?? null) : null,
-      }),
+      hourly_rate: data.hourly_rate ?? null,
+      monthly_salary: data.has_fixed_salary ? (data.monthly_salary ?? null) : null,
+      overtime_rate: data.has_fixed_salary ? (data.overtime_rate ?? null) : null,
     })
     .eq('id', authUser.user.id)
 
@@ -84,14 +87,17 @@ async function createEmployeeImpl(formData: FormData) {
 }
 
 async function updateEmployeeImpl(id: string, formData: FormData) {
-  const { role } = await getAuthorizedClient()
+  const { supabase, role } = await getAuthorizedClient(['admin'])
 
   const raw = Object.fromEntries(formData)
   const parsed = employeeSchema.safeParse(raw)
   if (!parsed.success) return { success: false as const, error: parsed.error.issues[0].message }
 
   const { data } = parsed
-  const supabase = await createClient()
+  const assignableRoles = getAssignableEmployeeRoles(role)
+  if (!assignableRoles.includes(data.role)) {
+    return { success: false as const, error: 'Sem permissão' }
+  }
 
   const { error } = await supabase
     .from('profiles')
@@ -101,12 +107,10 @@ async function updateEmployeeImpl(id: string, formData: FormData) {
       birth_date: data.birth_date ?? null,
       nationality: data.nationality ?? null,
       address: data.address ?? null,
-      ...(role === 'admin' && { role: data.role }),
-      ...(role === 'admin' && {
-        hourly_rate: data.hourly_rate ?? null,
-        monthly_salary: data.has_fixed_salary ? (data.monthly_salary ?? null) : null,
-        overtime_rate: data.has_fixed_salary ? (data.overtime_rate ?? null) : null,
-      }),
+      role: data.role,
+      hourly_rate: data.hourly_rate ?? null,
+      monthly_salary: data.has_fixed_salary ? (data.monthly_salary ?? null) : null,
+      overtime_rate: data.has_fixed_salary ? (data.overtime_rate ?? null) : null,
     })
     .eq('id', id)
 
