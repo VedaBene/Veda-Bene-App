@@ -1,6 +1,7 @@
 import 'server-only'
 
 import { createClient } from '@/utils/supabase/server'
+import { resolveOrderHours } from '@/lib/server/hours'
 
 function escapeCSV(value: string | number | null | undefined): string {
   if (value == null) return ''
@@ -56,10 +57,10 @@ export async function exportPayableCSV(startDate: string, endDate: string, emplo
   }
 
   for (const o of orders) {
-    const wm = (o as { worked_minutes?: number | null }).worked_minutes
-    const hours = wm != null
-      ? wm / 60
-      : (o.property as { avg_cleaning_hours?: number | null } | null)?.avg_cleaning_hours ?? 0
+    const hours = resolveOrderHours(
+      o as { worked_minutes: number | null },
+      o.property as unknown as { avg_cleaning_hours: number | null } | null,
+    )
     if (o.cleaning_staff_id && map.has(o.cleaning_staff_id)) {
       const s = map.get(o.cleaning_staff_id)!; s.os_count++; s.total_hours += hours
     }

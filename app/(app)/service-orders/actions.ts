@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { getAuthorizedClient } from '@/lib/server/authz'
-import { calculateTotalPrice, recalculateOrderPricing } from '@/lib/server/pricing'
+import { calculateTotalPrice, loadOrderPricingContext, recalculateOrderPricing } from '@/lib/server/pricing'
 import { withLogging } from '@/lib/server/logger'
 import type { OSStatus, PricingMode } from '@/lib/types/database'
 
@@ -102,24 +102,16 @@ async function updateServiceOrderImpl(id: string, formData: FormData) {
 
   const { data } = parsed
 
-  const [{ data: property }, { data: current }] = await Promise.all([
-    supabase
-      .from('properties')
-      .select('base_price, extra_per_person, min_guests')
-      .eq('id', data.property_id)
-      .single(),
-    supabase.from('service_orders').select('worked_minutes').eq('id', id).single(),
-  ])
-
-  const total_price = property
+  const ctx = await loadOrderPricingContext(supabase, id, data.property_id)
+  const total_price = ctx?.property
     ? calculateTotalPrice(
         data.pricing_mode,
-        property.base_price,
-        property.extra_per_person,
+        ctx.property.base_price,
+        ctx.property.extra_per_person,
         data.real_guests ?? null,
-        property.min_guests,
+        ctx.property.min_guests,
         data.extra_services_price ?? null,
-        current?.worked_minutes ?? null,
+        ctx.workedMinutes,
       )
     : null
 
@@ -221,30 +213,18 @@ async function updateExtraServicesImpl(
 ) {
   const { supabase } = await getAuthorizedClient()
 
-  // Fetch the current order + property to recalculate total_price
-  const { data: order } = await supabase
-    .from('service_orders')
-    .select('property_id, real_guests, worked_minutes')
-    .eq('id', id)
-    .single()
+  const ctx = await loadOrderPricingContext(supabase, id)
+  if (!ctx) return { success: false as const, error: 'OS não encontrada' }
 
-  if (!order) return { success: false as const, error: 'OS não encontrada' }
-
-  const { data: property } = await supabase
-    .from('properties')
-    .select('base_price, extra_per_person, min_guests')
-    .eq('id', order.property_id)
-    .single()
-
-  const total_price = property
+  const total_price = ctx.property
     ? calculateTotalPrice(
         pricingMode,
-        property.base_price,
-        property.extra_per_person,
-        order.real_guests,
-        property.min_guests,
+        ctx.property.base_price,
+        ctx.property.extra_per_person,
+        ctx.realGuests,
+        ctx.property.min_guests,
         price,
-        order.worked_minutes ?? null,
+        ctx.workedMinutes,
       )
     : null
 

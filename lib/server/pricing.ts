@@ -79,3 +79,55 @@ export async function recalculateOrderPricing(
   await supabase.from('service_orders').update({ total_price }).eq('id', orderId)
   return total_price
 }
+
+export type OrderPricingContext = {
+  propertyId: string
+  realGuests: number | null
+  workedMinutes: number | null
+  property: {
+    base_price: number | null
+    extra_per_person: number | null
+    min_guests: number | null
+  } | null
+}
+
+// Carrega num único select aninhado tudo que `calculateTotalPrice` precisa
+// para uma OS já existente (update / updateExtraServices). Retorna null se
+// a OS não existir.
+//
+// `overridePropertyId` cobre o caso em que o form de update troca o imóvel
+// vinculado: nesse caso o pricing deve refletir o imóvel novo (do form),
+// não o ainda persistido na OS. Quando o id passado bate com o atual,
+// reaproveita o join e evita a query extra.
+export async function loadOrderPricingContext(
+  supabase: SupabaseServerClient,
+  orderId: string,
+  overridePropertyId?: string,
+): Promise<OrderPricingContext | null> {
+  const { data } = await supabase
+    .from('service_orders')
+    .select('property_id, real_guests, worked_minutes, property:properties(base_price, extra_per_person, min_guests)')
+    .eq('id', orderId)
+    .single()
+
+  if (!data) return null
+
+  type PricingFields = { base_price: number | null; extra_per_person: number | null; min_guests: number | null }
+  let property = data.property as unknown as PricingFields | null
+
+  if (overridePropertyId && overridePropertyId !== data.property_id) {
+    const { data: overrideProp } = await supabase
+      .from('properties')
+      .select('base_price, extra_per_person, min_guests')
+      .eq('id', overridePropertyId)
+      .single()
+    property = overrideProp ?? null
+  }
+
+  return {
+    propertyId: overridePropertyId ?? data.property_id,
+    realGuests: data.real_guests ?? null,
+    workedMinutes: data.worked_minutes ?? null,
+    property,
+  }
+}

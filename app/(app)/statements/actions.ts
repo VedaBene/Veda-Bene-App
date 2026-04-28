@@ -1,6 +1,7 @@
 'use server'
 
 import { getAuthorizedClient } from '@/lib/server/authz'
+import { resolveOrderHours } from '@/lib/server/hours'
 
 export type PayableRow = {
   employee_id: string
@@ -120,10 +121,10 @@ export async function fetchPayableData(
   }
 
   for (const o of orders) {
-    const wm = (o as { worked_minutes?: number | null }).worked_minutes
-    const hours = wm != null
-      ? wm / 60
-      : (o.property as { avg_cleaning_hours?: number | null } | null)?.avg_cleaning_hours ?? 0
+    const hours = resolveOrderHours(
+      o as { worked_minutes: number | null },
+      o.property as unknown as { avg_cleaning_hours: number | null } | null,
+    )
     if (o.cleaning_staff_id && map.has(o.cleaning_staff_id)) {
       const row = map.get(o.cleaning_staff_id)!
       row.os_count++
@@ -373,9 +374,7 @@ export async function fetchPayableDetail(
       property: { name: string; avg_cleaning_hours: number | null } | null
     }
 
-    const hours = order.worked_minutes != null
-      ? order.worked_minutes / 60
-      : order.property?.avg_cleaning_hours ?? 0
+    const hours = resolveOrderHours(order, order.property)
 
     const staffIdsForOrder = new Set<string>()
     if (order.cleaning_staff_id) staffIdsForOrder.add(order.cleaning_staff_id)

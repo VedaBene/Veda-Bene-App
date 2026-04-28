@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import { captureQueryError } from '@/lib/server/logger'
+import { resolveOrderHours } from '@/lib/server/hours'
 import type { Role } from '@/lib/types/database'
 
 function unwrap<T>(
@@ -158,13 +159,7 @@ export async function fetchDashboardData(): Promise<{ data: DashboardData; role:
   // Horas trabalhadas no mês
   const hoursData = unwrap<{ worked_minutes: number | null; property: { avg_cleaning_hours: number | null } | null }>(hoursRes, 'hours_this_month')
   const hoursThisMonth = Math.round(
-    hoursData.reduce((sum, o) => {
-      const wm = (o as { worked_minutes?: number | null }).worked_minutes
-      const hours = wm != null
-        ? wm / 60
-        : ((o.property as { avg_cleaning_hours?: number | null } | null)?.avg_cleaning_hours ?? 0)
-      return sum + hours
-    }, 0) * 100
+    hoursData.reduce((sum, o) => sum + resolveOrderHours(o, o.property), 0) * 100
   ) / 100
 
   // Receita do mês
@@ -237,10 +232,7 @@ export async function fetchDashboardData(): Promise<{ data: DashboardData; role:
     const monthOrders = recentOrders.filter(o => o.completed_at?.startsWith(key))
     let cost = 0
     for (const o of monthOrders) {
-      const wm = (o as { worked_minutes?: number | null }).worked_minutes
-      const hours = wm != null
-        ? wm / 60
-        : ((o.property as { avg_cleaning_hours?: number | null } | null)?.avg_cleaning_hours ?? 0)
+      const hours = resolveOrderHours(o, o.property)
       for (const staffId of [o.cleaning_staff_id, o.consegna_staff_id]) {
         if (!staffId) continue
         const p = profilesMap.get(staffId)
