@@ -61,12 +61,12 @@ export default async function PropertyDetailPage({
 
   const property = rawProperty as unknown as PropertyFormData
 
-  let agencies: { id: string; name: string }[] = []
-  let owners: { id: string; name: string }[] = []
+  let agencies: { id: string; name: string; email: string | null }[] = []
+  let owners: { id: string; name: string; email: string | null }[] = []
   if (role === 'admin' || role === 'secretaria') {
     const [{ data: agenciesData }, { data: ownersData }] = await Promise.all([
-      supabase.from('agencies').select('id, name').order('name'),
-      supabase.from('owners').select('id, name').order('name'),
+      supabase.from('agencies').select('id, name, email').order('name'),
+      supabase.from('owners').select('id, name, email').order('name'),
     ])
     agencies = agenciesData ?? []
     owners = ownersData ?? []

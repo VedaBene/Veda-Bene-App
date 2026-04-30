@@ -33,10 +33,12 @@ const propertySchema = z.object({
   agency_id: optStr,
   new_agency_name: optStr,
   new_agency_email: optStr,
+  existing_agency_email: optStr,
   // particular
   owner_id: optStr,
   new_owner_name: optStr,
   new_owner_email: optStr,
+  existing_owner_email: optStr,
   // metragem
   sqm_interior: optNum,
   sqm_exterior: optNum,
@@ -93,6 +95,42 @@ async function resolveRelations(
     owner_id = o.id
   }
 
+  if (
+    data.client_type === 'rental' &&
+    agency_id &&
+    data.existing_agency_email &&
+    !data.new_agency_name
+  ) {
+    const { data: updated, error } = await supabase
+      .from('agencies')
+      .update({ email: data.existing_agency_email })
+      .eq('id', agency_id)
+      .is('email', null)
+      .select('id')
+    if (error) throw new Error('Erro ao atualizar email da agência: ' + error.message)
+    if (!updated || updated.length === 0) {
+      throw new Error('Esta agência já possui email cadastrado.')
+    }
+  }
+
+  if (
+    data.client_type === 'particular' &&
+    owner_id &&
+    data.existing_owner_email &&
+    !data.new_owner_name
+  ) {
+    const { data: updated, error } = await supabase
+      .from('owners')
+      .update({ email: data.existing_owner_email })
+      .eq('id', owner_id)
+      .is('email', null)
+      .select('id')
+    if (error) throw new Error('Erro ao atualizar email do proprietário: ' + error.message)
+    if (!updated || updated.length === 0) {
+      throw new Error('Este proprietário já possui email cadastrado.')
+    }
+  }
+
   return { agency_id, owner_id }
 }
 
@@ -137,7 +175,13 @@ async function createPropertyImpl(formData: FormData) {
   const parsed = propertySchema.safeParse(Object.fromEntries(formData))
   if (!parsed.success) return { success: false as const, error: parsed.error.issues[0].message }
 
-  const { agency_id, owner_id } = await resolveRelations(supabase, parsed.data)
+  let agency_id: string | null
+  let owner_id: string | null
+  try {
+    ;({ agency_id, owner_id } = await resolveRelations(supabase, parsed.data))
+  } catch (e) {
+    return { success: false as const, error: e instanceof Error ? e.message : 'Erro ao processar relações.' }
+  }
 
   const { error } = await supabase
     .from('properties')
@@ -155,7 +199,13 @@ async function updatePropertyImpl(id: string, formData: FormData) {
   const parsed = propertySchema.safeParse(Object.fromEntries(formData))
   if (!parsed.success) return { success: false as const, error: parsed.error.issues[0].message }
 
-  const { agency_id, owner_id } = await resolveRelations(supabase, parsed.data)
+  let agency_id: string | null
+  let owner_id: string | null
+  try {
+    ;({ agency_id, owner_id } = await resolveRelations(supabase, parsed.data))
+  } catch (e) {
+    return { success: false as const, error: e instanceof Error ? e.message : 'Erro ao processar relações.' }
+  }
 
   const { error } = await supabase
     .from('properties')

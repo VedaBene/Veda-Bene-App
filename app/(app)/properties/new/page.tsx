@@ -21,8 +21,8 @@ export default async function NewPropertyPage() {
   if (role !== 'admin') redirect('/properties')
 
   const [{ data: agencies }, { data: owners }] = await Promise.all([
-    supabase.from('agencies').select('id, name').order('name'),
-    supabase.from('owners').select('id, name').order('name'),
+    supabase.from('agencies').select('id, name, email').order('name'),
+    supabase.from('owners').select('id, name, email').order('name'),
   ])
 
   return (

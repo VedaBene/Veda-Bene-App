@@ -101,8 +101,8 @@ export function PropertyForm({
   readOnly = false,
 }: {
   property?: PropertyFormData
-  agencies: { id: string; name: string }[]
-  owners: { id: string; name: string }[]
+  agencies: { id: string; name: string; email: string | null }[]
+  owners: { id: string; name: string; email: string | null }[]
   role: Role
   deleteAction?: () => Promise<{ success: false; error: string } | void>
   readOnly?: boolean
@@ -138,6 +138,7 @@ export function PropertyForm({
   const [agencyId, setAgencyId] = useState(property?.agency_id ?? agencies[0]?.id ?? '')
   const [newAgencyName, setNewAgencyName] = useState('')
   const [newAgencyEmail, setNewAgencyEmail] = useState('')
+  const [existingAgencyEmail, setExistingAgencyEmail] = useState('')
 
   const [ownerMode, setOwnerMode] = useState<'existing' | 'new'>(
     property?.owner_id ? 'existing' : owners.length === 0 ? 'new' : 'existing',
@@ -145,6 +146,14 @@ export function PropertyForm({
   const [ownerId, setOwnerId] = useState(property?.owner_id ?? owners[0]?.id ?? '')
   const [newOwnerName, setNewOwnerName] = useState('')
   const [newOwnerEmail, setNewOwnerEmail] = useState('')
+  const [existingOwnerEmail, setExistingOwnerEmail] = useState('')
+
+  const selectedAgency = agencies.find((a) => a.id === agencyId)
+  const selectedOwner = owners.find((o) => o.id === ownerId)
+  const agencyEmailMissing =
+    agencyMode === 'existing' && !!selectedAgency && !selectedAgency.email
+  const ownerEmailMissing =
+    ownerMode === 'existing' && !!selectedOwner && !selectedOwner.email
 
   const [sqmInterior, setSqmInterior] = useState(property?.sqm_interior?.toString() ?? '')
   const [sqmExterior, setSqmExterior] = useState(property?.sqm_exterior?.toString() ?? '')
@@ -190,6 +199,9 @@ export function PropertyForm({
     if (clientType === 'rental') {
       if (agencyMode === 'existing') {
         fd.set('agency_id', agencyId)
+        if (agencyEmailMissing && existingAgencyEmail.trim()) {
+          fd.set('existing_agency_email', existingAgencyEmail.trim())
+        }
       } else {
         fd.set('new_agency_name', newAgencyName)
         fd.set('new_agency_email', newAgencyEmail)
@@ -197,6 +209,9 @@ export function PropertyForm({
     } else {
       if (ownerMode === 'existing') {
         fd.set('owner_id', ownerId)
+        if (ownerEmailMissing && existingOwnerEmail.trim()) {
+          fd.set('existing_owner_email', existingOwnerEmail.trim())
+        }
       } else {
         fd.set('new_owner_name', newOwnerName)
         fd.set('new_owner_email', newOwnerEmail)
@@ -295,9 +310,26 @@ export function PropertyForm({
               />
             )}
             {agencyMode === 'existing' ? (
-              <select value={agencyId} onChange={(e) => setAgencyId(e.target.value)} disabled={readOnly} className={inputCls}>
-                {agencies.map((a) => (<option key={a.id} value={a.id}>{a.name}</option>))}
-              </select>
+              <div className="space-y-2">
+                <select value={agencyId} onChange={(e) => { setAgencyId(e.target.value); setExistingAgencyEmail('') }} disabled={readOnly} className={inputCls}>
+                  {agencies.map((a) => (<option key={a.id} value={a.id}>{a.name}</option>))}
+                </select>
+                {agencyEmailMissing && (
+                  <div className="space-y-1">
+                    <input
+                      type="email"
+                      value={existingAgencyEmail}
+                      onChange={(e) => setExistingAgencyEmail(e.target.value)}
+                      placeholder="Email"
+                      className={inputCls}
+                      disabled={readOnly}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Esta agência não tem email cadastrado. Preencha para liberar acesso ao cliente.
+                    </p>
+                  </div>
+                )}
+              </div>
             ) : (
               <div className="space-y-2">
                 <input type="text" value={newAgencyName} onChange={(e) => setNewAgencyName(e.target.value)} placeholder="Nome da agência *" className={inputCls} disabled={readOnly} />
@@ -321,9 +353,26 @@ export function PropertyForm({
               />
             )}
             {ownerMode === 'existing' ? (
-              <select value={ownerId} onChange={(e) => setOwnerId(e.target.value)} disabled={readOnly} className={inputCls}>
-                {owners.map((o) => (<option key={o.id} value={o.id}>{o.name}</option>))}
-              </select>
+              <div className="space-y-2">
+                <select value={ownerId} onChange={(e) => { setOwnerId(e.target.value); setExistingOwnerEmail('') }} disabled={readOnly} className={inputCls}>
+                  {owners.map((o) => (<option key={o.id} value={o.id}>{o.name}</option>))}
+                </select>
+                {ownerEmailMissing && (
+                  <div className="space-y-1">
+                    <input
+                      type="email"
+                      value={existingOwnerEmail}
+                      onChange={(e) => setExistingOwnerEmail(e.target.value)}
+                      placeholder="Email"
+                      className={inputCls}
+                      disabled={readOnly}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Este proprietário não tem email cadastrado. Preencha para liberar acesso ao cliente.
+                    </p>
+                  </div>
+                )}
+              </div>
             ) : (
               <div className="space-y-2">
                 <input type="text" value={newOwnerName} onChange={(e) => setNewOwnerName(e.target.value)} placeholder="Nome do proprietário *" className={inputCls} disabled={readOnly} />
