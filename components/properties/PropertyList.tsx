@@ -63,7 +63,7 @@ export function PropertyList({
       <div className="p-4 border-b border-border/50">
         <Input
           type="text"
-          placeholder="Buscar por nome..."
+          placeholder="Cerca per nome..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           leftIcon={<Search size={16} />}
@@ -80,7 +80,7 @@ export function PropertyList({
                 <Building2 size={20} className="text-muted-foreground/50" />
               </div>
               <p className="text-sm text-muted-foreground font-medium">
-                {q ? 'Nenhum imóvel encontrado.' : 'Nenhum imóvel cadastrado.'}
+                {q ? 'Nessun immobile trovato.' : 'Nessun immobile registrato.'}
               </p>
             </div>
           </div>
@@ -112,13 +112,13 @@ export function PropertyList({
                     <span className="font-medium text-foreground">{p.zone}</span>
                   </div>
                   <div className="text-xs text-muted-foreground line-clamp-1">
-                    {p.address ?? 'Sem endereço cadastrado'}
+                    {p.address ?? 'Nessun indirizzo registrato'}
                   </div>
                 </div>
 
                 {showPrice && p.base_price != null && (
                   <div className="mt-3 pt-3 border-t border-border/50 flex justify-between items-center">
-                    <span className="text-xs text-muted-foreground">Preço Base</span>
+                    <span className="text-xs text-muted-foreground">Prezzo Base</span>
                     <span className="font-medium text-foreground text-sm">
                       € {p.base_price.toFixed(2)}
                     </span>
@@ -140,9 +140,9 @@ export function PropertyList({
                 <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Tipo</th>
               )}
               <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Zona</th>
-              <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Endereço</th>
+              <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Indirizzo</th>
               {showPrice && (
-                <th className="text-right px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Preço Base</th>
+                <th className="text-right px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Prezzo Base</th>
               )}
             </tr>
           </thead>
@@ -158,7 +158,7 @@ export function PropertyList({
                       <Building2 size={20} className="text-muted-foreground/50" />
                     </div>
                     <p className="text-sm text-muted-foreground font-medium">
-                      {q ? 'Nenhum imóvel encontrado.' : 'Nenhum imóvel cadastrado.'}
+                      {q ? 'Nessun immobile trovato.' : 'Nessun immobile registrato.'}
                     </p>
                   </div>
                 </td>

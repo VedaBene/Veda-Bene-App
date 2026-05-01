@@ -27,7 +27,7 @@ export default async function NewPropertyPage() {
 
   return (
     <div className="animate-fade-in-up">
-      <PageHeader title="Novo Imóvel" />
+      <PageHeader title="Nuovo Immobile" />
       <PropertyForm
         agencies={agencies ?? []}
         owners={owners ?? []}

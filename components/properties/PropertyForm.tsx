@@ -257,7 +257,7 @@ export function PropertyForm({
     if (!deleteAction) return
     if (
       !window.confirm(
-        'Tem certeza que deseja excluir este imóvel? Esta ação não pode ser desfeita.',
+        'Sei sicuro di voler eliminare questo immobile? Questa azione non può essere annullata.',
       )
     )
       return
@@ -273,21 +273,21 @@ export function PropertyForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-4 max-w-3xl">
       <Section
-        title="1. Identificação"
+        title="1. Anagrafica"
         icon={<Building2 size={18} />}
         isOpen={open.identification}
         onToggle={() => toggle('identification')}
       >
         <Field label="Nome" required full>
-          <input type="text" value={name} onChange={(e) => setName(e.target.value)} required={!readOnly} disabled={readOnly} className={inputCls} placeholder="Nome do imóvel" />
+          <input type="text" value={name} onChange={(e) => setName(e.target.value)} required={!readOnly} disabled={readOnly} className={inputCls} placeholder="Nome dell'immobile" />
         </Field>
 
         {showSensitiveInfo && (
-          <Field label="Tipo de Cliente" required full>
+          <Field label="Tipo di Cliente" required full>
             <ModeToggle
               options={[
-                { value: 'rental', label: 'Agência' },
-                { value: 'particular', label: 'Particular' },
+                { value: 'rental', label: 'Agenzia' },
+                { value: 'particular', label: 'Privato' },
               ]}
               value={clientType}
               onChange={(v) => setClientType(v as 'rental' | 'particular')}
@@ -297,12 +297,12 @@ export function PropertyForm({
         )}
 
         {showSensitiveInfo && clientType === 'rental' && (
-          <Field label="Agência" full>
+          <Field label="Agenzia" full>
             {agencies.length > 0 && (
               <SmallToggle
                 options={[
-                  { value: 'existing', label: 'Selecionar existente' },
-                  { value: 'new', label: 'Criar nova' },
+                  { value: 'existing', label: 'Seleziona esistente' },
+                  { value: 'new', label: 'Crea nuova' },
                 ]}
                 value={agencyMode}
                 onChange={(v) => setAgencyMode(v as 'existing' | 'new')}
@@ -325,14 +325,14 @@ export function PropertyForm({
                       disabled={readOnly}
                     />
                     <p className="text-xs text-muted-foreground">
-                      Esta agência não tem email cadastrado. Preencha para liberar acesso ao cliente.
+                      Questa agenzia non ha un'email registrata. Compila per consentire l'accesso al cliente.
                     </p>
                   </div>
                 )}
               </div>
             ) : (
               <div className="space-y-2">
-                <input type="text" value={newAgencyName} onChange={(e) => setNewAgencyName(e.target.value)} placeholder="Nome da agência *" className={inputCls} disabled={readOnly} />
+                <input type="text" value={newAgencyName} onChange={(e) => setNewAgencyName(e.target.value)} placeholder="Nome dell'agenzia *" className={inputCls} disabled={readOnly} />
                 <input type="email" value={newAgencyEmail} onChange={(e) => setNewAgencyEmail(e.target.value)} placeholder="Email" className={inputCls} disabled={readOnly} />
               </div>
             )}
@@ -340,12 +340,12 @@ export function PropertyForm({
         )}
 
         {showSensitiveInfo && clientType === 'particular' && (
-          <Field label="Proprietário" full>
+          <Field label="Proprietario" full>
             {owners.length > 0 && (
               <SmallToggle
                 options={[
-                  { value: 'existing', label: 'Selecionar existente' },
-                  { value: 'new', label: 'Criar novo' },
+                  { value: 'existing', label: 'Seleziona esistente' },
+                  { value: 'new', label: 'Crea nuovo' },
                 ]}
                 value={ownerMode}
                 onChange={(v) => setOwnerMode(v as 'existing' | 'new')}
@@ -368,14 +368,14 @@ export function PropertyForm({
                       disabled={readOnly}
                     />
                     <p className="text-xs text-muted-foreground">
-                      Este proprietário não tem email cadastrado. Preencha para liberar acesso ao cliente.
+                      Questo proprietario non ha un'email registrata. Compila per consentire l'accesso al cliente.
                     </p>
                   </div>
                 )}
               </div>
             ) : (
               <div className="space-y-2">
-                <input type="text" value={newOwnerName} onChange={(e) => setNewOwnerName(e.target.value)} placeholder="Nome do proprietário *" className={inputCls} disabled={readOnly} />
+                <input type="text" value={newOwnerName} onChange={(e) => setNewOwnerName(e.target.value)} placeholder="Nome del proprietario *" className={inputCls} disabled={readOnly} />
                 <input type="email" value={newOwnerEmail} onChange={(e) => setNewOwnerEmail(e.target.value)} placeholder="Email" className={inputCls} disabled={readOnly} />
               </div>
             )}
@@ -389,25 +389,25 @@ export function PropertyForm({
         </Field>
 
         {showSensitiveInfo && (
-          <Field label="Telefone">
+          <Field label="Telefono">
             <input type="text" value={phone} onChange={(e) => setPhone(applyItalianPhoneMask(e.target.value))} disabled={readOnly} className={inputCls} placeholder="+39 000 000 0000" />
           </Field>
         )}
 
-        <Field label="Endereço" full>
+        <Field label="Indirizzo" full>
           <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} disabled={readOnly} className={inputCls} />
         </Field>
 
-        <Field label="CEP">
+        <Field label="CAP">
           <input type="text" value={zipCode} onChange={(e) => setZipCode(e.target.value)} disabled={readOnly} className={inputCls} />
         </Field>
       </Section>
 
-      <Section title="2. Metragem" icon={<Ruler size={18} />} isOpen={open.metragem} onToggle={() => toggle('metragem')}>
+      <Section title="2. Metratura" icon={<Ruler size={18} />} isOpen={open.metragem} onToggle={() => toggle('metragem')}>
         <Field label="Interno (m²)">
           <input type="number" step="0.1" min="0" value={sqmInterior} onChange={(e) => setSqmInterior(e.target.value)} disabled={readOnly} className={inputCls} />
         </Field>
-        <Field label="Externo (m²)">
+        <Field label="Esterno (m²)">
           <input type="number" step="0.1" min="0" value={sqmExterior} onChange={(e) => setSqmExterior(e.target.value)} disabled={readOnly} className={inputCls} />
         </Field>
         <Field label="Total (m²)">
@@ -415,30 +415,30 @@ export function PropertyForm({
         </Field>
       </Section>
 
-      <Section title="3. Capacidade e Estrutura" icon={<BedDouble size={18} />} isOpen={open.capacidade} onToggle={() => toggle('capacidade')}>
-        <Field label="Mín. Hóspedes"><input type="number" min="0" value={minGuests} onChange={(e) => setMinGuests(e.target.value)} disabled={readOnly} className={inputCls} /></Field>
-        <Field label="Máx. Hóspedes"><input type="number" min="0" value={maxGuests} onChange={(e) => setMaxGuests(e.target.value)} disabled={readOnly} className={inputCls} /></Field>
-        <Field label="Camas de Casal"><input type="number" min="0" value={doubleBeds} onChange={(e) => setDoubleBeds(e.target.value)} disabled={readOnly} className={inputCls} /></Field>
-        <Field label="Camas de Solteiro"><input type="number" min="0" value={singleBeds} onChange={(e) => setSingleBeds(e.target.value)} disabled={readOnly} className={inputCls} /></Field>
-        <Field label="Sofá-camas"><input type="number" min="0" value={sofaBeds} onChange={(e) => setSofaBeds(e.target.value)} disabled={readOnly} className={inputCls} /></Field>
-        <Field label="Poltrona-camas"><input type="number" min="0" value={armchairBeds} onChange={(e) => setArmchairBeds(e.target.value)} disabled={readOnly} className={inputCls} /></Field>
-        <Field label="Quartos"><input type="number" min="0" value={bedrooms} onChange={(e) => setBedrooms(e.target.value)} disabled={readOnly} className={inputCls} /></Field>
-        <Field label="Banheiros"><input type="number" min="0" value={bathrooms} onChange={(e) => setBathrooms(e.target.value)} disabled={readOnly} className={inputCls} /></Field>
-        <Field label="Bidês"><input type="number" min="0" value={bidets} onChange={(e) => setBidets(e.target.value)} disabled={readOnly} className={inputCls} /></Field>
-        <Field label="Berços"><input type="number" min="0" value={cribs} onChange={(e) => setCribs(e.target.value)} disabled={readOnly} className={inputCls} /></Field>
+      <Section title="3. Capacità e Struttura" icon={<BedDouble size={18} />} isOpen={open.capacidade} onToggle={() => toggle('capacidade')}>
+        <Field label="Min. Ospiti"><input type="number" min="0" value={minGuests} onChange={(e) => setMinGuests(e.target.value)} disabled={readOnly} className={inputCls} /></Field>
+        <Field label="Max. Ospiti"><input type="number" min="0" value={maxGuests} onChange={(e) => setMaxGuests(e.target.value)} disabled={readOnly} className={inputCls} /></Field>
+        <Field label="Letti Matrimoniali"><input type="number" min="0" value={doubleBeds} onChange={(e) => setDoubleBeds(e.target.value)} disabled={readOnly} className={inputCls} /></Field>
+        <Field label="Letti Singoli"><input type="number" min="0" value={singleBeds} onChange={(e) => setSingleBeds(e.target.value)} disabled={readOnly} className={inputCls} /></Field>
+        <Field label="Divani Letto"><input type="number" min="0" value={sofaBeds} onChange={(e) => setSofaBeds(e.target.value)} disabled={readOnly} className={inputCls} /></Field>
+        <Field label="Poltrone Letto"><input type="number" min="0" value={armchairBeds} onChange={(e) => setArmchairBeds(e.target.value)} disabled={readOnly} className={inputCls} /></Field>
+        <Field label="Camere"><input type="number" min="0" value={bedrooms} onChange={(e) => setBedrooms(e.target.value)} disabled={readOnly} className={inputCls} /></Field>
+        <Field label="Bagni"><input type="number" min="0" value={bathrooms} onChange={(e) => setBathrooms(e.target.value)} disabled={readOnly} className={inputCls} /></Field>
+        <Field label="Bidet"><input type="number" min="0" value={bidets} onChange={(e) => setBidets(e.target.value)} disabled={readOnly} className={inputCls} /></Field>
+        <Field label="Culle"><input type="number" min="0" value={cribs} onChange={(e) => setCribs(e.target.value)} disabled={readOnly} className={inputCls} /></Field>
       </Section>
 
       {showPricing && (
-        <Section title="4. Precificação e Tempo" icon={<Euro size={18} />} isOpen={open.precificacao} onToggle={() => toggle('precificacao')}>
-          <Field label="Preço Base (€)"><input type="number" step="0.01" min="0" value={basePrice} onChange={(e) => setBasePrice(e.target.value)} disabled={readOnly} className={inputCls} /></Field>
-          <Field label="Adicional por Pessoa (€)"><input type="number" step="0.01" min="0" value={extraPerPerson} onChange={(e) => setExtraPerPerson(e.target.value)} disabled={readOnly} className={inputCls} /></Field>
-          <Field label="Tempo Médio de Limpeza (h)"><input type="number" step="0.5" min="0" value={avgCleaningHours} onChange={(e) => setAvgCleaningHours(e.target.value)} disabled={readOnly} className={inputCls} /></Field>
+        <Section title="4. Prezzi e Tempi" icon={<Euro size={18} />} isOpen={open.precificacao} onToggle={() => toggle('precificacao')}>
+          <Field label="Prezzo Base (€)"><input type="number" step="0.01" min="0" value={basePrice} onChange={(e) => setBasePrice(e.target.value)} disabled={readOnly} className={inputCls} /></Field>
+          <Field label="Supplemento per Persona (€)"><input type="number" step="0.01" min="0" value={extraPerPerson} onChange={(e) => setExtraPerPerson(e.target.value)} disabled={readOnly} className={inputCls} /></Field>
+          <Field label="Tempo Medio di Pulizia (h)"><input type="number" step="0.5" min="0" value={avgCleaningHours} onChange={(e) => setAvgCleaningHours(e.target.value)} disabled={readOnly} className={inputCls} /></Field>
         </Section>
       )}
 
-      <Section title="5. Observações" icon={<MessageSquare size={18} />} isOpen={open.observacoes} onToggle={() => toggle('observacoes')}>
-        <Field label="Observações" full>
-          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} disabled={readOnly} rows={4} className={`${inputCls} resize-none`} placeholder="Observações gerais sobre o imóvel..." />
+      <Section title="5. Note" icon={<MessageSquare size={18} />} isOpen={open.observacoes} onToggle={() => toggle('observacoes')}>
+        <Field label="Note" full>
+          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} disabled={readOnly} rows={4} className={`${inputCls} resize-none`} placeholder="Note generali sull'immobile..." />
         </Field>
       </Section>
 
@@ -452,19 +452,19 @@ export function PropertyForm({
       {success && (
         <div className="flex items-center gap-2 text-sm text-success bg-success-bg px-4 py-3 rounded-xl">
           <CheckCircle size={16} className="shrink-0" />
-          Imóvel salvo com sucesso.
+          Immobile salvato con successo.
         </div>
       )}
 
       {!readOnly && (
         <div className="flex items-center justify-between pt-2">
           <Button type="submit" isLoading={isPending} variant="accent">
-            {isPending ? 'Salvando…' : property ? 'Salvar Alterações' : 'Criar Imóvel'}
+            {isPending ? 'Salvataggio…' : property ? 'Salva Modifiche' : 'Crea Immobile'}
           </Button>
 
           {deleteAction && (
             <Button type="button" onClick={handleDelete} isLoading={isDeleting} variant="danger" size="sm">
-              {isDeleting ? 'Excluindo…' : 'Excluir Imóvel'}
+              {isDeleting ? 'Eliminazione…' : 'Elimina Immobile'}
             </Button>
           )}
         </div>

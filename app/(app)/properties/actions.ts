@@ -22,7 +22,7 @@ const intDef = (def = 0) =>
   z.preprocess(v => (v === '' || v == null ? def : Number(v)), z.number().int().min(0).default(def))
 
 const propertySchema = z.object({
-  name: z.string().min(1, 'Nome obrigatório'),
+  name: z.string().min(1, 'Nome obbligatorio'),
   client_type: z.enum(['rental', 'particular']),
   zone: z.enum(ZONES),
   phone: optStr,
@@ -78,7 +78,7 @@ async function resolveRelations(
       })
       .select('id')
       .single()
-    if (error) throw new Error('Erro ao criar agência: ' + error.message)
+    if (error) throw new Error("Errore nella creazione dell'agenzia: " + error.message)
     agency_id = a.id
   }
 
@@ -91,7 +91,7 @@ async function resolveRelations(
       })
       .select('id')
       .single()
-    if (error) throw new Error('Erro ao criar proprietário: ' + error.message)
+    if (error) throw new Error("Errore nella creazione del proprietario: " + error.message)
     owner_id = o.id
   }
 
@@ -107,9 +107,9 @@ async function resolveRelations(
       .eq('id', agency_id)
       .is('email', null)
       .select('id')
-    if (error) throw new Error('Erro ao atualizar email da agência: ' + error.message)
+    if (error) throw new Error("Errore nell'aggiornamento dell'email dell'agenzia: " + error.message)
     if (!updated || updated.length === 0) {
-      throw new Error('Esta agência já possui email cadastrado.')
+      throw new Error("Questa agenzia ha già un'email registrata.")
     }
   }
 
@@ -125,9 +125,9 @@ async function resolveRelations(
       .eq('id', owner_id)
       .is('email', null)
       .select('id')
-    if (error) throw new Error('Erro ao atualizar email do proprietário: ' + error.message)
+    if (error) throw new Error("Errore nell'aggiornamento dell'email del proprietario: " + error.message)
     if (!updated || updated.length === 0) {
-      throw new Error('Este proprietário já possui email cadastrado.')
+      throw new Error("Questo proprietario ha già un'email registrata.")
     }
   }
 
@@ -180,7 +180,7 @@ async function createPropertyImpl(formData: FormData) {
   try {
     ;({ agency_id, owner_id } = await resolveRelations(supabase, parsed.data))
   } catch (e) {
-    return { success: false as const, error: e instanceof Error ? e.message : 'Erro ao processar relações.' }
+    return { success: false as const, error: e instanceof Error ? e.message : "Errore nell'elaborazione delle relazioni." }
   }
 
   const { error } = await supabase
@@ -204,7 +204,7 @@ async function updatePropertyImpl(id: string, formData: FormData) {
   try {
     ;({ agency_id, owner_id } = await resolveRelations(supabase, parsed.data))
   } catch (e) {
-    return { success: false as const, error: e instanceof Error ? e.message : 'Erro ao processar relações.' }
+    return { success: false as const, error: e instanceof Error ? e.message : "Errore nell'elaborazione delle relazioni." }
   }
 
   const { error } = await supabase

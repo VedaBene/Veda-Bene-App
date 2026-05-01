@@ -58,11 +58,11 @@ export default async function PropertiesPage(props: PageProps<never>) {
   return (
     <div className="animate-fade-in-up">
       <PageHeader
-        title="Imóveis"
+        title="Immobili"
         action={
           role === 'admin' ? (
             <Link href="/properties/new">
-              <Button variant="accent" icon={<Plus size={16} />}>Novo Imóvel</Button>
+              <Button variant="accent" icon={<Plus size={16} />}>Nuovo Immobile</Button>
             </Link>
           ) : undefined
         }
