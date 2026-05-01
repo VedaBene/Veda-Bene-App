@@ -112,11 +112,11 @@ export default async function ServiceOrdersPage(props: PageProps<never>) {
   return (
     <div className="animate-fade-in-up">
       <PageHeader
-        title="Ordens de Serviço"
+        title="Ordini di Lavoro"
         action={
           ['admin', 'secretaria'].includes(role) ? (
             <Link href="/service-orders/new">
-              <Button variant="accent" icon={<Plus size={16} />}>Nova OS</Button>
+              <Button variant="accent" icon={<Plus size={16} />}>Nuovo O.L.</Button>
             </Link>
           ) : undefined
         }

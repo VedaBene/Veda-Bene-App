@@ -28,7 +28,7 @@ type NavItem = {
 const navItems: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin'] },
   { href: '/properties', label: 'Immobili', icon: Home, roles: ['admin', 'secretaria', 'limpeza', 'consegna', 'cliente'] },
-  { href: '/service-orders', label: 'Ordens de Serviço', icon: ClipboardList, roles: ['admin', 'secretaria', 'limpeza', 'consegna', 'cliente'] },
+  { href: '/service-orders', label: 'Ordini di Lavoro', icon: ClipboardList, roles: ['admin', 'secretaria', 'limpeza', 'consegna', 'cliente'] },
   { href: '/employees', label: 'Funcionários', icon: Users, roles: ['admin'] },
   { href: '/statements/payable', label: 'A Pagar', icon: ArrowUpRight, roles: ['admin'], group: 'Financeiro' },
   { href: '/statements/receivable', label: 'A Receber', icon: ArrowDownLeft, roles: ['admin'], group: 'Financeiro' },

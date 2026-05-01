@@ -17,7 +17,7 @@ const intDef = (def = 0) =>
   z.preprocess(v => (v === '' || v == null ? def : Number(v)), z.number().int().min(0).default(def))
 
 const serviceOrderSchema = z.object({
-  property_id: z.string().min(1, 'Imóvel obrigatório'),
+  property_id: z.string().min(1, 'Immobile obbligatorio'),
   cleaning_staff_id: optStr,
   consegna_staff_id: optStr,
   cleaning_date: optStr,
@@ -214,7 +214,7 @@ async function updateExtraServicesImpl(
   const { supabase } = await getAuthorizedClient()
 
   const ctx = await loadOrderPricingContext(supabase, id)
-  if (!ctx) return { success: false as const, error: 'OS não encontrada' }
+  if (!ctx) return { success: false as const, error: 'O.L. non trovato' }
 
   const total_price = ctx.property
     ? calculateTotalPrice(

@@ -39,7 +39,7 @@ export default async function NewServiceOrderPage() {
 
   return (
     <div className="animate-fade-in-up">
-      <PageHeader title="Nova Ordem de Serviço" />
+      <PageHeader title="Nuovo Ordine di Lavoro" />
       <ServiceOrderForm
         properties={(properties ?? []) as unknown as ServiceOrderPropertyOption[]}
         staff={(staffData ?? []) as StaffOption[]}

@@ -16,9 +16,9 @@ import type { ServiceOrderListItem } from '@/lib/types/view-models'
 import { Pagination } from '@/components/ui/Pagination'
 
 const STATUS_LABEL: Record<string, string> = {
-  open: 'Aberta',
-  in_progress: 'Em andamento',
-  done: 'Finalizada',
+  open: 'Aperto',
+  in_progress: 'In corso',
+  done: 'Completato',
 }
 
 const STATUS_VARIANT: Record<string, 'warning' | 'info' | 'success'> = {
@@ -47,7 +47,7 @@ function PricingModeBadge({ mode }: { mode: ServiceOrderListItem['pricing_mode']
 
 function formatDateTime(value: string | null | undefined) {
   if (!value) return '—'
-  return new Date(value).toLocaleString('pt-BR', {
+  return new Date(value).toLocaleString('it-IT', {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
@@ -64,13 +64,13 @@ function formatDate(value: string | null | undefined) {
 }
 
 const OCCUPANCY_FIELDS: { key: keyof ServiceOrderListItem; label: string }[] = [
-  { key: 'real_guests', label: 'Hóspedes' },
-  { key: 'double_beds', label: 'Camas Casal' },
-  { key: 'single_beds', label: 'Camas Solteiro' },
-  { key: 'sofa_beds', label: 'Sofá-camas' },
-  { key: 'bathrooms', label: 'Banheiros' },
-  { key: 'bidets', label: 'Bidês' },
-  { key: 'cribs', label: 'Berços' },
+  { key: 'real_guests', label: 'Ospiti' },
+  { key: 'double_beds', label: 'Letti Matrimoniali' },
+  { key: 'single_beds', label: 'Letti Singoli' },
+  { key: 'sofa_beds', label: 'Divani Letto' },
+  { key: 'bathrooms', label: 'Bagni' },
+  { key: 'bidets', label: 'Bidet' },
+  { key: 'cribs', label: 'Culle' },
 ]
 
 function escapeHtml(value: string): string {
@@ -83,8 +83,8 @@ function escapeHtml(value: string): string {
 }
 
 function generatePDF(orders: ServiceOrderListItem[], date: string) {
-  const dateLabel = date ? formatDate(date) : 'Todas as datas'
-  const now = new Date().toLocaleString('pt-BR', { timeZone: 'UTC' })
+  const dateLabel = date ? formatDate(date) : 'Tutte le date'
+  const now = new Date().toLocaleString('it-IT', { timeZone: 'UTC' })
 
   const totals: Record<string, number> = {}
   for (const { key } of OCCUPANCY_FIELDS) {
@@ -113,10 +113,10 @@ function generatePDF(orders: ServiceOrderListItem[], date: string) {
   `).join('')
 
   const html = `<!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="it">
 <head>
   <meta charset="UTF-8" />
-  <title>Ordens de Serviço — Veda Bene</title>
+  <title>Ordini di Lavoro — Veda Bene</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, sans-serif; font-size: 11px; color: #111; padding: 24px; }
@@ -136,24 +136,24 @@ function generatePDF(orders: ServiceOrderListItem[], date: string) {
   </style>
 </head>
 <body>
-  <h1>Veda Bene — Ordens de Serviço em Aberto</h1>
-  <p class="meta">Data: ${dateLabel} &nbsp;|&nbsp; Gerado em: ${now}</p>
+  <h1>Veda Bene — Ordini di Lavoro Aperti</h1>
+  <p class="meta">Data: ${dateLabel} &nbsp;|&nbsp; Generato il: ${now}</p>
   <table>
     <thead>
       <tr>
-        <th>OS #</th>
-        <th>Imóvel</th>
-        <th>Checkout</th>
-        <th>Checkin</th>
+        <th>O.L. #</th>
+        <th>Immobile</th>
+        <th>Check-out</th>
+        <th>Check-in</th>
         ${OCCUPANCY_FIELDS.map(({ label }) => `<th>${label}</th>`).join('')}
       </tr>
     </thead>
     <tbody>
-      ${rows || '<tr><td colspan="11" style="text-align:center;color:#999;padding:16px">Nenhuma OS encontrada</td></tr>'}
+      ${rows || '<tr><td colspan="11" style="text-align:center;color:#999;padding:16px">Nessun O.L. trovato</td></tr>'}
     </tbody>
   </table>
   ${activeTotalFields.length > 0 ? `
-  <h2>Totais</h2>
+  <h2>Totali</h2>
   <table class="totals-table">
     <tbody>${totalRows}</tbody>
   </table>` : ''}
@@ -246,7 +246,7 @@ function OSTable({
                 <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-xs text-muted-foreground">
                   <div>
                     <span className="block text-[10px] font-bold uppercase tracking-wider mb-0.5 text-muted-foreground/60">
-                      Limpeza
+                      Pulizia
                     </span>
                     <span className="font-semibold text-foreground/80">{formatDate(os.cleaning_date)}</span>
                   </div>
@@ -254,7 +254,7 @@ function OSTable({
                   {!isCliente && (
                     <div>
                       <span className="block text-[10px] font-bold uppercase tracking-wider mb-0.5 text-muted-foreground/60">
-                        Equipe
+                        Squadra
                       </span>
                       <div className="flex flex-col gap-0.5">
                         <span className="truncate" title={os.cleaning_staff?.full_name ?? '—'}>
@@ -269,7 +269,7 @@ function OSTable({
 
                   <div className="col-span-1">
                     <span className="block text-[10px] font-bold uppercase tracking-wider mb-0.5 text-muted-foreground/60">
-                      Checkout
+                      Check-out
                     </span>
                     <span className="font-medium">{formatDateTime(os.checkout_at)}</span>
                   </div>
@@ -283,7 +283,7 @@ function OSTable({
                   {!isCliente && os.status === 'in_progress' && os.started_at && (
                     <div className="col-span-2">
                       <span className="block text-[10px] font-bold uppercase tracking-wider mb-0.5 text-muted-foreground/60">
-                        Tempo em execução
+                        Tempo in corso
                       </span>
                       <div className="flex items-center gap-1.5">
                         <Timer size={13} className="text-info" />
@@ -295,7 +295,7 @@ function OSTable({
                   {!isCliente && os.status === 'done' && os.worked_minutes != null && (
                     <div className="col-span-2">
                       <span className="block text-[10px] font-bold uppercase tracking-wider mb-0.5 text-muted-foreground/60">
-                        Tempo total
+                        Tempo totale
                       </span>
                       <span className="font-semibold text-foreground/80">{formatWorkedTime(os.worked_minutes)}</span>
                     </div>
@@ -312,7 +312,7 @@ function OSTable({
                     onClick={() => onStart(os)}
                     className="w-full"
                   >
-                    Iniciar Limpeza
+                    Avvia Pulizia
                   </Button>
                 </div>
               )}
@@ -326,7 +326,7 @@ function OSTable({
                     onClick={() => onFinish(os)}
                     className="w-full"
                   >
-                    Finalizar Limpeza
+                    Completa Pulizia
                   </Button>
                 </div>
               )}
@@ -340,18 +340,18 @@ function OSTable({
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border/50 bg-muted/30">
-              <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">OS #</th>
-              <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Imóvel</th>
+              <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">O.L. #</th>
+              <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Immobile</th>
               <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Data</th>
-              <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Checkout</th>
-              <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Checkin</th>
+              <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Check-out</th>
+              <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Check-in</th>
               {!isCliente && (
                 <>
-                  <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Limpeza</th>
+                  <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Pulizia</th>
                   <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Consegna</th>
                 </>
               )}
-              <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Status</th>
+              <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Stato</th>
               <th className="px-5 py-3" />
             </tr>
           </thead>
@@ -417,7 +417,7 @@ function OSTable({
                           icon={<Play size={13} />}
                           onClick={() => onStart(os)}
                         >
-                          Iniciar
+                          Avvia
                         </Button>
                       )}
                       {isWorker && assigned && os.status === 'in_progress' && onFinish && (
@@ -427,14 +427,14 @@ function OSTable({
                           icon={<Flag size={13} />}
                           onClick={() => onFinish(os)}
                         >
-                          Finalizar
+                          Completa
                         </Button>
                       )}
                       <Link
                         href={`/service-orders/${os.id}`}
                         className="text-xs font-medium text-accent hover:text-accent/80 transition-colors"
                       >
-                        Ver
+                        Vedi
                       </Link>
                     </div>
                   </td>
@@ -553,7 +553,7 @@ export function ServiceOrderList({
       <div className="flex flex-wrap items-center gap-3">
         <Input
           type="text"
-          placeholder="Buscar por imóvel..."
+          placeholder="Cerca per immobile..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           leftIcon={<Search size={16} />}
@@ -571,16 +571,16 @@ export function ServiceOrderList({
             className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
             <X size={14} />
-            Limpar
+            Cancella
           </button>
         )}
       </div>
 
-      {/* Em Andamento */}
+      {/* In corso */}
       {inProgress.length > 0 && (
         <Card>
           <div className="px-5 py-3.5 border-b border-border/50 flex items-center gap-2.5">
-            <h2 className="text-sm font-semibold text-foreground">Em Andamento</h2>
+            <h2 className="text-sm font-semibold text-foreground">In corso</h2>
             <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-info/10 text-info text-[11px] font-bold">
               {inProgress.length}
             </span>
@@ -595,10 +595,10 @@ export function ServiceOrderList({
         </Card>
       )}
 
-      {/* Em Aberto */}
+      {/* Aperti */}
       <Card>
         <div className="px-5 py-3.5 border-b border-border/50 flex items-center gap-2.5">
-          <h2 className="text-sm font-semibold text-foreground">Em Aberto</h2>
+          <h2 className="text-sm font-semibold text-foreground">Aperti</h2>
           {open.length > 0 && (
             <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-warning-bg text-warning text-[11px] font-bold">
               {open.length}
@@ -617,16 +617,16 @@ export function ServiceOrderList({
         <OSTable
           orders={open}
           role={role}
-          emptyText="Nenhuma OS em aberto."
+          emptyText="Nessun O.L. aperto."
           userId={userId}
           onStart={setStartModalOrder}
         />
       </Card>
 
-      {/* Finalizadas */}
+      {/* Completati */}
       <Card>
         <div className="px-5 py-3.5 border-b border-border/50 flex items-center gap-2.5">
-          <h2 className="text-sm font-semibold text-foreground">Finalizadas</h2>
+          <h2 className="text-sm font-semibold text-foreground">Completati</h2>
           {done.length > 0 && (
             <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-success-bg text-success text-[11px] font-bold">
               {done.length}
@@ -636,7 +636,7 @@ export function ServiceOrderList({
         <OSTable
           orders={done}
           role={role}
-          emptyText="Nenhuma OS finalizada."
+          emptyText="Nessun O.L. completato."
           userId={userId}
         />
         <Pagination
@@ -647,14 +647,14 @@ export function ServiceOrderList({
         />
       </Card>
 
-      {/* Modal: Iniciar Limpeza */}
+      {/* Modal: Avvia Pulizia */}
       {startModalOrder && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="bg-card border border-border rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4 space-y-4">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-2">
                 <Play size={18} className="text-accent" />
-                <h2 className="text-base font-semibold text-foreground">Iniciar Limpeza</h2>
+                <h2 className="text-base font-semibold text-foreground">Avvia Pulizia</h2>
               </div>
               <button type="button" onClick={() => setStartModalOrder(null)} className="text-muted-foreground hover:text-foreground transition-colors">
                 <X size={18} />
@@ -663,56 +663,56 @@ export function ServiceOrderList({
 
             <div className="rounded-xl bg-muted/40 border border-border/50 px-4 py-3 space-y-2">
               <div className="flex items-center justify-between">
-                <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">OS</p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">O.L.</p>
                 <span className="text-xs font-mono text-muted-foreground">#{startModalOrder.order_number}</span>
               </div>
               <p className="text-sm font-semibold text-foreground">{startModalOrder.property?.name ?? '—'}</p>
 
               <div className="grid grid-cols-2 gap-2 pt-1 border-t border-border/30">
                 <div>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Checkout</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Check-out</p>
                   <p className="text-xs font-medium text-foreground">{formatDateTime(startModalOrder.checkout_at)}</p>
                 </div>
                 <div>
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Check-in</p>
                   <p className="text-xs font-medium text-foreground">
-                    {startModalOrder.checkin_at ? formatDateTime(startModalOrder.checkin_at) : 'Sem check-in programado'}
+                    {startModalOrder.checkin_at ? formatDateTime(startModalOrder.checkin_at) : 'Nessun check-in programmato'}
                   </p>
                 </div>
               </div>
 
               {startModalOrder.property?.avg_cleaning_hours != null && (
                 <div className="pt-1 border-t border-border/30">
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Tempo estimado</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Tempo Stimato</p>
                   <p className="text-xs font-medium text-foreground">{startModalOrder.property.avg_cleaning_hours}h</p>
                 </div>
               )}
             </div>
 
             <p className="text-sm text-muted-foreground">
-              Ao confirmar, o horário de início será registrado e o status passará para <strong>Em andamento</strong>.
+              Alla conferma, l&apos;orario di inizio verrà registrato e lo stato passerà a <strong>In corso</strong>.
             </p>
 
             <div className="flex gap-2 pt-1">
               <Button type="button" variant="ghost" onClick={() => setStartModalOrder(null)} className="flex-1">
-                Cancelar
+                Annulla
               </Button>
               <Button type="button" variant="accent" isLoading={isTrackingAction} onClick={handleStartCleaning} className="flex-1">
-                Confirmar
+                Conferma
               </Button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal: Finalizar Limpeza */}
+      {/* Modal: Completa Pulizia */}
       {finishModalOrder && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="bg-card border border-border rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4 space-y-4">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-2">
                 <Flag size={18} className="text-accent" />
-                <h2 className="text-base font-semibold text-foreground">Finalizar Limpeza</h2>
+                <h2 className="text-base font-semibold text-foreground">Completa Pulizia</h2>
               </div>
               <button type="button" onClick={() => { setFinishModalOrder(null); setFinishNotes('') }} className="text-muted-foreground hover:text-foreground transition-colors">
                 <X size={18} />
@@ -721,14 +721,14 @@ export function ServiceOrderList({
 
             <div className="rounded-xl bg-muted/40 border border-border/50 px-4 py-3 space-y-2">
               <div className="flex items-center justify-between">
-                <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">OS</p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">O.L.</p>
                 <span className="text-xs font-mono text-muted-foreground">#{finishModalOrder.order_number}</span>
               </div>
               <p className="text-sm font-semibold text-foreground">{finishModalOrder.property?.name ?? '—'}</p>
               {finishModalOrder.started_at && (
                 <div className="flex items-center gap-1.5 pt-1 border-t border-border/30">
                   <Timer size={13} className="text-info" />
-                  <span className="text-xs text-muted-foreground">Tempo em execução:</span>
+                  <span className="text-xs text-muted-foreground">Tempo in corso:</span>
                   <LiveTimer startedAt={finishModalOrder.started_at} />
                 </div>
               )}
@@ -736,27 +736,27 @@ export function ServiceOrderList({
 
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                Observações
+                Note
               </label>
               <textarea
                 value={finishNotes}
                 onChange={e => setFinishNotes(e.target.value)}
-                placeholder="Tudo OK, problemas encontrados, observações gerais…"
+                placeholder="Tutto OK, problemi riscontrati, note generali…"
                 rows={3}
                 className="w-full px-3 py-2.5 border border-input-border rounded-lg text-sm text-foreground bg-white resize-none transition-all focus:ring-2 focus:ring-input-focus/20 focus:border-input-focus outline-none placeholder:text-muted-foreground/50"
               />
             </div>
 
             <p className="text-sm text-muted-foreground">
-              O horário de conclusão será registrado e o tempo total calculado automaticamente.
+              L&apos;orario di completamento verrà registrato e il tempo totale verrà calcolato automaticamente.
             </p>
 
             <div className="flex gap-2 pt-1">
               <Button type="button" variant="ghost" onClick={() => { setFinishModalOrder(null); setFinishNotes('') }} className="flex-1">
-                Cancelar
+                Annulla
               </Button>
               <Button type="button" variant="accent" isLoading={isTrackingAction} onClick={handleFinishCleaning} className="flex-1">
-                Confirmar
+                Conferma
               </Button>
             </div>
           </div>

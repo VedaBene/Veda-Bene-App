@@ -325,7 +325,7 @@ export function PropertyForm({
                       disabled={readOnly}
                     />
                     <p className="text-xs text-muted-foreground">
-                      Questa agenzia non ha un'email registrata. Compila per consentire l'accesso al cliente.
+                      Questa agenzia non ha un&apos;email registrata. Compila per consentire l&apos;accesso al cliente.
                     </p>
                   </div>
                 )}
@@ -368,7 +368,7 @@ export function PropertyForm({
                       disabled={readOnly}
                     />
                     <p className="text-xs text-muted-foreground">
-                      Questo proprietario non ha un'email registrata. Compila per consentire l'accesso al cliente.
+                      Questo proprietario non ha un&apos;email registrata. Compila per consentire l&apos;accesso al cliente.
                     </p>
                   </div>
                 )}
