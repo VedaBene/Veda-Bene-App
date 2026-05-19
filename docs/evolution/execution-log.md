@@ -412,3 +412,102 @@ Residual risks:
   coverage.
 - `ServiceOrderForm.tsx` still owns many field-state variables so behavior stays
   stable; deeper state-model refactors should wait for regression tests.
+
+## 2026-05-19 - Stage 6 Completed
+
+Stage: 6 - Reporting And Export Consolidation
+
+Status: completed
+
+Summary:
+
+- Added `lib/server/reporting/financial.ts` as the canonical server-only source
+  for payable rows, receivable rows, detail rows, dashboard financial
+  aggregations, and reporting option lists.
+- Reduced `app/(app)/statements/actions.ts` to validation, authorization, and
+  calls into the canonical reporting service.
+- Updated CSV export routes to authenticate/validate requests, load canonical
+  statement rows, and pass them to CSV formatters.
+- Converted `lib/utils/export-csv.ts` from a query/calculation module into pure
+  CSV formatting for canonical rows.
+- Moved shared statement/export row types into `lib/types/reporting.ts`, and
+  updated PDF utilities and statement components to consume those types.
+- Kept dashboard data access behind its existing function while delegating
+  financial aggregation to the reporting service.
+
+Files changed:
+
+- `app/(app)/statements/actions.ts`
+- `app/api/export/payable/route.ts`
+- `app/api/export/receivable/route.ts`
+- `components/statements/PayableStatement.tsx`
+- `components/statements/ReceivableStatement.tsx`
+- `lib/server/data-access/dashboard.ts`
+- `lib/server/reporting/financial.ts`
+- `lib/types/reporting.ts`
+- `lib/utils/export-csv.ts`
+- `lib/utils/export-pdf.ts`
+- `docs/evolution/README.md`
+- `docs/evolution/strategic-roadmap.md`
+- `docs/evolution/stage-06-reporting-exports.md`
+- `docs/evolution/execution-log.md`
+
+Verification:
+
+- Verified Stage 5 was marked completed in `docs/evolution/README.md`,
+  `docs/evolution/strategic-roadmap.md`, and this execution log before editing.
+- Read `AGENTS.md`, `CLAUDE.md`, `docs/decisions/README.md`,
+  `docs/decisions/001-rls-via-app-role-no-jwt.md`,
+  `docs/decisions/002-cls-via-filtro-select.md`,
+  `docs/decisions/004-proxy-ts-em-vez-de-middleware-ts.md`,
+  `docs/evolution/README.md`, `docs/evolution/strategic-roadmap.md`, this
+  execution log, and the Stage 6 file before editing.
+- Read Next.js 16 local docs:
+  `node_modules/next/dist/docs/01-app/02-guides/data-security.md`,
+  `node_modules/next/dist/docs/01-app/01-getting-started/15-route-handlers.md`,
+  `node_modules/next/dist/docs/01-app/01-getting-started/07-mutating-data.md`,
+  and `node_modules/next/dist/docs/01-app/01-getting-started/06-fetching-data.md`.
+- Inspected statement actions, payable/receivable export routes, CSV/PDF export
+  utilities, statement components, dashboard actions/data access/components,
+  `lib/server/pricing.ts`, `lib/server/hours.ts`, existing DAL modules, and
+  relevant shared types before editing.
+- `npm run lint` passed.
+- `npx tsc --noEmit` passed.
+- `npm run build` passed. An initial build failed because type exports from the
+  `"use server"` statements action module were treated as action-module runtime
+  exports by Next.js 16/Turbopack; moving those imports to
+  `lib/types/reporting.ts` resolved it.
+- Manual HTTP verification against the already-running dev server on port 3000
+  first confirmed unauthenticated behavior: `/statements/payable` and
+  `/statements/receivable` redirected to `/login`; unauthenticated
+  payable/receivable CSV export routes returned 401.
+- A later authenticated in-app browser pass confirmed `/statements/payable`,
+  `/statements/receivable`, their primary filter buttons, and `/dashboard`
+  loaded without app console errors.
+
+Decisions:
+
+- Kept current financial formulas unchanged. Receivable reports continue to use
+  persisted `service_orders.total_price`; service-order pricing remains owned by
+  `calculateTotalPrice` during OS create/update flows.
+- Kept `resolveOrderHours` as the single hour resolver for payable and dashboard
+  hour/cost calculations.
+- Preserved route/action role gates: payable remains admin-only, receivable
+  export/action behavior keeps the existing allowed roles, and statement pages
+  keep their existing page-level redirects.
+- Did not create a new ADR because no permanent architectural contract changed;
+  the stage only introduced an internal server-only reporting boundary already
+  planned by the roadmap.
+
+Residual risks:
+
+- Authenticated browser verification covered statement pages, primary filters,
+  and dashboard loading. CSV download file contents and PDF print windows remain
+  pending for a real browser because the Codex in-app browser cannot inspect
+  attachment downloads and did not expose the popup/print window used by the PDF
+  helper.
+- Reporting security still depends on application-layer CLS per ADR 002. The
+  reporting service improves locality and reviewability, but does not add
+  database column-level enforcement.
+- Automated regression tests for reporting totals and role DTOs remain Stage 7
+  work.

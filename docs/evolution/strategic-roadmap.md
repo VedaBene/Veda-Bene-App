@@ -162,7 +162,7 @@ Expected benefits:
 
 ## Stage 6 - Reporting And Export Consolidation
 
-Status: pending
+Status: completed
 
 Purpose: make dashboard, CSV, PDF, payable, and receivable data consistent.
 

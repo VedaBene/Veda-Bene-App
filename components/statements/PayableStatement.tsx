@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { fetchPayableData, fetchPayableDetail, type PayableRow, type EmployeeOption } from '@/app/(app)/statements/actions'
+import { fetchPayableData, fetchPayableDetail } from '@/app/(app)/statements/actions'
 import { exportPayablePDF } from '@/lib/utils/export-pdf'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Download, FileText, Filter, Wallet } from 'lucide-react'
+import type { EmployeeOption, PayableRow } from '@/lib/types/reporting'
 
 function today() {
   return new Date().toISOString().slice(0, 10)

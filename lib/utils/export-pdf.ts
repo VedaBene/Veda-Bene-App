@@ -1,4 +1,4 @@
-import type { ReceivableDetailRow, PayableDetailRow } from '@/app/(app)/statements/actions'
+import type { PayableDetailRow, ReceivableDetailRow } from '@/lib/types/reporting'
 
 function escapeHtml(s: string): string {
   return s

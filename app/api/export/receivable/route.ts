@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
-import { exportReceivableCSV } from '@/lib/utils/export-csv'
+import { getReceivableStatementRows } from '@/lib/server/reporting/financial'
+import { formatReceivableCSV } from '@/lib/utils/export-csv'
 import {
   receivableExportSearchParamsSchema,
   searchParamsToRecord,
@@ -31,7 +32,8 @@ export async function GET(request: NextRequest) {
   }
 
   const { startDate, endDate, clientType, clientId } = parsedFilters.data
-  const csv = await exportReceivableCSV(startDate, endDate, clientType, clientId)
+  const data = await getReceivableStatementRows(supabase, { startDate, endDate, clientType, clientId })
+  const csv = formatReceivableCSV(data)
   const filename = `extrato-a-receber_${startDate}_${endDate}.csv`
 
   return new NextResponse(csv, {

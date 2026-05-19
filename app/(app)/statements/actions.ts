@@ -1,75 +1,32 @@
 'use server'
 
 import { getAuthorizedClient } from '@/lib/server/authz'
-import { resolveOrderHours } from '@/lib/server/hours'
+import {
+  getPayableDetailRows,
+  getPayableStatementRows,
+  getReceivableDetailRows,
+  getReceivableStatementRows,
+  getReportingAgencies,
+  getReportingEmployees,
+  getReportingOwners,
+} from '@/lib/server/reporting/financial'
 import {
   payableStatementFiltersSchema,
   receivableStatementFiltersSchema,
   validationMessage,
 } from '@/lib/server/validation/contracts'
-
-export type PayableRow = {
-  employee_id: string
-  full_name: string
-  os_count: number
-  total_hours: number
-  hourly_rate: number | null
-  monthly_salary: number | null
-  total_amount: number | null
-}
-
-export type ReceivableRow = {
-  property_id: string
-  property_name: string
-  client_type: 'rental' | 'particular'
-  client_name: string
-  os_count: number
-  total_value: number
-}
-
-export type EmployeeOption = {
-  id: string
-  full_name: string
-}
-
-export type ClientOption = {
-  id: string
-  name: string
-}
-
-export type ReceivableDetailRow = {
-  order_id: string
-  order_number: number
-  completed_at: string | null
-  property_name: string
-  client_type: 'rental' | 'particular'
-  client_name: string
-  real_guests: number | null
-  extra_services_price: number | null
-  total_price: number
-}
-
-export type PayableDetailRow = {
-  employee_id: string
-  employee_name: string
-  order_id: string
-  order_number: number
-  completed_at: string | null
-  property_name: string
-  hours: number
-  hourly_rate: number | null
-  monthly_salary: number | null
-  os_total: number | null
-}
+import type {
+  ClientOption,
+  EmployeeOption,
+  PayableDetailRow,
+  PayableRow,
+  ReceivableDetailRow,
+  ReceivableRow,
+} from '@/lib/types/reporting'
 
 export async function fetchEmployees(): Promise<EmployeeOption[]> {
   const { supabase } = await getAuthorizedClient(['admin'])
-  const { data } = await supabase
-    .from('profiles')
-    .select('id, full_name')
-    .in('role', ['limpeza', 'consegna'])
-    .order('full_name')
-  return data ?? []
+  return getReportingEmployees(supabase)
 }
 
 export async function fetchPayableData(
@@ -81,99 +38,17 @@ export async function fetchPayableData(
   if (!parsedFilters.success) throw new Error(validationMessage(parsedFilters.error))
 
   const { supabase } = await getAuthorizedClient(['admin'])
-  const filters = parsedFilters.data
-
-  // Buscar OSs finalizadas no período com horas do imóvel
-  let query = supabase
-    .from('service_orders')
-    .select('cleaning_staff_id, consegna_staff_id, worked_minutes, property:properties(avg_cleaning_hours)')
-    .eq('status', 'done')
-    .gte('completed_at', filters.startDate)
-    .lte('completed_at', filters.endDate)
-
-  if (filters.employeeId) {
-    query = query.or(`cleaning_staff_id.eq.${filters.employeeId},consegna_staff_id.eq.${filters.employeeId}`)
-  }
-
-  const { data: orders } = await query
-
-  if (!orders || orders.length === 0) return []
-
-  // Coletar IDs únicos de funcionários
-  const staffIds = new Set<string>()
-  for (const o of orders) {
-    if (o.cleaning_staff_id) staffIds.add(o.cleaning_staff_id)
-    if (o.consegna_staff_id) staffIds.add(o.consegna_staff_id)
-  }
-
-  if (staffIds.size === 0) return []
-
-  const { data: profiles } = await supabase
-    .from('profiles')
-    .select('id, full_name, hourly_rate, monthly_salary')
-    .in('id', [...staffIds])
-
-  if (!profiles) return []
-
-  // Agregar por funcionário
-  const map = new Map<string, PayableRow>()
-  for (const p of profiles) {
-    map.set(p.id, {
-      employee_id: p.id,
-      full_name: p.full_name,
-      os_count: 0,
-      total_hours: 0,
-      hourly_rate: p.hourly_rate ?? null,
-      monthly_salary: p.monthly_salary ?? null,
-      total_amount: null,
-    })
-  }
-
-  for (const o of orders) {
-    const hours = resolveOrderHours(
-      o as { worked_minutes: number | null },
-      o.property as unknown as { avg_cleaning_hours: number | null } | null,
-    )
-    if (o.cleaning_staff_id && map.has(o.cleaning_staff_id)) {
-      const row = map.get(o.cleaning_staff_id)!
-      row.os_count++
-      row.total_hours += hours
-    }
-    if (o.consegna_staff_id && map.has(o.consegna_staff_id)) {
-      const row = map.get(o.consegna_staff_id)!
-      row.os_count++
-      row.total_hours += hours
-    }
-  }
-
-  return [...map.values()].map(row => ({
-    ...row,
-    total_hours: Math.round(row.total_hours * 100) / 100,
-    total_amount:
-      row.monthly_salary != null
-        ? row.monthly_salary
-        : row.hourly_rate != null
-          ? Math.round(row.hourly_rate * row.total_hours * 100) / 100
-          : null,
-  }))
+  return getPayableStatementRows(supabase, parsedFilters.data)
 }
 
 export async function fetchAgencies(): Promise<ClientOption[]> {
   const { supabase } = await getAuthorizedClient()
-  const { data } = await supabase
-    .from('agencies')
-    .select('id, name')
-    .order('name')
-  return data ?? []
+  return getReportingAgencies(supabase)
 }
 
 export async function fetchOwners(): Promise<ClientOption[]> {
   const { supabase } = await getAuthorizedClient()
-  const { data } = await supabase
-    .from('owners')
-    .select('id, name')
-    .order('name')
-  return data ?? []
+  return getReportingOwners(supabase)
 }
 
 export async function fetchReceivableData(
@@ -186,73 +61,7 @@ export async function fetchReceivableData(
   if (!parsedFilters.success) throw new Error(validationMessage(parsedFilters.error))
 
   const { supabase } = await getAuthorizedClient()
-  const filters = parsedFilters.data
-
-  const { data: orders } = await supabase
-    .from('service_orders')
-    .select(`
-      total_price,
-      property:properties(
-        id, name, client_type,
-        agency:agencies(id, name),
-        owner:owners(id, name)
-      )
-    `)
-    .eq('status', 'done')
-    .gte('completed_at', filters.startDate)
-    .lte('completed_at', filters.endDate)
-
-  if (!orders) return []
-
-  // Agregar por imóvel
-  const map = new Map<string, ReceivableRow>()
-
-  for (const o of orders) {
-    const prop = o.property as unknown as {
-      id: string
-      name: string
-      client_type: 'rental' | 'particular'
-      agency: { id: string; name: string } | null
-      owner: { id: string; name: string } | null
-    } | null
-
-    if (!prop) continue
-
-    // Filtro de tipo de cliente
-    if (filters.clientType && filters.clientType !== 'all' && prop.client_type !== filters.clientType) continue
-
-    // Filtro por cliente específico (agência ou proprietário)
-    if (filters.clientId) {
-      const matchesAgency = prop.agency?.id === filters.clientId
-      const matchesOwner = prop.owner?.id === filters.clientId
-      if (!matchesAgency && !matchesOwner) continue
-    }
-
-    const resolvedName =
-      prop.client_type === 'rental'
-        ? (prop.agency?.name ?? '—')
-        : (prop.owner?.name ?? '—')
-
-    if (!map.has(prop.id)) {
-      map.set(prop.id, {
-        property_id: prop.id,
-        property_name: prop.name,
-        client_type: prop.client_type,
-        client_name: resolvedName,
-        os_count: 0,
-        total_value: 0,
-      })
-    }
-
-    const row = map.get(prop.id)!
-    row.os_count++
-    row.total_value += o.total_price ?? 0
-  }
-
-  return [...map.values()].map(r => ({
-    ...r,
-    total_value: Math.round(r.total_value * 100) / 100,
-  }))
+  return getReceivableStatementRows(supabase, parsedFilters.data)
 }
 
 export async function fetchReceivableDetail(
@@ -265,76 +74,7 @@ export async function fetchReceivableDetail(
   if (!parsedFilters.success) throw new Error(validationMessage(parsedFilters.error))
 
   const { supabase } = await getAuthorizedClient()
-  const filters = parsedFilters.data
-
-  const { data: orders } = await supabase
-    .from('service_orders')
-    .select(`
-      id, order_number, completed_at, real_guests, extra_services_price, total_price,
-      property:properties(
-        id, name, client_type,
-        agency:agencies(id, name),
-        owner:owners(id, name)
-      )
-    `)
-    .eq('status', 'done')
-    .gte('completed_at', filters.startDate)
-    .lte('completed_at', filters.endDate)
-    .order('completed_at', { ascending: true })
-
-  if (!orders) return []
-
-  const rows: ReceivableDetailRow[] = []
-
-  for (const o of orders) {
-    const prop = (o as unknown as {
-      property: {
-        id: string
-        name: string
-        client_type: 'rental' | 'particular'
-        agency: { id: string; name: string } | null
-        owner: { id: string; name: string } | null
-      } | null
-    }).property
-
-    if (!prop) continue
-
-    if (filters.clientType && filters.clientType !== 'all' && prop.client_type !== filters.clientType) continue
-
-    if (filters.clientId) {
-      const matchesAgency = prop.agency?.id === filters.clientId
-      const matchesOwner = prop.owner?.id === filters.clientId
-      if (!matchesAgency && !matchesOwner) continue
-    }
-
-    const clientName =
-      prop.client_type === 'rental'
-        ? (prop.agency?.name ?? '—')
-        : (prop.owner?.name ?? '—')
-
-    const order = o as unknown as {
-      id: string
-      order_number: number
-      completed_at: string | null
-      real_guests: number | null
-      extra_services_price: number | null
-      total_price: number | null
-    }
-
-    rows.push({
-      order_id: order.id,
-      order_number: order.order_number,
-      completed_at: order.completed_at,
-      property_name: prop.name,
-      client_type: prop.client_type,
-      client_name: clientName,
-      real_guests: order.real_guests,
-      extra_services_price: order.extra_services_price,
-      total_price: Math.round((order.total_price ?? 0) * 100) / 100,
-    })
-  }
-
-  return rows
+  return getReceivableDetailRows(supabase, parsedFilters.data)
 }
 
 export async function fetchPayableDetail(
@@ -346,93 +86,5 @@ export async function fetchPayableDetail(
   if (!parsedFilters.success) throw new Error(validationMessage(parsedFilters.error))
 
   const { supabase } = await getAuthorizedClient(['admin'])
-  const filters = parsedFilters.data
-
-  let query = supabase
-    .from('service_orders')
-    .select(`
-      id, order_number, completed_at, worked_minutes,
-      cleaning_staff_id, consegna_staff_id,
-      property:properties(name, avg_cleaning_hours)
-    `)
-    .eq('status', 'done')
-    .gte('completed_at', filters.startDate)
-    .lte('completed_at', filters.endDate)
-    .order('completed_at', { ascending: true })
-
-  if (filters.employeeId) {
-    query = query.or(`cleaning_staff_id.eq.${filters.employeeId},consegna_staff_id.eq.${filters.employeeId}`)
-  }
-
-  const { data: orders } = await query
-  if (!orders || orders.length === 0) return []
-
-  const staffIds = new Set<string>()
-  for (const o of orders) {
-    if (o.cleaning_staff_id) staffIds.add(o.cleaning_staff_id)
-    if (o.consegna_staff_id) staffIds.add(o.consegna_staff_id)
-  }
-  if (staffIds.size === 0) return []
-
-  const { data: profiles } = await supabase
-    .from('profiles')
-    .select('id, full_name, hourly_rate, monthly_salary')
-    .in('id', [...staffIds])
-
-  if (!profiles) return []
-
-  const profileById = new Map(profiles.map(p => [p.id, p]))
-  const rows: PayableDetailRow[] = []
-
-  for (const o of orders) {
-    const order = o as unknown as {
-      id: string
-      order_number: number
-      completed_at: string | null
-      worked_minutes: number | null
-      cleaning_staff_id: string | null
-      consegna_staff_id: string | null
-      property: { name: string; avg_cleaning_hours: number | null } | null
-    }
-
-    const hours = resolveOrderHours(order, order.property)
-
-    const staffIdsForOrder = new Set<string>()
-    if (order.cleaning_staff_id) staffIdsForOrder.add(order.cleaning_staff_id)
-    if (order.consegna_staff_id) staffIdsForOrder.add(order.consegna_staff_id)
-
-    for (const sid of staffIdsForOrder) {
-      if (filters.employeeId && sid !== filters.employeeId) continue
-      const p = profileById.get(sid)
-      if (!p) continue
-
-      const roundedHours = Math.round(hours * 100) / 100
-      const osTotal =
-        p.monthly_salary != null
-          ? null
-          : p.hourly_rate != null
-            ? Math.round(p.hourly_rate * hours * 100) / 100
-            : null
-
-      rows.push({
-        employee_id: p.id,
-        employee_name: p.full_name,
-        order_id: order.id,
-        order_number: order.order_number,
-        completed_at: order.completed_at,
-        property_name: order.property?.name ?? '—',
-        hours: roundedHours,
-        hourly_rate: p.hourly_rate ?? null,
-        monthly_salary: p.monthly_salary ?? null,
-        os_total: osTotal,
-      })
-    }
-  }
-
-  rows.sort((a, b) => {
-    if (a.employee_name !== b.employee_name) return a.employee_name.localeCompare(b.employee_name)
-    return (a.completed_at ?? '').localeCompare(b.completed_at ?? '')
-  })
-
-  return rows
+  return getPayableDetailRows(supabase, parsedFilters.data)
 }

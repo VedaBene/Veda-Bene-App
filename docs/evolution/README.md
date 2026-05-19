@@ -67,6 +67,6 @@ running the full build is optional unless code changed.
 | 3 | `stage-03-validation-authorization.md` | completed |
 | 4 | `stage-04-admin-adapter.md` | completed |
 | 5 | `stage-05-service-orders-refactor.md` | completed |
-| 6 | `stage-06-reporting-exports.md` | pending |
+| 6 | `stage-06-reporting-exports.md` | completed |
 | 7 | `stage-07-critical-tests.md` | pending |
 | 8 | `stage-08-database-performance-rls.md` | pending |

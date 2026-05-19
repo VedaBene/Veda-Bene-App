@@ -1,12 +1,13 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { fetchReceivableData, fetchReceivableDetail, type ReceivableRow, type ClientOption } from '@/app/(app)/statements/actions'
+import { fetchReceivableData, fetchReceivableDetail } from '@/app/(app)/statements/actions'
 import { exportReceivablePDF } from '@/lib/utils/export-pdf'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Card } from '@/components/ui/Card'
 import { Download, FileText, Filter, Receipt } from 'lucide-react'
+import type { ClientOption, ReceivableRow } from '@/lib/types/reporting'
 
 function today() {
   return new Date().toISOString().slice(0, 10)

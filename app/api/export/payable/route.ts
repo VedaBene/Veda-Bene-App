@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
-import { exportPayableCSV } from '@/lib/utils/export-csv'
+import { getPayableStatementRows } from '@/lib/server/reporting/financial'
+import { formatPayableCSV } from '@/lib/utils/export-csv'
 import {
   payableExportSearchParamsSchema,
   searchParamsToRecord,
@@ -31,7 +32,8 @@ export async function GET(request: NextRequest) {
   }
 
   const { startDate, endDate, employeeId } = parsedFilters.data
-  const csv = await exportPayableCSV(startDate, endDate, employeeId)
+  const data = await getPayableStatementRows(supabase, { startDate, endDate, employeeId })
+  const csv = formatPayableCSV(data)
   const filename = `extrato-a-pagar_${startDate}_${endDate}.csv`
 
   return new NextResponse(csv, {
