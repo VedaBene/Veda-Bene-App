@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { z } from 'zod'
-import { createAdminClient } from '@/utils/supabase/admin'
+import { deleteEmployeeAuthUser, inviteEmployeeByEmail } from '@/utils/supabase/admin'
 import { getSiteOrigin } from '@/utils/site-url'
 import { getAssignableEmployeeRoles } from '@/lib/employee-permissions'
 import { getAuthorizedClient } from '@/lib/server/authz'
@@ -45,8 +45,6 @@ async function createEmployeeImpl(formData: FormData) {
     return { success: false as const, error: 'Sem permissão' }
   }
 
-  const adminClient = createAdminClient()
-
   const headersList = await headers()
   const origin = getSiteOrigin(headersList)
 
@@ -54,13 +52,11 @@ async function createEmployeeImpl(formData: FormData) {
   // um link para ele definir a própria senha no primeiro acesso.
   // redirectTo aponta para uma página client-side para preservar também
   // fluxos implícitos, que chegam ao browser como fragmento de URL.
-  const { data: authUser, error: authError } = await adminClient.auth.admin.inviteUserByEmail(
-    data.email,
-    {
-      data: { full_name: data.full_name },
-      redirectTo: `${origin}/auth/callback`,
-    },
-  )
+  const { data: authUser, error: authError } = await inviteEmployeeByEmail({
+    email: data.email,
+    fullName: data.full_name,
+    redirectTo: `${origin}/auth/callback`,
+  })
 
   if (authError) return { success: false as const, error: authError.message }
 
@@ -131,8 +127,7 @@ async function deleteEmployeeImpl(id: string) {
 
   await getAuthorizedClient(['admin'])
 
-  const adminClient = createAdminClient()
-  const { error } = await adminClient.auth.admin.deleteUser(parsedId.data)
+  const { error } = await deleteEmployeeAuthUser(parsedId.data)
   if (error) return { success: false as const, error: error.message }
 
   revalidatePath('/employees')

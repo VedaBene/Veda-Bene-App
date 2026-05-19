@@ -65,7 +65,7 @@ running the full build is optional unless code changed.
 | 1 | `stage-01-documentation-alignment.md` | completed |
 | 2 | `stage-02-data-access-layer.md` | completed |
 | 3 | `stage-03-validation-authorization.md` | completed |
-| 4 | `stage-04-admin-adapter.md` | pending |
+| 4 | `stage-04-admin-adapter.md` | completed |
 | 5 | `stage-05-service-orders-refactor.md` | pending |
 | 6 | `stage-06-reporting-exports.md` | pending |
 | 7 | `stage-07-critical-tests.md` | pending |

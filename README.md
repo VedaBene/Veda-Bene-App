@@ -53,7 +53,7 @@ CRM/ERP operacional para uma empresa de limpeza de imóveis em Roma (Itália), e
    |----------|------------|
    | `NEXT_PUBLIC_SUPABASE_URL` | Supabase Dashboard → Settings → API |
    | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase Dashboard → Settings → API |
-   | `SUPABASE_SERVICE_ROLE_KEY` | Supabase Dashboard → Settings → API (manter secreta — só usado em Server Actions administrativas) |
+   | `SUPABASE_SERVICE_ROLE_KEY` | Supabase Dashboard → Settings → API (manter secreta — usada apenas pelo adapter admin server-only) |
    | `NEXT_PUBLIC_SITE_URL` | `http://localhost:3000` em dev |
    | `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` | Sentry → Project Settings → Client Keys (opcional; vazio desabilita o SDK) |
 
@@ -82,7 +82,7 @@ npm run lint     # ESLint
 - **RLS**: roles injetadas no JWT via `custom_access_token_hook` como `app_role`. A função `get_my_role()` lê o JWT como JSONB — retorna com aspas duplas embutidas (ex: `'"admin"'`), então policies usam `= '"admin"'`, **não** `= 'admin'`.
 - **Column Level Security**: RLS protege linhas no Supabase/Postgres, mas a proteção de colunas sensíveis hoje fica na aplicação. Server Components, Server Actions, filtros explícitos de `select()` e DTOs devem selecionar apenas os campos permitidos por role. As views `properties_public` e `profiles_public` foram removidas e **não** são o mecanismo ativo. Ver [ADR 002](docs/decisions/002-cls-via-filtro-select.md).
 - **`is_urgent`** em `service_orders`: coluna `GENERATED ALWAYS AS STORED` — não pode ser inserida manualmente. É `true` quando `(checkin_at - checkout_at) < 4h`.
-- **Supabase clients**: `utils/supabase/{client,server,middleware}.ts` para uso comum + `utils/supabase/admin.ts` (service role, **apenas** para Server Actions administrativas).
+- **Supabase clients**: `utils/supabase/{client,server,middleware}.ts` para uso comum. `utils/supabase/admin.ts` é um adapter admin server-only; não exporta o client service-role bruto e expõe apenas operações administrativas explícitas.
 - **Preço da OS**: calculado no Server Action ao criar (busca `base_price` + `extra_per_person` do imóvel), nunca pelo cliente.
 
 ### Checklist para acesso a dados sensíveis
@@ -102,7 +102,7 @@ Ao criar ou alterar qualquer acesso a `profiles`, `properties` ou `service_order
 | `app/` | Rotas (App Router), Server Components por padrão |
 | `app/(app)/` | Área autenticada |
 | `lib/server/` | Helpers de Server Actions (auth, pricing) |
-| `utils/supabase/` | Clients (`client`, `server`, `middleware`, `admin`) |
+| `utils/supabase/` | Clients comuns (`client`, `server`, `middleware`) e adapter admin server-only |
 | `components/` | UI compartilhada |
 | `supabase/migrations/` | Schema versionado |
 

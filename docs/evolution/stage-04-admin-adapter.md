@@ -1,6 +1,6 @@
 # Stage 4 - Narrow Admin Adapter
 
-Status: pending
+Status: completed
 Depends on: stage-03
 Last updated: 2026-05-19
 
@@ -9,10 +9,10 @@ Last updated: 2026-05-19
 Stage 4 resolves the broad service-role client surface by replacing it with a
 narrow server-only admin adapter.
 
-## Current Problem
+## Original Problem
 
-`utils/supabase/admin.ts` exports a raw Supabase service-role client. Current
-usage is limited to employee invite/delete flows, but the interface permits
+`utils/supabase/admin.ts` exported a raw Supabase service-role client. Usage was
+limited to employee invite/delete flows, but the interface permitted
 arbitrary privileged database or auth operations.
 
 ## Why This Matters
@@ -84,5 +84,50 @@ npm run build
 
 ## Completion Record
 
-Not completed yet.
+Completed on 2026-05-19.
 
+Implemented:
+
+- Replaced the exported raw Supabase service-role client in
+  `utils/supabase/admin.ts` with a server-only narrow adapter.
+- Kept the service-role client private inside `createServiceRoleClient()`.
+- Exported only the explicit privileged operations required by employee flows:
+  `inviteEmployeeByEmail(input)` and `deleteEmployeeAuthUser(userId)`.
+- Updated `app/(app)/employees/actions.ts` to use the narrow adapter for
+  employee invitation and auth-user deletion.
+- Reused Stage 3 validation contracts for employee auth-user UUID validation.
+
+Verification:
+
+- Confirmed Stage 3 was marked `completed` in the roadmap and execution log
+  before editing.
+- Read `AGENTS.md`, `CLAUDE.md`, `docs/decisions/README.md`, ADR 001, ADR 002,
+  ADR 004, ADR 005, ADR 006, `docs/evolution/README.md`,
+  `docs/evolution/strategic-roadmap.md`, this execution log, and this stage file
+  before editing.
+- Read Next.js 16 local docs:
+  `node_modules/next/dist/docs/01-app/02-guides/data-security.md`,
+  `node_modules/next/dist/docs/01-app/01-getting-started/07-mutating-data.md`,
+  and
+  `node_modules/next/dist/docs/01-app/01-getting-started/05-server-and-client-components.md`.
+- Searched for `createAdminClient`, `auth.admin`, `SUPABASE_SERVICE_ROLE_KEY`,
+  and `utils/supabase/admin` usage after implementation.
+- `npm run lint` passed.
+- `npx tsc --noEmit` passed.
+- `npm run build` passed.
+
+Decisions:
+
+- Kept the adapter in `utils/supabase/admin.ts` to minimize churn and preserve
+  existing import locality.
+- Did not add a generic admin adapter or expose arbitrary admin/database
+  operations.
+- Did not create a new ADR because this implements the accepted Stage 4 roadmap
+  direction without changing an architectural contract.
+
+Residual risks:
+
+- `SUPABASE_SERVICE_ROLE_KEY` still exists as a required server secret, but its
+  usage is now confined to the server-only admin adapter.
+- Employee profile updates still rely on normal authenticated Supabase access
+  and existing RLS behavior, preserving the prior flow.

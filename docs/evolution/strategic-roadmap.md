@@ -116,18 +116,18 @@ Expected benefits:
 
 ## Stage 4 - Narrow Admin Adapter
 
-Status: pending
+Status: completed
 
 Purpose: contain service-role privilege behind a deep interface.
 
-Problem: `utils/supabase/admin.ts` exports a raw service-role Supabase client.
-The current usage is limited, but the interface is too powerful.
+Original problem: `utils/supabase/admin.ts` exported a raw service-role
+Supabase client. The usage was limited, but the interface was too powerful.
 
 Why it matters: service role bypasses RLS. A broad export increases the blast
 radius of accidental imports or future misuse.
 
-Solution: replace raw admin client exports with narrow server-only functions
-such as `inviteEmployee` and `deleteEmployeeAuthUser`.
+Solution: replaced raw admin client exports with narrow server-only functions
+for employee invitation and auth-user deletion.
 
 Expected benefits:
 

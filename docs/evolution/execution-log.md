@@ -260,3 +260,70 @@ Residual risks:
   creating an employee DAL was outside this stage's documented scope.
 - Date-range bounds may need a product decision if users require larger
   historical exports.
+
+## 2026-05-19 - Stage 4 Completed
+
+Stage: 4 - Narrow Admin Adapter
+
+Status: completed
+
+Summary:
+
+- Replaced the exported raw Supabase service-role client with a server-only
+  narrow admin adapter in `utils/supabase/admin.ts`.
+- Kept the service-role client private inside the adapter module.
+- Exposed only `inviteEmployeeByEmail(input)` and
+  `deleteEmployeeAuthUser(userId)` for the current employee invite/delete flows.
+- Updated employee Server Actions to use those explicit operations while
+  preserving the existing invite redirect, profile update, delete, revalidation,
+  and redirect behavior.
+
+Files changed:
+
+- `app/(app)/employees/actions.ts`
+- `utils/supabase/admin.ts`
+- `docs/evolution/README.md`
+- `docs/evolution/strategic-roadmap.md`
+- `docs/evolution/stage-04-admin-adapter.md`
+- `docs/evolution/execution-log.md`
+
+Verification:
+
+- Verified Stage 3 was marked completed in `docs/evolution/README.md`,
+  `docs/evolution/strategic-roadmap.md`, and this execution log before editing.
+- Read `AGENTS.md`, `CLAUDE.md`, `docs/decisions/README.md`,
+  `docs/decisions/001-rls-via-app-role-no-jwt.md`,
+  `docs/decisions/002-cls-via-filtro-select.md`,
+  `docs/decisions/004-proxy-ts-em-vez-de-middleware-ts.md`,
+  `docs/decisions/005-rls-helpers-em-schema-privado.md`,
+  `docs/decisions/006-rpcs-privilegiadas-sem-execucao-direta.md`,
+  `docs/evolution/README.md`, `docs/evolution/strategic-roadmap.md`, this
+  execution log, and the Stage 4 file before editing.
+- Read Next.js 16 local docs:
+  `node_modules/next/dist/docs/01-app/02-guides/data-security.md`,
+  `node_modules/next/dist/docs/01-app/01-getting-started/07-mutating-data.md`,
+  and
+  `node_modules/next/dist/docs/01-app/01-getting-started/05-server-and-client-components.md`.
+- Searched for broad admin usage with `rg` and confirmed no exported raw
+  service-role client remains.
+- `npm run lint` passed.
+- `npx tsc --noEmit` passed.
+- `npm run build` passed.
+
+Decisions:
+
+- Kept the adapter at `utils/supabase/admin.ts` rather than introducing a new
+  directory, because the stage only needed to replace the public interface and
+  avoid broader file churn.
+- Reused the Stage 3 `uuidSchema` in the adapter for auth-user deletion input
+  validation.
+- Did not add capabilities beyond employee invite and employee auth-user delete.
+- Did not create a new ADR because no permanent architectural contract changed;
+  this stage implements the already accepted roadmap direction.
+
+Residual risks:
+
+- The Supabase service-role key remains powerful and must stay server-only;
+  current code confines it to `utils/supabase/admin.ts`.
+- Employee profile updates still use the authenticated admin client and existing
+  RLS behavior, matching the prior implementation.
