@@ -1,7 +1,7 @@
 'use client'
 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import type { MonthStat } from '@/app/(app)/dashboard/actions'
+import type { MonthStat } from '@/lib/types/dashboard'
 import { Users } from 'lucide-react'
 
 type Props = {

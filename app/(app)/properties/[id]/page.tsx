@@ -1,11 +1,9 @@
-import { notFound, redirect } from 'next/navigation'
-import { createClient } from '@/utils/supabase/server'
+import { notFound } from 'next/navigation'
 import { PropertyForm } from '@/components/properties/PropertyForm'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { deleteProperty } from '../actions'
-import { toPropertyFormData } from '@/lib/server/view-models'
-import type { Role } from '@/lib/types/database'
-import type { PropertyFormData } from '@/lib/types/view-models'
+import { getCurrentViewer } from '@/lib/server/data-access/viewer'
+import { getPropertyDetail, getPropertyFormOptions } from '@/lib/server/data-access/properties'
 
 export default async function PropertyDetailPage({
   params,
@@ -13,76 +11,23 @@ export default async function PropertyDetailPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const supabase = await createClient()
+  const { supabase, viewer } = await getCurrentViewer()
+  const property = await getPropertyDetail(supabase, viewer, id)
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+  if (!property) notFound()
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  const role = (profile?.role ?? 'cliente') as Role
-  const propertySelect = [
-    'id',
-    'name',
-    'zone',
-    'address',
-    'zip_code',
-    'sqm_interior',
-    'sqm_exterior',
-    'sqm_total',
-    'min_guests',
-    'max_guests',
-    'double_beds',
-    'single_beds',
-    'sofa_beds',
-    'armchair_beds',
-    'bathrooms',
-    'bidets',
-    'cribs',
-    'bedrooms',
-    'notes',
-    ...(role === 'admin' || role === 'secretaria'
-      ? ['client_type', 'agency_id', 'owner_id', 'phone']
-      : []),
-    ...(role === 'admin' ? ['base_price', 'extra_per_person', 'avg_cleaning_hours'] : []),
-  ].join(', ')
-
-  const { data: rawProperty } = await supabase
-    .from('properties')
-    .select(propertySelect)
-    .eq('id', id)
-    .single()
-
-  if (!rawProperty) notFound()
-
-  const property = rawProperty as unknown as PropertyFormData
-
-  let agencies: { id: string; name: string; email: string | null }[] = []
-  let owners: { id: string; name: string; email: string | null }[] = []
-  if (role === 'admin' || role === 'secretaria') {
-    const [{ data: agenciesData }, { data: ownersData }] = await Promise.all([
-      supabase.from('agencies').select('id, name, email').order('name'),
-      supabase.from('owners').select('id, name, email').order('name'),
-    ])
-    agencies = agenciesData ?? []
-    owners = ownersData ?? []
-  }
-
-  const canEdit = role === 'admin'
+  const { agencies, owners } = await getPropertyFormOptions(supabase, viewer)
+  const canEdit = viewer.role === 'admin'
 
   return (
     <div className="animate-fade-in-up">
       <PageHeader title={property.name} />
       <PropertyForm
-        property={toPropertyFormData(property, role)}
+        property={property}
         agencies={agencies}
         owners={owners}
-        role={role}
-        deleteAction={role === 'admin' ? deleteProperty.bind(null, id) : undefined}
+        role={viewer.role}
+        deleteAction={viewer.role === 'admin' ? deleteProperty.bind(null, id) : undefined}
         readOnly={!canEdit}
       />
     </div>

@@ -1,49 +1,23 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/utils/supabase/server'
 import { ServiceOrderForm } from '@/components/service-orders/ServiceOrderForm'
 import { PageHeader } from '@/components/ui/PageHeader'
-import type { Role } from '@/lib/types/database'
-import type { ServiceOrderPropertyOption, StaffOption } from '@/lib/types/view-models'
+import { getCurrentViewer } from '@/lib/server/data-access/viewer'
+import { getServiceOrderFormOptions } from '@/lib/server/data-access/service-orders'
 
 export default async function NewServiceOrderPage() {
-  const supabase = await createClient()
+  const { supabase, viewer } = await getCurrentViewer()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+  if (!['admin', 'secretaria'].includes(viewer.role)) redirect('/service-orders')
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  const role = (profile?.role ?? 'cliente') as Role
-
-  if (!['admin', 'secretaria'].includes(role)) redirect('/service-orders')
-
-  const propertySelect = role === 'admin'
-    ? 'id, name, avg_cleaning_hours, min_guests, max_guests, double_beds, single_beds, sofa_beds, armchair_beds, bathrooms, bidets, cribs, base_price'
-    : 'id, name, avg_cleaning_hours, min_guests, max_guests, double_beds, single_beds, sofa_beds, armchair_beds, bathrooms, bidets, cribs'
-
-  const [{ data: properties }, { data: staffData }] = await Promise.all([
-    supabase
-      .from('properties')
-      .select(propertySelect)
-      .order('name'),
-    supabase
-      .from('profiles')
-      .select('id, full_name')
-      .in('role', ['limpeza', 'consegna'])
-      .order('full_name'),
-  ])
+  const { properties, staff } = await getServiceOrderFormOptions(supabase, viewer)
 
   return (
     <div className="animate-fade-in-up">
       <PageHeader title="Nuovo Ordine di Lavoro" />
       <ServiceOrderForm
-        properties={(properties ?? []) as unknown as ServiceOrderPropertyOption[]}
-        staff={(staffData ?? []) as StaffOption[]}
-        role={role}
+        properties={properties}
+        staff={staff}
+        role={viewer.role}
       />
     </div>
   )

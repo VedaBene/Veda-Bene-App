@@ -69,7 +69,7 @@ Expected benefits:
 
 ## Stage 2 - Server-Only Data Access Layer
 
-Status: pending
+Status: completed
 
 Purpose: centralize Supabase queries, role-aware selects, and DTO shaping.
 

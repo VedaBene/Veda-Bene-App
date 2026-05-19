@@ -1,37 +1,23 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/utils/supabase/server'
 import { PropertyForm } from '@/components/properties/PropertyForm'
 import { PageHeader } from '@/components/ui/PageHeader'
-import type { Role } from '@/lib/types/database'
+import { getCurrentViewer } from '@/lib/server/data-access/viewer'
+import { getPropertyFormOptions } from '@/lib/server/data-access/properties'
 
 export default async function NewPropertyPage() {
-  const supabase = await createClient()
+  const { supabase, viewer } = await getCurrentViewer()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+  if (viewer.role !== 'admin') redirect('/properties')
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  const role = (profile?.role ?? 'cliente') as Role
-
-  if (role !== 'admin') redirect('/properties')
-
-  const [{ data: agencies }, { data: owners }] = await Promise.all([
-    supabase.from('agencies').select('id, name, email').order('name'),
-    supabase.from('owners').select('id, name, email').order('name'),
-  ])
+  const { agencies, owners } = await getPropertyFormOptions(supabase, viewer)
 
   return (
     <div className="animate-fade-in-up">
       <PageHeader title="Nuovo Immobile" />
       <PropertyForm
-        agencies={agencies ?? []}
-        owners={owners ?? []}
-        role={role}
+        agencies={agencies}
+        owners={owners}
+        role={viewer.role}
       />
     </div>
   )

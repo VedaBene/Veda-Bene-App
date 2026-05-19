@@ -1,4 +1,4 @@
-import type { TopProperty } from '@/app/(app)/dashboard/actions'
+import type { TopProperty } from '@/lib/types/dashboard'
 import { Trophy } from 'lucide-react'
 
 type Props = {

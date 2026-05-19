@@ -1,6 +1,6 @@
 # Stage 2 - Server-Only Data Access Layer
 
-Status: pending
+Status: completed
 Depends on: stage-01
 Last updated: 2026-05-19
 
@@ -112,5 +112,49 @@ npm run build
 
 ## Completion Record
 
-Not completed yet.
+Completed on 2026-05-19.
 
+Implemented:
+
+- Added `lib/server/data-access/` with server-only modules for viewer lookup,
+  properties, service orders, and dashboard data.
+- Centralized role-aware property selects for list/detail/form options.
+- Centralized role-aware service-order selects for list/detail/form options.
+- Moved dashboard query aggregation behind a server-only data-access function
+  while keeping the Server Action as the route-facing entrypoint.
+- Kept existing DTO shaping through `lib/server/view-models.ts`.
+- Reused the centralized viewer lookup from `lib/server/authz.ts`.
+
+Migrated paths:
+
+- `app/(app)/properties/page.tsx`
+- `app/(app)/properties/[id]/page.tsx`
+- `app/(app)/properties/new/page.tsx`
+- `app/(app)/service-orders/page.tsx`
+- `app/(app)/service-orders/[id]/page.tsx`
+- `app/(app)/service-orders/new/page.tsx`
+- `app/(app)/dashboard/actions.ts`
+
+Explicitly not migrated in this stage:
+
+- Statement/reporting actions and export utilities remain as follow-up for
+  Stage 6 because they combine reporting semantics, CSV/export behavior, and
+  financial aggregation.
+- Mutation Server Actions remain in place except for shared viewer lookup,
+  because Stage 2 is focused on read-query locality and DTO shaping.
+- Input validation/authorization contracts, admin adapter hardening, database
+  review/RLS changes, and critical regression tests remain assigned to their
+  later stages.
+
+Verification:
+
+- `npm run lint`
+- `npx tsc --noEmit`
+- `npm run build`
+
+Residual risks:
+
+- Some direct Supabase reads remain in statement/reporting/export code until
+  Stage 6.
+- Mutation actions still contain direct Supabase access for writes and pricing
+  support reads; future stages should avoid expanding their raw query surface.
