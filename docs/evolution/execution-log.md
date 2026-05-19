@@ -327,3 +327,88 @@ Residual risks:
   current code confines it to `utils/supabase/admin.ts`.
 - Employee profile updates still use the authenticated admin client and existing
   RLS behavior, matching the prior implementation.
+
+## 2026-05-19 - Stage 5 Completed
+
+Stage: 5 - Service Orders Refactor
+
+Status: completed
+
+Summary:
+
+- Refactored service-order UI hotspots by workflow while preserving existing
+  business behavior and visual structure.
+- Kept `ServiceOrderForm.tsx` as the composition and action-orchestration point,
+  reducing it from 729 lines to 331 lines.
+- Kept `ServiceOrderList.tsx` as the composition point for filters, grouped
+  sections, pagination, and tracking actions, reducing it from 767 lines to 271
+  lines.
+- Extracted focused modules for status controls, time controls/modals,
+  extras/pricing controls, form sections, list table/cards, active-order PDF
+  printing, filters, and shared display helpers.
+- Preserved `app/(app)/service-orders/actions.ts` unchanged.
+
+Files changed:
+
+- `components/service-orders/ServiceOrderForm.tsx`
+- `components/service-orders/ServiceOrderList.tsx`
+- `components/service-orders/ServiceOrderActiveExport.tsx`
+- `components/service-orders/ServiceOrderFilters.tsx`
+- `components/service-orders/ServiceOrderFormSections.tsx`
+- `components/service-orders/ServiceOrderListTable.tsx`
+- `components/service-orders/ServiceOrderPricingControls.tsx`
+- `components/service-orders/ServiceOrderStatusControls.tsx`
+- `components/service-orders/ServiceOrderTimeControls.tsx`
+- `components/service-orders/display.tsx`
+- `docs/evolution/README.md`
+- `docs/evolution/strategic-roadmap.md`
+- `docs/evolution/stage-05-service-orders-refactor.md`
+- `docs/evolution/execution-log.md`
+
+Verification:
+
+- Verified Stage 4 was marked completed in `docs/evolution/README.md`,
+  `docs/evolution/strategic-roadmap.md`, and this execution log before editing.
+- Read `AGENTS.md`, `CLAUDE.md`, `docs/decisions/README.md`,
+  `docs/decisions/001-rls-via-app-role-no-jwt.md`,
+  `docs/decisions/002-cls-via-filtro-select.md`,
+  `docs/decisions/004-proxy-ts-em-vez-de-middleware-ts.md`,
+  `docs/evolution/README.md`, `docs/evolution/strategic-roadmap.md`, this
+  execution log, and the Stage 5 file before editing.
+- Read Next.js 16 local docs:
+  `node_modules/next/dist/docs/01-app/01-getting-started/05-server-and-client-components.md`,
+  `node_modules/next/dist/docs/01-app/01-getting-started/07-mutating-data.md`,
+  `node_modules/next/dist/docs/01-app/02-guides/data-security.md`, and
+  `node_modules/next/dist/docs/01-app/03-api-reference/01-directives/use-client.md`.
+- Inspected current service-order form/list components, nearby
+  `components/service-orders/**` modules, and
+  `app/(app)/service-orders/actions.ts`.
+- `npm run lint` passed.
+- `npx tsc --noEmit` passed after rerunning in isolation. A previous parallel
+  run overlapped with `next build` regenerating `.next/types` and failed with
+  transient missing `.next/types` files.
+- `npm run build` passed.
+- Manual browser verification: started the local dev server on port 3000 and
+  opened `/service-orders`. The app loaded and redirected to `/login` due to no
+  authenticated browser session, so authenticated OS list/detail interactions
+  could not be fully clicked through in this session.
+
+Decisions:
+
+- Extracted by workflow rather than arbitrary line count: status, time,
+  extras/pricing, form sections, list rendering, active-order print export, and
+  display helpers each gained a primary module.
+- Kept mutation calls in the existing top-level client components and did not
+  alter Server Actions, validation, pricing, status, or time-tracking rules.
+- Left broader reporting/export consolidation for Stage 6 and critical
+  regression tests for Stage 7.
+- Did not create a new ADR because the refactor did not change a permanent
+  architectural contract or domain decision.
+
+Residual risks:
+
+- Browser verification was limited by authentication state; authenticated modal
+  and mutation flows still need a logged-in manual pass or future automated
+  coverage.
+- `ServiceOrderForm.tsx` still owns many field-state variables so behavior stays
+  stable; deeper state-model refactors should wait for regression tests.

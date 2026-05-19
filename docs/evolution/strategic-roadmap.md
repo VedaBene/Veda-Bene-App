@@ -138,7 +138,7 @@ Expected benefits:
 
 ## Stage 5 - Service Orders Refactor
 
-Status: pending
+Status: completed
 
 Purpose: reduce the largest workflow hotspot without shallow decomposition.
 

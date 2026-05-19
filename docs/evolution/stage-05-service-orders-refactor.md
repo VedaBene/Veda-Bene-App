@@ -1,6 +1,6 @@
 # Stage 5 - Service Orders Refactor
 
-Status: pending
+Status: completed
 Depends on: stage-04
 Last updated: 2026-05-19
 
@@ -86,5 +86,59 @@ Manual browser verification is recommended for service-order list/detail flows.
 
 ## Completion Record
 
-Not completed yet.
+Completed on 2026-05-19.
 
+Summary:
+
+- Reduced `ServiceOrderForm.tsx` from 729 lines to 331 lines by keeping it as
+  the composition point for form state, action orchestration, and workflow
+  sections.
+- Reduced `ServiceOrderList.tsx` from 767 lines to 271 lines by keeping it as
+  the composition point for filters, grouped list sections, pagination, and
+  time-tracking action orchestration.
+- Extracted focused service-order UI modules by workflow:
+  - `ServiceOrderStatusControls.tsx` for status display and status transition
+    controls.
+  - `ServiceOrderTimeControls.tsx` for time panels and start/finish modals.
+  - `ServiceOrderPricingControls.tsx` for pricing mode and extras controls.
+  - `ServiceOrderFormSections.tsx` for the main form sections and shared field
+    layout.
+  - `ServiceOrderListTable.tsx` for mobile cards and desktop table rendering.
+  - `ServiceOrderActiveExport.tsx` for active-order print/PDF generation.
+  - `ServiceOrderFilters.tsx` for list filters.
+  - `display.tsx` for shared labels, badges, date formatting, and urgency time
+    helper.
+- Preserved existing Server Actions and business rules. No domain behavior,
+  reporting consolidation, migrations, RLS/policy changes, or new features were
+  introduced.
+
+Verification:
+
+- `npm run lint` passed.
+- `npx tsc --noEmit` passed after being rerun in isolation. An earlier parallel
+  run overlapped with `next build` regenerating `.next/types` and produced
+  transient missing `.next/types` file errors.
+- `npm run build` passed.
+- Manual browser verification: started the local dev server on port 3000 and
+  opened `/service-orders`. The app loaded and redirected to `/login` because
+  the browser session was unauthenticated, so authenticated list/detail workflow
+  clicks could not be fully exercised in-browser in this session.
+
+Decisions:
+
+- Kept the form and list components as state/action orchestration points rather
+  than moving state into many small hooks, because this stage targeted
+  workflow-local UI extraction without changing behavior.
+- Kept active-order print generation client-side and scoped to the existing
+  active-list PDF button. Broader reporting/export consolidation remains Stage
+  6.
+- Did not create a new ADR because this refactor does not change a permanent
+  architecture contract or domain decision.
+
+Residual risks:
+
+- Authenticated manual coverage was limited by the lack of an active browser
+  session, so modal interaction and mutation flows are covered by type/build
+  verification and preserved wiring, not by a completed browser click-through.
+- The top-level form still owns a large amount of field state by design. A
+  future stage may add regression tests before deeper state refactors.
