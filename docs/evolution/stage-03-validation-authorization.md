@@ -1,6 +1,6 @@
 # Stage 3 - Validation And Authorization Contracts
 
-Status: pending
+Status: completed
 Depends on: stage-02
 Last updated: 2026-05-19
 
@@ -93,5 +93,37 @@ npm run build
 
 ## Completion Record
 
-Not completed yet.
+Completed on 2026-05-19.
 
+Implemented:
+
+- Added `lib/server/validation/contracts.ts` as the server-only home for shared
+  validation contracts.
+- Centralized schemas for UUIDs, date-only values, bounded date ranges,
+  pagination, search filters, client type, roles, OS status, pricing mode,
+  employee role, optional IDs, notes, and non-negative money values.
+- Applied parsed search-param contracts to property and service-order list
+  pages before calling the Stage 2 DAL.
+- Applied UUID param contracts to property, service-order, and employee detail
+  pages.
+- Applied action argument contracts to service-order status/time/extras/delete
+  flows, property update/delete flows, and employee update/delete flows.
+- Applied reporting/export filters to payable and receivable Server Actions and
+  CSV Route Handlers, including date-range bounds and optional ID validation.
+- Reused Stage 2 viewer lookup and added centralized role parsing there.
+
+Verification:
+
+- `npm run lint`
+- `npx tsc --noEmit`
+- `npm run build`
+
+Residual risks:
+
+- Statement/reporting/export query consolidation remains Stage 6 work; this
+  stage validates inputs but does not change canonical reporting ownership.
+- Employee data access still has direct Supabase reads in employee pages because
+  creating an employee DAL was outside this stage's documented scope.
+- Date-range bounds now cap reporting/export requests at 366 days; operational
+  users needing larger historical exports will require an explicit product or
+  architecture decision.

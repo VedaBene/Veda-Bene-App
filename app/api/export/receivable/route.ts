@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { exportReceivableCSV } from '@/lib/utils/export-csv'
+import {
+  receivableExportSearchParamsSchema,
+  searchParamsToRecord,
+  validationMessage,
+} from '@/lib/server/validation/contracts'
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
@@ -17,18 +22,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Sem permissão' }, { status: 403 })
   }
 
-  const { searchParams } = request.nextUrl
-  const start = searchParams.get('start') ?? ''
-  const end = searchParams.get('end') ?? ''
-  const clientType = searchParams.get('client_type') as 'rental' | 'particular' | null
-  const clientId = searchParams.get('client_id') ?? undefined
+  const parsedFilters = receivableExportSearchParamsSchema.safeParse(
+    searchParamsToRecord(request.nextUrl.searchParams),
+  )
 
-  if (!start || !end) {
-    return NextResponse.json({ error: 'Parâmetros start e end obrigatórios' }, { status: 400 })
+  if (!parsedFilters.success) {
+    return NextResponse.json({ error: validationMessage(parsedFilters.error) }, { status: 400 })
   }
 
-  const csv = await exportReceivableCSV(start, end, clientType ?? undefined, clientId)
-  const filename = `extrato-a-receber_${start}_${end}.csv`
+  const { startDate, endDate, clientType, clientId } = parsedFilters.data
+  const csv = await exportReceivableCSV(startDate, endDate, clientType, clientId)
+  const filename = `extrato-a-receber_${startDate}_${endDate}.csv`
 
   return new NextResponse(csv, {
     headers: {

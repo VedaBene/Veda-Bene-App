@@ -6,6 +6,16 @@ import { z } from 'zod'
 import { getAuthorizedClient } from '@/lib/server/authz'
 import { calculateTotalPrice, loadOrderPricingContext, recalculateOrderPricing } from '@/lib/server/pricing'
 import { withLogging } from '@/lib/server/logger'
+import {
+  nonNegativeMoneySchema,
+  optionalDateOnlySchema,
+  optionalNotesSchema,
+  optionalUuidSchema,
+  osStatusSchema,
+  pricingModeSchema,
+  uuidSchema,
+  validationMessage,
+} from '@/lib/server/validation/contracts'
 import type { OSStatus, PricingMode } from '@/lib/types/database'
 
 const optStr = z.preprocess(v => (v === '' ? undefined : v), z.string().optional())
@@ -17,10 +27,10 @@ const intDef = (def = 0) =>
   z.preprocess(v => (v === '' || v == null ? def : Number(v)), z.number().int().min(0).default(def))
 
 const serviceOrderSchema = z.object({
-  property_id: z.string().min(1, 'Immobile obbligatorio'),
-  cleaning_staff_id: optStr,
-  consegna_staff_id: optStr,
-  cleaning_date: optStr,
+  property_id: z.string().min(1, 'Immobile obbligatorio').pipe(uuidSchema),
+  cleaning_staff_id: optionalUuidSchema,
+  consegna_staff_id: optionalUuidSchema,
+  cleaning_date: optionalDateOnlySchema,
   checkout_at: optStr,
   checkin_at: optStr,
   real_guests: optNum,
@@ -34,7 +44,14 @@ const serviceOrderSchema = z.object({
   cleaning_notes: optStr,
   extra_services_description: optStr,
   extra_services_price: optNum,
-  pricing_mode: z.enum(['standard', 'ripasso', 'out_long_stay']).default('standard'),
+  pricing_mode: pricingModeSchema.default('standard'),
+})
+
+const extraServicesActionSchema = z.object({
+  id: uuidSchema,
+  description: optionalNotesSchema,
+  price: nonNegativeMoneySchema,
+  pricingMode: pricingModeSchema.default('standard'),
 })
 
 async function createServiceOrderImpl(formData: FormData) {
@@ -95,6 +112,9 @@ async function createServiceOrderImpl(formData: FormData) {
 }
 
 async function updateServiceOrderImpl(id: string, formData: FormData) {
+  const parsedId = uuidSchema.safeParse(id)
+  if (!parsedId.success) return { success: false as const, error: validationMessage(parsedId.error) }
+
   const { supabase } = await getAuthorizedClient()
 
   const parsed = serviceOrderSchema.safeParse(Object.fromEntries(formData))
@@ -102,7 +122,7 @@ async function updateServiceOrderImpl(id: string, formData: FormData) {
 
   const { data } = parsed
 
-  const ctx = await loadOrderPricingContext(supabase, id, data.property_id)
+  const ctx = await loadOrderPricingContext(supabase, parsedId.data, data.property_id)
   const total_price = ctx?.property
     ? calculateTotalPrice(
         data.pricing_mode,
@@ -138,34 +158,43 @@ async function updateServiceOrderImpl(id: string, formData: FormData) {
       pricing_mode: data.pricing_mode,
       total_price,
     })
-    .eq('id', id)
+    .eq('id', parsedId.data)
 
   if (error) return { success: false as const, error: error.message }
 
   revalidatePath('/service-orders')
-  revalidatePath(`/service-orders/${id}`)
+  revalidatePath(`/service-orders/${parsedId.data}`)
   return { success: true as const }
 }
 
 async function updateServiceOrderStatusImpl(id: string, status: OSStatus) {
+  const parsedId = uuidSchema.safeParse(id)
+  if (!parsedId.success) return { success: false as const, error: validationMessage(parsedId.error) }
+
+  const parsedStatus = osStatusSchema.safeParse(status)
+  if (!parsedStatus.success) return { success: false as const, error: validationMessage(parsedStatus.error) }
+
   const { supabase } = await getAuthorizedClient()
 
   const { error } = await supabase
     .from('service_orders')
     .update({
-      status,
-      completed_at: status === 'done' ? new Date().toISOString() : null,
+      status: parsedStatus.data,
+      completed_at: parsedStatus.data === 'done' ? new Date().toISOString() : null,
     })
-    .eq('id', id)
+    .eq('id', parsedId.data)
 
   if (error) return { success: false as const, error: error.message }
 
   revalidatePath('/service-orders')
-  revalidatePath(`/service-orders/${id}`)
+  revalidatePath(`/service-orders/${parsedId.data}`)
   return { success: true as const }
 }
 
 async function startCleaningImpl(id: string) {
+  const parsedId = uuidSchema.safeParse(id)
+  if (!parsedId.success) return { success: false as const, error: validationMessage(parsedId.error) }
+
   const { supabase } = await getAuthorizedClient(['admin', 'secretaria', 'limpeza'])
 
   const { error } = await supabase
@@ -174,16 +203,22 @@ async function startCleaningImpl(id: string) {
       status: 'in_progress',
       started_at: new Date().toISOString(),
     })
-    .eq('id', id)
+    .eq('id', parsedId.data)
 
   if (error) return { success: false as const, error: error.message }
 
   revalidatePath('/service-orders')
-  revalidatePath(`/service-orders/${id}`)
+  revalidatePath(`/service-orders/${parsedId.data}`)
   return { success: true as const }
 }
 
 async function finishCleaningImpl(id: string, notes: string) {
+  const parsedId = uuidSchema.safeParse(id)
+  if (!parsedId.success) return { success: false as const, error: validationMessage(parsedId.error) }
+
+  const parsedNotes = optionalNotesSchema.safeParse(notes)
+  if (!parsedNotes.success) return { success: false as const, error: validationMessage(parsedNotes.error) }
+
   const { supabase } = await getAuthorizedClient(['admin', 'secretaria', 'limpeza'])
 
   const { error } = await supabase
@@ -191,16 +226,16 @@ async function finishCleaningImpl(id: string, notes: string) {
     .update({
       status: 'done',
       completed_at: new Date().toISOString(),
-      completion_notes: notes.trim() || null,
+      completion_notes: parsedNotes.data.trim() || null,
     })
-    .eq('id', id)
+    .eq('id', parsedId.data)
 
   if (error) return { success: false as const, error: error.message }
 
-  await recalculateOrderPricing(supabase, id)
+  await recalculateOrderPricing(supabase, parsedId.data)
 
   revalidatePath('/service-orders')
-  revalidatePath(`/service-orders/${id}`)
+  revalidatePath(`/service-orders/${parsedId.data}`)
   revalidatePath('/statements/receivable')
   return { success: true as const }
 }
@@ -211,19 +246,22 @@ async function updateExtraServicesImpl(
   price: number,
   pricingMode: PricingMode = 'standard',
 ) {
+  const parsed = extraServicesActionSchema.safeParse({ id, description, price, pricingMode })
+  if (!parsed.success) return { success: false as const, error: validationMessage(parsed.error) }
+
   const { supabase } = await getAuthorizedClient()
 
-  const ctx = await loadOrderPricingContext(supabase, id)
+  const ctx = await loadOrderPricingContext(supabase, parsed.data.id)
   if (!ctx) return { success: false as const, error: 'O.L. non trovato' }
 
   const total_price = ctx.property
     ? calculateTotalPrice(
-        pricingMode,
+        parsed.data.pricingMode,
         ctx.property.base_price,
         ctx.property.extra_per_person,
         ctx.realGuests,
         ctx.property.min_guests,
-        price,
+        parsed.data.price,
         ctx.workedMinutes,
       )
     : null
@@ -231,25 +269,28 @@ async function updateExtraServicesImpl(
   const { error } = await supabase
     .from('service_orders')
     .update({
-      extra_services_description: description.trim() || null,
-      extra_services_price: price,
-      pricing_mode: pricingMode,
+      extra_services_description: parsed.data.description.trim() || null,
+      extra_services_price: parsed.data.price,
+      pricing_mode: parsed.data.pricingMode,
       total_price,
     })
-    .eq('id', id)
+    .eq('id', parsed.data.id)
 
   if (error) return { success: false as const, error: error.message }
 
   revalidatePath('/service-orders')
-  revalidatePath(`/service-orders/${id}`)
+  revalidatePath(`/service-orders/${parsed.data.id}`)
   revalidatePath('/statements/receivable')
   return { success: true as const }
 }
 
 async function deleteServiceOrderImpl(id: string) {
+  const parsedId = uuidSchema.safeParse(id)
+  if (!parsedId.success) return { success: false as const, error: validationMessage(parsedId.error) }
+
   const { supabase } = await getAuthorizedClient()
 
-  const { error } = await supabase.from('service_orders').delete().eq('id', id)
+  const { error } = await supabase.from('service_orders').delete().eq('id', parsedId.data)
   if (error) return { success: false as const, error: error.message }
 
   revalidatePath('/service-orders')

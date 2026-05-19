@@ -4,13 +4,17 @@ import { PageHeader } from '@/components/ui/PageHeader'
 import { deleteProperty } from '../actions'
 import { getCurrentViewer } from '@/lib/server/data-access/viewer'
 import { getPropertyDetail, getPropertyFormOptions } from '@/lib/server/data-access/properties'
+import { idParamSchema } from '@/lib/server/validation/contracts'
 
 export default async function PropertyDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>
 }) {
-  const { id } = await params
+  const parsedParams = idParamSchema.safeParse(await params)
+  if (!parsedParams.success) notFound()
+
+  const { id } = parsedParams.data
   const { supabase, viewer } = await getCurrentViewer()
   const property = await getPropertyDetail(supabase, viewer, id)
 

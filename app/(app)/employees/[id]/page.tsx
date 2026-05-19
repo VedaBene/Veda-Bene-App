@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/ui/PageHeader'
 import { deleteEmployee } from '../actions'
 import { canManageEmployees } from '@/lib/employee-permissions'
 import { toEmployeeFormData } from '@/lib/server/view-models'
+import { idParamSchema } from '@/lib/server/validation/contracts'
 import type { Role } from '@/lib/types/database'
 import type { EmployeeFormData } from '@/lib/types/view-models'
 
@@ -13,7 +14,10 @@ export default async function EmployeeDetailPage({
 }: {
   params: Promise<{ id: string }>
 }) {
-  const { id } = await params
+  const parsedParams = idParamSchema.safeParse(await params)
+  if (!parsedParams.success) notFound()
+
+  const { id } = parsedParams.data
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()

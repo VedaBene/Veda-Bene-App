@@ -7,13 +7,17 @@ import {
   getServiceOrderDetail,
   getServiceOrderFormOptions,
 } from '@/lib/server/data-access/service-orders'
+import { idParamSchema } from '@/lib/server/validation/contracts'
 
 export default async function ServiceOrderDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>
 }) {
-  const { id } = await params
+  const parsedParams = idParamSchema.safeParse(await params)
+  if (!parsedParams.success) notFound()
+
+  const { id } = parsedParams.data
   const { supabase, viewer } = await getCurrentViewer()
   const [order, { properties, staff }] = await Promise.all([
     getServiceOrderDetail(supabase, viewer, id),

@@ -176,3 +176,87 @@ Residual risks:
   narrower server-only seams.
 - CLS remains application-layer protection; this stage improves locality but
   does not add a database column-security boundary.
+
+## 2026-05-19 - Stage 3 Completed
+
+Stage: 3 - Validation And Authorization Contracts
+
+Status: completed
+
+Summary:
+
+- Added `lib/server/validation/contracts.ts` as a server-only validation
+  contract module.
+- Centralized schemas for UUIDs, date-only values, bounded date ranges,
+  pagination, search filters, client type, roles, OS status, pricing mode,
+  employee role, optional IDs, notes, and non-negative money values.
+- Applied parsed search-param contracts to property and service-order list
+  pages before calling the Stage 2 DAL.
+- Applied UUID param contracts to property, service-order, and employee detail
+  pages.
+- Applied action argument contracts to service-order status/time/extras/delete
+  flows, property update/delete flows, and employee update/delete flows.
+- Applied payable/receivable reporting filters to Server Actions and CSV Route
+  Handlers, including date-range bounds and optional ID validation.
+- Reused the Stage 2 viewer lookup for centralized role parsing.
+
+Files changed:
+
+- `app/(app)/employees/[id]/page.tsx`
+- `app/(app)/employees/actions.ts`
+- `app/(app)/properties/[id]/page.tsx`
+- `app/(app)/properties/actions.ts`
+- `app/(app)/properties/page.tsx`
+- `app/(app)/service-orders/[id]/page.tsx`
+- `app/(app)/service-orders/actions.ts`
+- `app/(app)/service-orders/page.tsx`
+- `app/(app)/statements/actions.ts`
+- `app/api/export/payable/route.ts`
+- `app/api/export/receivable/route.ts`
+- `lib/server/data-access/properties.ts`
+- `lib/server/data-access/service-orders.ts`
+- `lib/server/data-access/viewer.ts`
+- `lib/server/validation/contracts.ts`
+- `docs/evolution/README.md`
+- `docs/evolution/strategic-roadmap.md`
+- `docs/evolution/stage-03-validation-authorization.md`
+- `docs/evolution/execution-log.md`
+
+Verification:
+
+- Verified Stage 1 and Stage 2 were marked completed in
+  `docs/evolution/README.md`, `docs/evolution/strategic-roadmap.md`, and this
+  execution log before editing.
+- Read `AGENTS.md`, `CLAUDE.md`, `docs/decisions/README.md`,
+  `docs/decisions/001-rls-via-app-role-no-jwt.md`,
+  `docs/decisions/002-cls-via-filtro-select.md`,
+  `docs/decisions/003-cliente-b2c-via-email-match.md`,
+  `docs/decisions/004-proxy-ts-em-vez-de-middleware-ts.md`,
+  `docs/evolution/strategic-roadmap.md`, this execution log, and the Stage 3
+  file before editing.
+- Read Next.js 16 local docs:
+  `node_modules/next/dist/docs/01-app/02-guides/data-security.md`,
+  `node_modules/next/dist/docs/01-app/01-getting-started/07-mutating-data.md`,
+  `node_modules/next/dist/docs/01-app/01-getting-started/15-route-handlers.md`,
+  `node_modules/next/dist/docs/01-app/01-getting-started/03-layouts-and-pages.md`,
+  and `node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/page.md`.
+- `npm run lint` passed.
+- `npx tsc --noEmit` passed.
+- `npm run build` passed.
+
+Decisions:
+
+- Invalid list-page filters fall back to safe defaults to preserve UI behavior,
+  while invalid action/export/reporting inputs return controlled errors.
+- Reporting/export date ranges are capped at 366 days to bound expensive
+  requests without changing report ownership.
+- Did not create a new ADR because this stage implements the accepted roadmap
+  contracts and does not alter an existing architectural decision.
+
+Residual risks:
+
+- Statement/reporting/export query consolidation remains Stage 6 work.
+- Employee data access still has direct Supabase reads in employee pages because
+  creating an employee DAL was outside this stage's documented scope.
+- Date-range bounds may need a product decision if users require larger
+  historical exports.

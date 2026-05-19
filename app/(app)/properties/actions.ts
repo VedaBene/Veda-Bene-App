@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { getAuthorizedClient } from '@/lib/server/authz'
 import { withLogging } from '@/lib/server/logger'
+import { clientTypeSchema, optionalUuidSchema, uuidSchema, validationMessage } from '@/lib/server/validation/contracts'
 
 const ZONES = [
   'Saint Peter', 'Piazza Navona', 'Trastevere Area', 'Colosseum',
@@ -23,19 +24,19 @@ const intDef = (def = 0) =>
 
 const propertySchema = z.object({
   name: z.string().min(1, 'Nome obbligatorio'),
-  client_type: z.enum(['rental', 'particular']),
+  client_type: clientTypeSchema,
   zone: z.enum(ZONES),
   phone: optStr,
   email: optStr,
   address: optStr,
   zip_code: optStr,
   // rental
-  agency_id: optStr,
+  agency_id: optionalUuidSchema,
   new_agency_name: optStr,
   new_agency_email: optStr,
   existing_agency_email: optStr,
   // particular
-  owner_id: optStr,
+  owner_id: optionalUuidSchema,
   new_owner_name: optStr,
   new_owner_email: optStr,
   existing_owner_email: optStr,
@@ -194,6 +195,9 @@ async function createPropertyImpl(formData: FormData) {
 }
 
 async function updatePropertyImpl(id: string, formData: FormData) {
+  const parsedId = uuidSchema.safeParse(id)
+  if (!parsedId.success) return { success: false as const, error: validationMessage(parsedId.error) }
+
   const { supabase } = await getAuthorizedClient(['admin'])
 
   const parsed = propertySchema.safeParse(Object.fromEntries(formData))
@@ -210,19 +214,22 @@ async function updatePropertyImpl(id: string, formData: FormData) {
   const { error } = await supabase
     .from('properties')
     .update(buildRecord(parsed.data, agency_id, owner_id))
-    .eq('id', id)
+    .eq('id', parsedId.data)
 
   if (error) return { success: false as const, error: error.message }
 
   revalidatePath('/properties')
-  revalidatePath(`/properties/${id}`)
+  revalidatePath(`/properties/${parsedId.data}`)
   return { success: true as const }
 }
 
 async function deletePropertyImpl(id: string) {
+  const parsedId = uuidSchema.safeParse(id)
+  if (!parsedId.success) return { success: false as const, error: validationMessage(parsedId.error) }
+
   const { supabase } = await getAuthorizedClient(['admin'])
 
-  const { error } = await supabase.from('properties').delete().eq('id', id)
+  const { error } = await supabase.from('properties').delete().eq('id', parsedId.data)
   if (error) return { success: false as const, error: error.message }
 
   revalidatePath('/properties')

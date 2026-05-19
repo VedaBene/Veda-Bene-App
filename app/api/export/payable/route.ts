@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { exportPayableCSV } from '@/lib/utils/export-csv'
+import {
+  payableExportSearchParamsSchema,
+  searchParamsToRecord,
+  validationMessage,
+} from '@/lib/server/validation/contracts'
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
@@ -17,17 +22,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Sem permissão' }, { status: 403 })
   }
 
-  const { searchParams } = request.nextUrl
-  const start = searchParams.get('start') ?? ''
-  const end = searchParams.get('end') ?? ''
-  const employeeId = searchParams.get('employee_id') ?? undefined
+  const parsedFilters = payableExportSearchParamsSchema.safeParse(
+    searchParamsToRecord(request.nextUrl.searchParams),
+  )
 
-  if (!start || !end) {
-    return NextResponse.json({ error: 'Parâmetros start e end obrigatórios' }, { status: 400 })
+  if (!parsedFilters.success) {
+    return NextResponse.json({ error: validationMessage(parsedFilters.error) }, { status: 400 })
   }
 
-  const csv = await exportPayableCSV(start, end, employeeId)
-  const filename = `extrato-a-pagar_${start}_${end}.csv`
+  const { startDate, endDate, employeeId } = parsedFilters.data
+  const csv = await exportPayableCSV(startDate, endDate, employeeId)
+  const filename = `extrato-a-pagar_${startDate}_${endDate}.csv`
 
   return new NextResponse(csv, {
     headers: {

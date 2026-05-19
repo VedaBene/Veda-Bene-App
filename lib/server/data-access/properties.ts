@@ -1,14 +1,9 @@
 import 'server-only'
 
 import { toPropertyFormData, toPropertyListItem } from '@/lib/server/view-models'
+import type { PropertyListFilters } from '@/lib/server/validation/contracts'
 import type { PropertyFormData, PropertyListItem } from '@/lib/types/view-models'
 import type { SupabaseServerClient, Viewer } from './viewer'
-
-export type PropertyListFilters = {
-  page: number
-  pageSize: number
-  q?: string
-}
 
 export type PropertyListResult = {
   items: PropertyListItem[]

@@ -5,18 +5,19 @@ import { Button } from '@/components/ui/Button'
 import { Plus } from 'lucide-react'
 import { getCurrentViewer } from '@/lib/server/data-access/viewer'
 import { getPropertyList } from '@/lib/server/data-access/properties'
+import { propertyListSearchParamsSchema } from '@/lib/server/validation/contracts'
 
 const PAGE_SIZE = 20
 
 export default async function PropertiesPage(props: PageProps<never>) {
-  const { page: pageParam, q } = await props.searchParams as { page?: string; q?: string }
-  const page = Math.max(1, parseInt(pageParam ?? '1', 10) || 1)
+  const parsedFilters = propertyListSearchParamsSchema.safeParse(await props.searchParams)
+  const filters = parsedFilters.success ? parsedFilters.data : { page: 1, q: undefined }
 
   const { supabase, viewer } = await getCurrentViewer()
   const { items, totalPages } = await getPropertyList(supabase, viewer, {
-    page,
+    page: filters.page,
     pageSize: PAGE_SIZE,
-    q,
+    q: filters.q,
   })
 
   return (
@@ -35,9 +36,9 @@ export default async function PropertiesPage(props: PageProps<never>) {
       <PropertyList
         properties={items}
         role={viewer.role}
-        currentPage={page}
+        currentPage={filters.page}
         totalPages={totalPages}
-        q={q ?? ''}
+        q={filters.q ?? ''}
       />
     </div>
   )

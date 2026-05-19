@@ -1,6 +1,7 @@
 import 'server-only'
 
 import { toServiceOrderFormData, toServiceOrderListItem } from '@/lib/server/view-models'
+import type { ServiceOrderListFilters } from '@/lib/server/validation/contracts'
 import type {
   ServiceOrderFormData,
   ServiceOrderListItem,
@@ -8,13 +9,6 @@ import type {
   StaffOption,
 } from '@/lib/types/view-models'
 import type { SupabaseServerClient, Viewer } from './viewer'
-
-export type ServiceOrderListFilters = {
-  donePage: number
-  donePageSize: number
-  q?: string
-  date?: string
-}
 
 export type ServiceOrderListResult = {
   active: ServiceOrderListItem[]

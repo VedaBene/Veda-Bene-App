@@ -2,6 +2,7 @@ import 'server-only'
 
 import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
+import { roleSchema } from '@/lib/server/validation/contracts'
 import type { Role } from '@/lib/types/database'
 
 export type Viewer = {
@@ -24,12 +25,13 @@ export async function getCurrentViewer(): Promise<{
     .select('role')
     .eq('id', user.id)
     .single()
+  const parsedRole = roleSchema.safeParse(profile?.role)
 
   return {
     supabase,
     viewer: {
       userId: user.id,
-      role: (profile?.role ?? 'cliente') as Role,
+      role: parsedRole.success ? parsedRole.data : 'cliente',
     },
   }
 }

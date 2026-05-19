@@ -2,6 +2,11 @@
 
 import { getAuthorizedClient } from '@/lib/server/authz'
 import { resolveOrderHours } from '@/lib/server/hours'
+import {
+  payableStatementFiltersSchema,
+  receivableStatementFiltersSchema,
+  validationMessage,
+} from '@/lib/server/validation/contracts'
 
 export type PayableRow = {
   employee_id: string
@@ -72,18 +77,22 @@ export async function fetchPayableData(
   endDate: string,
   employeeId?: string,
 ): Promise<PayableRow[]> {
+  const parsedFilters = payableStatementFiltersSchema.safeParse({ startDate, endDate, employeeId })
+  if (!parsedFilters.success) throw new Error(validationMessage(parsedFilters.error))
+
   const { supabase } = await getAuthorizedClient(['admin'])
+  const filters = parsedFilters.data
 
   // Buscar OSs finalizadas no período com horas do imóvel
   let query = supabase
     .from('service_orders')
     .select('cleaning_staff_id, consegna_staff_id, worked_minutes, property:properties(avg_cleaning_hours)')
     .eq('status', 'done')
-    .gte('completed_at', startDate)
-    .lte('completed_at', endDate)
+    .gte('completed_at', filters.startDate)
+    .lte('completed_at', filters.endDate)
 
-  if (employeeId) {
-    query = query.or(`cleaning_staff_id.eq.${employeeId},consegna_staff_id.eq.${employeeId}`)
+  if (filters.employeeId) {
+    query = query.or(`cleaning_staff_id.eq.${filters.employeeId},consegna_staff_id.eq.${filters.employeeId}`)
   }
 
   const { data: orders } = await query
@@ -173,7 +182,11 @@ export async function fetchReceivableData(
   clientType?: 'rental' | 'particular' | 'all',
   clientId?: string,
 ): Promise<ReceivableRow[]> {
+  const parsedFilters = receivableStatementFiltersSchema.safeParse({ startDate, endDate, clientType, clientId })
+  if (!parsedFilters.success) throw new Error(validationMessage(parsedFilters.error))
+
   const { supabase } = await getAuthorizedClient()
+  const filters = parsedFilters.data
 
   const { data: orders } = await supabase
     .from('service_orders')
@@ -186,8 +199,8 @@ export async function fetchReceivableData(
       )
     `)
     .eq('status', 'done')
-    .gte('completed_at', startDate)
-    .lte('completed_at', endDate)
+    .gte('completed_at', filters.startDate)
+    .lte('completed_at', filters.endDate)
 
   if (!orders) return []
 
@@ -206,12 +219,12 @@ export async function fetchReceivableData(
     if (!prop) continue
 
     // Filtro de tipo de cliente
-    if (clientType && clientType !== 'all' && prop.client_type !== clientType) continue
+    if (filters.clientType && filters.clientType !== 'all' && prop.client_type !== filters.clientType) continue
 
     // Filtro por cliente específico (agência ou proprietário)
-    if (clientId) {
-      const matchesAgency = prop.agency?.id === clientId
-      const matchesOwner = prop.owner?.id === clientId
+    if (filters.clientId) {
+      const matchesAgency = prop.agency?.id === filters.clientId
+      const matchesOwner = prop.owner?.id === filters.clientId
       if (!matchesAgency && !matchesOwner) continue
     }
 
@@ -248,7 +261,11 @@ export async function fetchReceivableDetail(
   clientType?: 'rental' | 'particular' | 'all',
   clientId?: string,
 ): Promise<ReceivableDetailRow[]> {
+  const parsedFilters = receivableStatementFiltersSchema.safeParse({ startDate, endDate, clientType, clientId })
+  if (!parsedFilters.success) throw new Error(validationMessage(parsedFilters.error))
+
   const { supabase } = await getAuthorizedClient()
+  const filters = parsedFilters.data
 
   const { data: orders } = await supabase
     .from('service_orders')
@@ -261,8 +278,8 @@ export async function fetchReceivableDetail(
       )
     `)
     .eq('status', 'done')
-    .gte('completed_at', startDate)
-    .lte('completed_at', endDate)
+    .gte('completed_at', filters.startDate)
+    .lte('completed_at', filters.endDate)
     .order('completed_at', { ascending: true })
 
   if (!orders) return []
@@ -282,11 +299,11 @@ export async function fetchReceivableDetail(
 
     if (!prop) continue
 
-    if (clientType && clientType !== 'all' && prop.client_type !== clientType) continue
+    if (filters.clientType && filters.clientType !== 'all' && prop.client_type !== filters.clientType) continue
 
-    if (clientId) {
-      const matchesAgency = prop.agency?.id === clientId
-      const matchesOwner = prop.owner?.id === clientId
+    if (filters.clientId) {
+      const matchesAgency = prop.agency?.id === filters.clientId
+      const matchesOwner = prop.owner?.id === filters.clientId
       if (!matchesAgency && !matchesOwner) continue
     }
 
@@ -325,7 +342,11 @@ export async function fetchPayableDetail(
   endDate: string,
   employeeId?: string,
 ): Promise<PayableDetailRow[]> {
+  const parsedFilters = payableStatementFiltersSchema.safeParse({ startDate, endDate, employeeId })
+  if (!parsedFilters.success) throw new Error(validationMessage(parsedFilters.error))
+
   const { supabase } = await getAuthorizedClient(['admin'])
+  const filters = parsedFilters.data
 
   let query = supabase
     .from('service_orders')
@@ -335,12 +356,12 @@ export async function fetchPayableDetail(
       property:properties(name, avg_cleaning_hours)
     `)
     .eq('status', 'done')
-    .gte('completed_at', startDate)
-    .lte('completed_at', endDate)
+    .gte('completed_at', filters.startDate)
+    .lte('completed_at', filters.endDate)
     .order('completed_at', { ascending: true })
 
-  if (employeeId) {
-    query = query.or(`cleaning_staff_id.eq.${employeeId},consegna_staff_id.eq.${employeeId}`)
+  if (filters.employeeId) {
+    query = query.or(`cleaning_staff_id.eq.${filters.employeeId},consegna_staff_id.eq.${filters.employeeId}`)
   }
 
   const { data: orders } = await query
@@ -381,7 +402,7 @@ export async function fetchPayableDetail(
     if (order.consegna_staff_id) staffIdsForOrder.add(order.consegna_staff_id)
 
     for (const sid of staffIdsForOrder) {
-      if (employeeId && sid !== employeeId) continue
+      if (filters.employeeId && sid !== filters.employeeId) continue
       const p = profileById.get(sid)
       if (!p) continue
 

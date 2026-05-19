@@ -9,6 +9,7 @@ import { getSiteOrigin } from '@/utils/site-url'
 import { getAssignableEmployeeRoles } from '@/lib/employee-permissions'
 import { getAuthorizedClient } from '@/lib/server/authz'
 import { withLogging } from '@/lib/server/logger'
+import { employeeRoleSchema, optionalDateOnlySchema, uuidSchema, validationMessage } from '@/lib/server/validation/contracts'
 
 const optStr = z.preprocess(v => (v === '' ? undefined : v), z.string().optional())
 const optNum = z.preprocess(
@@ -20,10 +21,10 @@ const employeeSchema = z.object({
   full_name: z.string().min(1, 'Nome obrigatório'),
   email: z.string().email('Email inválido'),
   phone: optStr,
-  birth_date: optStr,
+  birth_date: optionalDateOnlySchema,
   nationality: optStr,
   address: optStr,
-  role: z.enum(['admin', 'secretaria', 'limpeza', 'consegna']),
+  role: employeeRoleSchema,
   // remuneração — opcionais, só admin envia
   hourly_rate: optNum,
   has_fixed_salary: z.preprocess(v => v === 'true' || v === true, z.boolean()).optional(),
@@ -87,6 +88,9 @@ async function createEmployeeImpl(formData: FormData) {
 }
 
 async function updateEmployeeImpl(id: string, formData: FormData) {
+  const parsedId = uuidSchema.safeParse(id)
+  if (!parsedId.success) return { success: false as const, error: validationMessage(parsedId.error) }
+
   const { supabase, role } = await getAuthorizedClient(['admin'])
 
   const raw = Object.fromEntries(formData)
@@ -112,20 +116,23 @@ async function updateEmployeeImpl(id: string, formData: FormData) {
       monthly_salary: data.has_fixed_salary ? (data.monthly_salary ?? null) : null,
       overtime_rate: data.has_fixed_salary ? (data.overtime_rate ?? null) : null,
     })
-    .eq('id', id)
+    .eq('id', parsedId.data)
 
   if (error) return { success: false as const, error: error.message }
 
   revalidatePath('/employees')
-  revalidatePath(`/employees/${id}`)
+  revalidatePath(`/employees/${parsedId.data}`)
   return { success: true as const }
 }
 
 async function deleteEmployeeImpl(id: string) {
+  const parsedId = uuidSchema.safeParse(id)
+  if (!parsedId.success) return { success: false as const, error: validationMessage(parsedId.error) }
+
   await getAuthorizedClient(['admin'])
 
   const adminClient = createAdminClient()
-  const { error } = await adminClient.auth.admin.deleteUser(id)
+  const { error } = await adminClient.auth.admin.deleteUser(parsedId.data)
   if (error) return { success: false as const, error: error.message }
 
   revalidatePath('/employees')

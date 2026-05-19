@@ -5,24 +5,22 @@ import { Button } from '@/components/ui/Button'
 import { Plus } from 'lucide-react'
 import { getCurrentViewer } from '@/lib/server/data-access/viewer'
 import { getServiceOrderList } from '@/lib/server/data-access/service-orders'
+import { serviceOrderListSearchParamsSchema } from '@/lib/server/validation/contracts'
 
 const DONE_PAGE_SIZE = 20
 
 export default async function ServiceOrdersPage(props: PageProps<never>) {
-  const { donePage: donePageParam, q, date } = await props.searchParams as {
-    donePage?: string
-    q?: string
-    date?: string
-  }
-
-  const donePage = Math.max(1, parseInt(donePageParam ?? '1', 10) || 1)
+  const parsedFilters = serviceOrderListSearchParamsSchema.safeParse(await props.searchParams)
+  const filters = parsedFilters.success
+    ? parsedFilters.data
+    : { donePage: 1, q: undefined, date: undefined }
 
   const { supabase, viewer } = await getCurrentViewer()
   const { active, done, doneTotalPages } = await getServiceOrderList(supabase, viewer, {
-    donePage,
+    donePage: filters.donePage,
     donePageSize: DONE_PAGE_SIZE,
-    q,
-    date,
+    q: filters.q,
+    date: filters.date,
   })
 
   return (
@@ -43,10 +41,10 @@ export default async function ServiceOrdersPage(props: PageProps<never>) {
         done={done}
         role={viewer.role}
         userId={viewer.userId}
-        donePage={donePage}
+        donePage={filters.donePage}
         doneTotalPages={doneTotalPages}
-        initialQ={q ?? ''}
-        initialDate={date ?? ''}
+        initialQ={filters.q ?? ''}
+        initialDate={filters.date ?? ''}
       />
     </div>
   )
