@@ -511,3 +511,87 @@ Residual risks:
   database column-level enforcement.
 - Automated regression tests for reporting totals and role DTOs remain Stage 7
   work.
+
+## 2026-05-19 - Stage 7 Completed
+
+Stage: 7 - Critical Regression Tests
+
+Status: completed
+
+Summary:
+
+- Added Vitest as the lightweight unit test runner and exposed it via
+  `npm test`.
+- Added a Node-only Vitest config with a test-only alias for `server-only`, so
+  server modules can be imported without changing production code.
+- Added focused tests for pricing, hour resolution, validation contracts,
+  role-sensitive DTO/view-model shaping, DAL role-aware select strings, and the
+  Stage 6 canonical payable/receivable reporting producers.
+- Added a deterministic fake Supabase query chain for unit tests that need DAL
+  or reporting behavior without real production data.
+- Updated CI to run `npm test` after lint and typecheck.
+
+Files changed:
+
+- `.github/workflows/ci.yml`
+- `package.json`
+- `package-lock.json`
+- `vitest.config.mts`
+- `test/server-only.ts`
+- `test/fake-supabase.ts`
+- `lib/server/pricing.test.ts`
+- `lib/server/hours.test.ts`
+- `lib/server/validation/contracts.test.ts`
+- `lib/server/view-models.test.ts`
+- `lib/server/data-access/role-selects.test.ts`
+- `lib/server/reporting/financial.test.ts`
+- `docs/evolution/README.md`
+- `docs/evolution/strategic-roadmap.md`
+- `docs/evolution/stage-07-critical-tests.md`
+- `docs/evolution/execution-log.md`
+
+Verification:
+
+- Verified Stage 6 was marked completed in `docs/evolution/README.md`,
+  `docs/evolution/strategic-roadmap.md`, and this execution log before editing.
+- Read `AGENTS.md`, `CLAUDE.md`, `docs/decisions/README.md`,
+  `docs/decisions/001-rls-via-app-role-no-jwt.md`,
+  `docs/decisions/002-cls-via-filtro-select.md`,
+  `docs/decisions/004-proxy-ts-em-vez-de-middleware-ts.md`,
+  `docs/evolution/README.md`, `docs/evolution/strategic-roadmap.md`, this
+  execution log, and the Stage 7 file before editing.
+- Read Next.js 16 local docs:
+  `node_modules/next/dist/docs/01-app/02-guides/testing/index.md`,
+  `node_modules/next/dist/docs/01-app/02-guides/testing/vitest.md`, and
+  `node_modules/next/dist/docs/01-app/02-guides/data-security.md`.
+- Inspected test/scripts/configuration and the requested critical modules:
+  `package.json`, `.github/workflows/ci.yml`, TypeScript/ESLint/Next config,
+  `lib/server/pricing.ts`, `lib/server/hours.ts`,
+  `lib/server/validation/contracts.ts`,
+  `lib/server/reporting/financial.ts`, `lib/server/data-access/**`,
+  `lib/server/view-models.ts`, `lib/types/**`, and Stage 6 reporting/export
+  surfaces.
+- `npm run lint` passed.
+- `npx tsc --noEmit` passed.
+- `npm test` passed: 6 test files, 27 tests.
+- `npm run build` passed.
+
+Decisions:
+
+- Used Vitest in Node mode rather than component/E2E tooling because the stage
+  targets isolated server-side contracts and fast deterministic regression
+  coverage.
+- Kept tests close to the server modules they protect and avoided real Supabase
+  data by using a small fake query chain.
+- Tested ADR 002 visibility through both DTO output and DAL select strings,
+  because CLS remains an application-layer responsibility.
+- Removed `vite-tsconfig-paths` after Vite reported native `tsconfig` path
+  resolution support; Vitest remains the only new dev dependency.
+- Did not create a new ADR because no architectural contract changed.
+
+Residual risks:
+
+- The suite does not replace real authenticated manual/E2E checks for UI flows
+  or real Supabase RLS behavior.
+- Database performance, RLS policies, migrations, and Supabase advisor review
+  remain explicitly out of scope for Stage 7 and belong to Stage 8.
