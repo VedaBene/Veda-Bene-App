@@ -185,7 +185,7 @@ Expected benefits:
 
 ## Stage 7 - Critical Regression Tests
 
-Status: pending
+Status: completed
 
 Purpose: protect the rules most likely to break during refactors.
 
