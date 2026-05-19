@@ -80,10 +80,20 @@ npm run lint     # ESLint
 ## Arquitetura — pontos críticos
 
 - **RLS**: roles injetadas no JWT via `custom_access_token_hook` como `app_role`. A função `get_my_role()` lê o JWT como JSONB — retorna com aspas duplas embutidas (ex: `'"admin"'`), então policies usam `= '"admin"'`, **não** `= 'admin'`.
-- **Column Level Security**: implementado via views (`properties_public`, `profiles_public`) em vez de `REVOKE`/`GRANT`, pois o Supabase usa um único role DB `authenticated` para todos os usuários autenticados.
+- **Column Level Security**: RLS protege linhas no Supabase/Postgres, mas a proteção de colunas sensíveis hoje fica na aplicação. Server Components, Server Actions, filtros explícitos de `select()` e DTOs devem selecionar apenas os campos permitidos por role. As views `properties_public` e `profiles_public` foram removidas e **não** são o mecanismo ativo. Ver [ADR 002](docs/decisions/002-cls-via-filtro-select.md).
 - **`is_urgent`** em `service_orders`: coluna `GENERATED ALWAYS AS STORED` — não pode ser inserida manualmente. É `true` quando `(checkin_at - checkout_at) < 4h`.
 - **Supabase clients**: `utils/supabase/{client,server,middleware}.ts` para uso comum + `utils/supabase/admin.ts` (service role, **apenas** para Server Actions administrativas).
 - **Preço da OS**: calculado no Server Action ao criar (busca `base_price` + `extra_per_person` do imóvel), nunca pelo cliente.
+
+### Checklist para acesso a dados sensíveis
+
+Ao criar ou alterar qualquer acesso a `profiles`, `properties` ou `service_orders`:
+
+- Liste colunas explicitamente no `select()`; não use `select('*')`.
+- Selecione o conjunto mínimo de campos necessário para a tela, ação ou export.
+- Revise visibilidade por role antes de expor preço de imóvel, remuneração, dados financeiros ou dados pessoais.
+- Aplique DTO/view-model server-side antes de retornar dados para Client Components.
+- Consulte [ADR 002](docs/decisions/002-cls-via-filtro-select.md) quando o acesso envolver campos sensíveis.
 
 ## Estrutura de pastas
 
