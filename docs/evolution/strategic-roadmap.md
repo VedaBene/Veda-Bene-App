@@ -207,7 +207,7 @@ Expected benefits:
 
 ## Stage 8 - Database Performance And RLS Review
 
-Status: pending
+Status: completed
 
 Purpose: prepare the Supabase/Postgres layer for growth after app boundaries are
 cleaner.

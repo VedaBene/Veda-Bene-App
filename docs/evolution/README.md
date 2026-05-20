@@ -69,4 +69,4 @@ running the full build is optional unless code changed.
 | 5 | `stage-05-service-orders-refactor.md` | completed |
 | 6 | `stage-06-reporting-exports.md` | completed |
 | 7 | `stage-07-critical-tests.md` | completed |
-| 8 | `stage-08-database-performance-rls.md` | pending |
+| 8 | `stage-08-database-performance-rls.md` | completed |

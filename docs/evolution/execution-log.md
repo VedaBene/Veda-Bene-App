@@ -595,3 +595,93 @@ Residual risks:
   or real Supabase RLS behavior.
 - Database performance, RLS policies, migrations, and Supabase advisor review
   remain explicitly out of scope for Stage 7 and belong to Stage 8.
+
+## 2026-05-20 - Stage 8 Completed
+
+Stage: 8 - Database Performance And RLS Review
+
+Status: completed
+
+Summary:
+
+- Reviewed current Supabase/Postgres performance and RLS posture after the Stage
+  2-7 DAL, reporting, and test work.
+- Used Supabase Advisor through `npx supabase db advisors --linked` as evidence.
+- Added a focused migration for service-order reporting/list indexes, cliente
+  helper email indexes, RLS initplan optimization, and policy role narrowing.
+- Preserved existing financial rules, DTO/view-model contracts, reporting
+  architecture, and service-order behavior.
+
+Files changed:
+
+- `supabase/migrations/20260520105915_stage_08_database_performance_rls.sql`
+- `docs/evolution/README.md`
+- `docs/evolution/strategic-roadmap.md`
+- `docs/evolution/stage-08-database-performance-rls.md`
+- `docs/evolution/execution-log.md`
+
+Verification:
+
+- Verified Stage 7 was marked completed in `docs/evolution/README.md`,
+  `docs/evolution/strategic-roadmap.md`, and this execution log before editing.
+- Read `AGENTS.md`, `CLAUDE.md`, `docs/decisions/README.md`,
+  `docs/decisions/001-rls-via-app-role-no-jwt.md`,
+  `docs/decisions/002-cls-via-filtro-select.md`,
+  `docs/decisions/003-cliente-b2c-via-email-match.md`,
+  `docs/decisions/005-rls-helpers-em-schema-privado.md`,
+  `docs/decisions/006-rpcs-privilegiadas-sem-execucao-direta.md`,
+  `docs/evolution/README.md`, `docs/evolution/strategic-roadmap.md`, this
+  execution log, and the Stage 8 file before editing.
+- Read Next.js 16 local docs:
+  `node_modules/next/dist/docs/01-app/02-guides/data-security.md`,
+  `node_modules/next/dist/docs/01-app/01-getting-started/06-fetching-data.md`,
+  and `node_modules/next/dist/docs/01-app/01-getting-started/15-route-handlers.md`.
+- Checked current Supabase RLS and query-optimization documentation.
+- Inspected current migrations, RLS policies, functions, grants, indexes,
+  dashboard queries, statement/reporting queries, export routes, service-order
+  flows, and Stage 7 regression tests.
+- Remote read-only checks via `npx supabase db query --linked` confirmed:
+  RLS enabled on the five public application tables; privileged RLS helpers in
+  `private` with empty `search_path`; public privileged RPC/trigger functions
+  not executable by `anon` or `authenticated`; no current
+  `service_orders.completed_at`, `owners.email`, or `agencies.email` index.
+- Representative remote `EXPLAIN` plans showed sequential scans on the current
+  small dataset for completed-at statement/dashboard filters and active
+  service-order list filters.
+- After setting `SUPABASE_DB_PASSWORD`, `npx supabase migration list --linked`
+  completed and listed the Stage 8 migration.
+- `npx supabase db lint --linked --level warning --fail-on none` completed with
+  no schema errors found.
+- `npx supabase db push --linked` completed and reported the remote database was
+  up to date.
+- `npx supabase db advisors --linked --type all --level info --fail-on none`
+  no longer reported the `auth_rls_initplan` warnings addressed by this stage.
+- `npm run lint` passed.
+- `npx tsc --noEmit` passed.
+- `npm test` passed: 6 test files, 27 tests.
+- `npm run build` passed.
+
+Decisions:
+
+- Added partial indexes instead of broad composite indexes where query
+  predicates are stable (`status = 'done'`, active statuses, non-null emails).
+- Rewrote only the Advisor-flagged RLS policies for initplan behavior rather
+  than merging permissive policies, because policy consolidation is higher risk
+  and would need a dedicated RLS behavior review.
+- Narrowed final `PUBLIC` policies for cliente/staff SELECT paths to
+  `authenticated` while preserving their existing role and ownership predicates.
+- Did not remove indexes marked unused by Advisor because the production
+  dataset is small and usage stats alone are not enough evidence to remove FK
+  or filter-support indexes.
+- Did not create a new ADR because no permanent architectural contract changed.
+
+Residual risks:
+
+- Supabase Advisor still reports `multiple_permissive_policies`; addressing it
+  should be a separate, explicitly approved RLS consolidation change.
+- Supabase Auth leaked password protection and Auth DB connection allocation
+  findings remain project configuration follow-ups outside repository SQL.
+- Supabase Advisor reports the new Stage 8 indexes as unused immediately after
+  creation; this is expected until production queries accumulate usage stats.
+- Property search with leading-wildcard `ILIKE` remains a possible future
+  hotspot; a trigram index was not added without usage/latency evidence.
