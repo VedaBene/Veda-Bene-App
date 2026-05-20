@@ -41,4 +41,8 @@ Outras convenções importantes:
 - `~/Downloads/Spec_1.md` — Plano tático de implementação arquivo a arquivo (derivado do PRD)
 
 ## Estado atual
-Etapas 0–9 concluídas. Componentes UI compartilhados em `components/ui/`.
+Etapas 0–8 concluídas. O histórico da evolução técnica concluída está em
+[`docs/evolution/`](docs/evolution/) e deve ser consultado quando mudanças
+tocarem DAL/data access, autorização/validação, service orders,
+reporting/exports/dashboard, Supabase/Postgres/RLS ou helpers/RPCs
+privilegiados. Componentes UI compartilhados em `components/ui/`.

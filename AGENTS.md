@@ -5,13 +5,14 @@ This version has breaking changes — APIs, conventions, and file structure may 
 <!-- END:nextjs-agent-rules -->
 
 <!-- BEGIN:veda-bene-evolution-rules -->
-# Strategic evolution workflow
+# Strategic evolution history
 
-Before executing any staged architecture/evolution work, read `docs/evolution/README.md`.
-That folder is the official source of context, roadmap, status, execution protocol,
-and cross-session continuity for staged technical evolution of this project.
+`docs/evolution/` records the completed staged technical evolution of this
+project. Do not read the full folder for routine feature, UI, copy, or small bug
+tasks.
 
-If the user asks to execute a numbered stage, execute only that stage unless they
-explicitly expand the scope. At the end of the stage, update the relevant
-`docs/evolution/stage-XX-*.md` file and `docs/evolution/execution-log.md`.
+Read `docs/evolution/README.md` only when the user asks about that evolution
+history or when work touches the evolved architecture areas: DAL/data access,
+authorization/validation, service orders, reporting/exports/dashboard,
+Supabase/Postgres/RLS, privileged helpers/RPCs, or the documented stage records.
 <!-- END:veda-bene-evolution-rules -->

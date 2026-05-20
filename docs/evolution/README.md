@@ -1,10 +1,17 @@
-# Veda Bene Evolution Protocol
+# Veda Bene Evolution History
 
-This folder is the official cross-session context for the staged technical
-evolution of Veda Bene. Any new agent session that is asked to execute an
-evolution stage must start here.
+This folder records the completed staged technical evolution of Veda Bene.
+
+The active stages are complete. Treat this folder as historical architecture
+context, not as a mandatory reading path for every task. Read it when work
+touches DAL/data access, authorization/validation, service orders,
+reporting/exports/dashboard, Supabase/Postgres/RLS, privileged helpers/RPCs, or
+when the user explicitly asks about the staged evolution.
 
 ## Required Reading Order
+
+Use this order only for evolution-related work or when investigating the stage
+history:
 
 1. `AGENTS.md` for repository-level agent rules.
 2. `CLAUDE.md` for current project architecture context.
@@ -14,9 +21,10 @@ evolution stage must start here.
 6. The specific `docs/evolution/stage-XX-*.md` file requested by the user.
 7. The relevant Next.js 16 guide in `node_modules/next/dist/docs/` before code changes.
 
-## Execution Contract
+## Historical Execution Contract
 
-When the user asks to execute a stage, the agent must:
+The stages below are completed. If a future agent is explicitly asked to reopen,
+audit, or extend staged evolution work, it must:
 
 1. Confirm the requested stage exists.
 2. Check the stage status and dependencies.
