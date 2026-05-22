@@ -37,8 +37,9 @@ function generatePDF(orders: ServiceOrderListItem[], date: string) {
     <tr>
       <td>#${o.order_number}</td>
       <td>${escapeHtml(o.property?.name ?? '—')}</td>
-      <td>${formatDateTime(o.checkout_at)}</td>
       <td>${formatDateTime(o.checkin_at)}</td>
+      <td>${formatDateTime(o.checkout_at)}</td>
+      <td class="notes-cell">${o.cleaning_notes ? escapeHtml(o.cleaning_notes) : '—'}</td>
       ${OCCUPANCY_FIELDS.map(({ key }) => {
         const val = (o[key] as number) ?? 0
         return `<td class="${val > 0 ? 'highlight' : 'dim'}">${val > 0 ? val : '—'}</td>`
@@ -59,6 +60,7 @@ function generatePDF(orders: ServiceOrderListItem[], date: string) {
   <meta charset="UTF-8" />
   <title>Ordini di Lavoro — Veda Bene</title>
   <style>
+    @page { size: landscape; margin: 15mm; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, sans-serif; font-size: 11px; color: #111; padding: 24px; }
     h1 { font-size: 18px; margin-bottom: 2px; }
@@ -73,6 +75,7 @@ function generatePDF(orders: ServiceOrderListItem[], date: string) {
     .totals-table { max-width: 300px; }
     .totals-table td:first-child { color: #555; }
     .totals-table td:last-child { font-weight: 700; text-align: right; }
+    .notes-cell { max-width: 250px; white-space: normal; word-break: break-word; font-size: 10px; color: #333; }
     @media print { body { padding: 0; } }
   </style>
 </head>
@@ -84,13 +87,14 @@ function generatePDF(orders: ServiceOrderListItem[], date: string) {
       <tr>
         <th>O.L. #</th>
         <th>Immobile</th>
-        <th>Check-out</th>
         <th>Check-in</th>
+        <th>Check-out</th>
+        <th>Note Pulizia</th>
         ${OCCUPANCY_FIELDS.map(({ label }) => `<th>${label}</th>`).join('')}
       </tr>
     </thead>
     <tbody>
-      ${rows || '<tr><td colspan="11" style="text-align:center;color:#999;padding:16px">Nessun O.L. trovato</td></tr>'}
+      ${rows || '<tr><td colspan="12" style="text-align:center;color:#999;padding:16px">Nessun O.L. trovato</td></tr>'}
     </tbody>
   </table>
   ${activeTotalFields.length > 0 ? `

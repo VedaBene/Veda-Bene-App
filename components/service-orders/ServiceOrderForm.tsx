@@ -218,6 +218,7 @@ export function ServiceOrderForm({
           isLoading={isTrackingAction}
           onCancel={() => setShowStartModal(false)}
           onConfirm={handleStartCleaning}
+          cleaningNotes={cleaningNotes}
         />
       )}
 
@@ -270,7 +271,7 @@ export function ServiceOrderForm({
         setters={{ realGuests: setRealGuests, doubleBeds: setDoubleBeds, singleBeds: setSingleBeds, sofaBeds: setSofaBeds, armchairBeds: setArmchairBeds, bathrooms: setBathrooms, bidets: setBidets, cribs: setCribs }}
       />
 
-      {isAdminOrSec && (
+      {(canEdit || (order && order.cleaning_notes)) && (
         <CleaningNotesSection
           isOpen={open.obsLimpeza}
           onToggle={() => toggle('obsLimpeza')}

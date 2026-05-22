@@ -97,6 +97,7 @@ export type ServiceOrderListItem = Pick<
   | 'started_at'
   | 'worked_minutes'
   | 'pricing_mode'
+  | 'cleaning_notes'
 > & {
   property: Pick<Property, 'id' | 'name' | 'avg_cleaning_hours'> | null
   cleaning_staff: StaffOption | null

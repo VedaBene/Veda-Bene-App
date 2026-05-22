@@ -124,6 +124,7 @@ export function toServiceOrderListItem(order: RawServiceOrderList, role: Role): 
     started_at: order.started_at ?? null,
     worked_minutes: order.worked_minutes ?? null,
     pricing_mode: order.pricing_mode,
+    cleaning_notes: order.cleaning_notes ?? null,
   }
 }
 
@@ -160,10 +161,10 @@ export function toServiceOrderFormData(
     completed_at: order.completed_at ?? null,
     worked_minutes: order.worked_minutes ?? null,
     pricing_mode: order.pricing_mode,
+    cleaning_notes: order.cleaning_notes ?? null,
   }
 
   if (role === 'admin' || role === 'secretaria') {
-    dto.cleaning_notes = order.cleaning_notes ?? null
     dto.extra_services_description = order.extra_services_description ?? null
     dto.extra_services_price = order.extra_services_price ?? null
     dto.completion_notes = order.completion_notes ?? null

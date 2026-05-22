@@ -180,6 +180,7 @@ export function ServiceOrderList({
           onCancel={() => setStartModalOrder(null)}
           onConfirm={handleStartCleaning}
           details={<StartOrderDetails order={startModalOrder} />}
+          cleaningNotes={startModalOrder.cleaning_notes}
         />
       )}
 

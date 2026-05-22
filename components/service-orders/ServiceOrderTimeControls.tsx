@@ -1,7 +1,7 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { CheckCircle, Flag, Play, Timer, X } from 'lucide-react'
+import { CheckCircle, FileText, Flag, Play, Timer, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import type { OSStatus } from '@/lib/types/database'
 import { LiveTimer, formatWorkedTime } from './LiveTimer'
@@ -101,12 +101,14 @@ export function StartCleaningModal({
   onCancel,
   onConfirm,
   details,
+  cleaningNotes,
 }: {
   propertyName: string | null | undefined
   isLoading: boolean
   onCancel: () => void
   onConfirm: () => void
   details?: ReactNode
+  cleaningNotes?: string | null
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
@@ -125,6 +127,17 @@ export function StartCleaningModal({
           <p className="text-sm font-semibold text-foreground">{propertyName ?? '—'}</p>
           {details}
         </div>
+        {cleaningNotes && (
+          <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 px-4 py-3 space-y-1 text-left">
+            <p className="text-[10px] text-amber-700 dark:text-amber-400 uppercase tracking-wide font-semibold flex items-center gap-1.5">
+              <FileText size={13} className="shrink-0" />
+              Note sulla Pulizia
+            </p>
+            <div className="max-h-32 overflow-y-auto pr-1 text-xs text-foreground whitespace-pre-wrap leading-relaxed">
+              {cleaningNotes}
+            </div>
+          </div>
+        )}
         <p className="text-sm text-muted-foreground">
           Alla conferma, l&apos;orario di inizio verrà registrato e lo stato passerà a <strong>In corso</strong>.
         </p>

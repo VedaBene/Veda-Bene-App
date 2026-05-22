@@ -42,6 +42,7 @@ const SERVICE_ORDER_LIST_SELECT = `
   started_at,
   worked_minutes,
   pricing_mode,
+  cleaning_notes,
   property:properties(id, name, avg_cleaning_hours),
   cleaning_staff:profiles!cleaning_staff_id(id, full_name),
   consegna_staff:profiles!consegna_staff_id(id, full_name)
@@ -74,8 +75,9 @@ function getServiceOrderDetailSelect(viewer: Viewer): string {
     'completion_notes',
     'worked_minutes',
     'pricing_mode',
+    'cleaning_notes',
     ...(isAdminOrSecretaria
-      ? ['cleaning_notes', 'extra_services_description', 'extra_services_price']
+      ? ['extra_services_description', 'extra_services_price']
       : []),
   ].join(', ')
 }
