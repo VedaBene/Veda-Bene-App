@@ -34,7 +34,7 @@ Outras convenções importantes:
 - **Funções privilegiadas**: helpers de RLS com `SECURITY DEFINER` devem ficar em schema privado; RPCs privilegiadas em `public` não devem conceder `EXECUTE` direto a `anon`/`authenticated` sem ADR/revisão explícita.
 - **Preço da OS**: calculado no Server Action ao criar/atualizar (busca `base_price` + `extra_per_person` do imóvel), nunca pelo cliente. `secretaria` pode escolher `pricing_mode`, mas não recebe `base_price` nem valores calculados no navegador.
   - Fórmula centralizada em `calculateTotalPrice` (`lib/server/pricing.ts`). Para OS **já existente**, carregue o contexto com `loadOrderPricingContext(supabase, orderId, overridePropertyId?)` antes de chamar — não replique os fetches inline.
-- **Horas de uma OS**: sempre via `resolveOrderHours(order, property)` em `lib/server/hours.ts` — retorna `worked_minutes/60` quando registrado, ou `avg_cleaning_hours` do imóvel como fallback. Usar em qualquer cálculo de payroll, dashboard ou export; nunca recalcular inline.
+- **Horas de uma OS**: para métricas operacionais, dashboards de produtividade e histórico, use `resolveOrderHours(order, property)` em `lib/server/hours.ts` — retorna `worked_minutes/60` quando registrado, ou `avg_cleaning_hours` do imóvel como fallback. Para remuneração/extrato a pagar, use `resolveOrderPayableHours(property)`, que considera sempre o `avg_cleaning_hours` do imóvel.
 
 ## Documentos de referência
 - `~/Downloads/prd-veda-bene.md` — PRD completo (schema SQL, RLS, padrões de código)

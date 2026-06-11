@@ -181,7 +181,7 @@ export function exportPayablePDF(
             <th>Data</th>
             <th>OS</th>
             <th>Imóvel</th>
-            <th class="num">Tempo de Execução</th>
+            <th class="num">Tempo para Pagamento</th>
             <th class="num">Valor/Hora</th>
             <th class="num">Total por OS</th>
           </tr>
@@ -189,7 +189,7 @@ export function exportPayablePDF(
         <tbody>${rows}</tbody>
         <tfoot>
           <tr>
-            <td colspan="3">Total de Horas Trabalhadas</td>
+            <td colspan="3">Total de Horas para Pagamento</td>
             <td class="num">${g.totalHours.toFixed(2)} h</td>
             <td></td>
             <td class="num">${money(g.totalPayable)}</td>
@@ -203,7 +203,7 @@ export function exportPayablePDF(
   const grandPayable = groups.reduce((s, g) => s + g.totalPayable, 0)
   const grandBlock = showGrand
     ? `<div class="grand">
-         Total Geral de Horas: ${grandHours.toFixed(2)} h &nbsp;·&nbsp;
+         Total Geral de Horas para Pagamento: ${grandHours.toFixed(2)} h &nbsp;·&nbsp;
          Total Geral a Pagar: ${money(grandPayable)}
        </div>`
     : ''

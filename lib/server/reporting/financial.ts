@@ -1,7 +1,7 @@
 import 'server-only'
 
 import { captureQueryError } from '@/lib/server/logger'
-import { resolveOrderHours } from '@/lib/server/hours'
+import { resolveOrderHours, resolveOrderPayableHours } from '@/lib/server/hours'
 import type { DashboardData, MonthStat, TopProperty } from '@/lib/types/dashboard'
 import type {
   ClientOption,
@@ -266,7 +266,7 @@ export async function getPayableDetailRows(
   const rows: PayableDetailRow[] = []
 
   for (const order of orders) {
-    const hours = resolveOrderHours(order, order.property)
+    const hours = resolveOrderPayableHours(order.property)
     const uniqueStaffIds = new Set<string>()
     if (order.cleaning_staff_id) uniqueStaffIds.add(order.cleaning_staff_id)
     if (order.consegna_staff_id) uniqueStaffIds.add(order.consegna_staff_id)

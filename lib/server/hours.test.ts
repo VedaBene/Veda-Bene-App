@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { resolveOrderHours } from './hours'
+import { resolveOrderHours, resolveOrderPayableHours } from './hours'
 
 describe('resolveOrderHours', () => {
   it('prefers tracked worked minutes over property averages', () => {
@@ -12,5 +12,16 @@ describe('resolveOrderHours', () => {
 
   it('returns zero when neither worked minutes nor property average exist', () => {
     expect(resolveOrderHours({ worked_minutes: null }, null)).toBe(0)
+  })
+})
+
+describe('resolveOrderPayableHours', () => {
+  it('uses the property average even when tracked worked minutes exist', () => {
+    expect(resolveOrderPayableHours({ avg_cleaning_hours: 4 })).toBe(4)
+  })
+
+  it('returns zero when the property average is missing', () => {
+    expect(resolveOrderPayableHours({ avg_cleaning_hours: null })).toBe(0)
+    expect(resolveOrderPayableHours(null)).toBe(0)
   })
 })

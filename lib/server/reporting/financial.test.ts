@@ -18,7 +18,7 @@ function asSupabase(fake: FakeSupabase): SupabaseServerClient {
 }
 
 describe('canonical financial reporting producers', () => {
-  it('builds payable detail rows from resolved hours and unique staff per order', async () => {
+  it('builds payable detail rows from property average hours and unique staff per order', async () => {
     const fake = new FakeSupabase({
       service_orders: [
         {
@@ -56,10 +56,10 @@ describe('canonical financial reporting producers', () => {
         order_number: 1,
         completed_at: '2026-01-10',
         property_name: 'Campo',
-        hours: 1.5,
+        hours: 4,
         hourly_rate: 20,
         monthly_salary: null,
-        os_total: 30,
+        os_total: 80,
       },
       {
         employee_id: 'staff-2',
@@ -76,7 +76,7 @@ describe('canonical financial reporting producers', () => {
     ])
   })
 
-  it('aggregates payable rows without changing salary and hourly formulas', async () => {
+  it('aggregates payable rows using property average hours without changing salary and hourly formulas', async () => {
     const fake = new FakeSupabase({
       service_orders: [
         {
@@ -111,10 +111,10 @@ describe('canonical financial reporting producers', () => {
         employee_id: 'staff-1',
         full_name: 'Ana',
         os_count: 2,
-        total_hours: 3.5,
+        total_hours: 6,
         hourly_rate: 20,
         monthly_salary: null,
-        total_amount: 70,
+        total_amount: 120,
       },
       {
         employee_id: 'staff-2',

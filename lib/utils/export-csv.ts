@@ -20,7 +20,7 @@ export function formatPayableCSV(data: PayableRow[]): string {
   const header = row([
     'Funcionário',
     'Total OS',
-    'Horas Trabalhadas',
+    'Horas para Pagamento',
     'Valor/Hora (€)',
     'Salário Fixo (€)',
     'Total a Pagar (€)',
