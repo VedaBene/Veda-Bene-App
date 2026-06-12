@@ -27,10 +27,13 @@ As decisões com maior peso e nuance estão registradas em [`docs/decisions/`](d
 - [ADR 004](docs/decisions/004-proxy-ts-em-vez-de-middleware-ts.md) — `proxy.ts` em vez de `middleware.ts` (convenção do Next.js 16)
 - [ADR 005](docs/decisions/005-rls-helpers-em-schema-privado.md) — Helpers privilegiados de RLS ficam em schema privado, não em `public`
 - [ADR 006](docs/decisions/006-rpcs-privilegiadas-sem-execucao-direta.md) — RPCs `SECURITY DEFINER` em `public` não ficam executáveis diretamente por `anon`/`authenticated`
+- [ADR 007](docs/decisions/007-exposicao-de-notas-de-limpeza-para-todos-os-perfis.md) — Notas de limpeza são visíveis para todos os perfis que já podem ler a OS
+- [ADR 008](docs/decisions/008-controles-seguranca-autenticacao.md) — Timeout de sessão por inatividade e bloqueio temporário após falhas de login
 
 Outras convenções importantes:
 - **`is_urgent`** na tabela `service_orders`: coluna `GENERATED ALWAYS AS STORED` — não pode ser inserida manualmente. É `true` quando `(checkin_at - checkout_at) < 4h`.
 - **Supabase clients**: `utils/supabase/{client,server,middleware}.ts` para uso comum. `utils/supabase/admin.ts` é um adapter admin server-only; não exporta o client service-role bruto e expõe apenas operações administrativas explícitas. O `middleware.ts` aqui é convenção do `@supabase/ssr`, não do Next.js — o arquivo de proxy do Next.js está na raiz como `proxy.ts` (ver ADR 004).
+- **Segurança de autenticação**: login por senha passa por `POST /api/auth/login` para aplicar bloqueio server-side após falhas; sessões autenticadas expiram após 45 minutos de inatividade. Ver ADR 008 antes de alterar login, sessão, cookies de atividade ou `public.auth_login_attempts`.
 - **Funções privilegiadas**: helpers de RLS com `SECURITY DEFINER` devem ficar em schema privado; RPCs privilegiadas em `public` não devem conceder `EXECUTE` direto a `anon`/`authenticated` sem ADR/revisão explícita.
 - **Preço da OS**: calculado no Server Action ao criar/atualizar (busca `base_price` + `extra_per_person` do imóvel), nunca pelo cliente. `secretaria` pode escolher `pricing_mode`, mas não recebe `base_price` nem valores calculados no navegador.
   - Fórmula centralizada em `calculateTotalPrice` (`lib/server/pricing.ts`). Para OS **já existente**, carregue o contexto com `loadOrderPricingContext(supabase, orderId, overridePropertyId?)` antes de chamar — não replique os fetches inline.

@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useRole } from '@/lib/hooks/useRole'
+import { clearSessionActivity } from '@/lib/session-timeout'
 import { createClient } from '@/utils/supabase/client'
 import {
   LayoutDashboard,
@@ -45,8 +46,9 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
   const { role } = useRole()
 
   async function handleSignOut() {
+    clearSessionActivity()
     const supabase = createClient()
-    await supabase.auth.signOut()
+    await supabase.auth.signOut({ scope: 'local' })
     router.push('/login')
   }
 

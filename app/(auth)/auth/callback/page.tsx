@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AlertCircle, Loader2 } from 'lucide-react'
+import { recordSessionActivity } from '@/lib/session-timeout'
 import { createClient } from '@/utils/supabase/client'
 import { getAuthErrorFromUrl } from '@/utils/supabase/auth-errors'
 
@@ -51,6 +52,7 @@ export default function AuthCallbackPage() {
       }
 
       const type = getCallbackType()
+      recordSessionActivity()
       router.replace(!type || type === 'invite' || type === 'recovery' ? '/update-password' : '/service-orders')
     }
 

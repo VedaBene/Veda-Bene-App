@@ -4,6 +4,7 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
   email_rate_limit_exceeded: 'O limite de envio de emails foi atingido. Aguarde alguns minutos antes de tentar novamente.',
   otp_expired: 'O link de acesso expirou ou já foi usado. Solicite um novo link e tente novamente.',
   over_email_send_rate_limit: 'O limite de envio de emails foi atingido. Aguarde alguns minutos antes de tentar novamente.',
+  session_expired: 'Sua sessão expirou por inatividade. Faça login novamente.',
   session_missing: 'Nenhuma sessão válida foi encontrada. Abra o link mais recente recebido por email.',
 }
 

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/utils/supabase/client'
+import { recordSessionActivity } from '@/lib/session-timeout'
 import { getAuthErrorFromUrl } from '@/utils/supabase/auth-errors'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
@@ -31,20 +31,26 @@ export default function LoginPage() {
     setError(null)
     setIsLoading(true)
 
-    const supabase = createClient()
-    const { error } = await supabase.auth.signInWithPassword({
-      email: email.trim().toLowerCase(),
-      password,
-    })
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      })
 
-    if (error) {
+      if (!response.ok) {
+        setError('Email ou senha incorretos.')
+        setIsLoading(false)
+        return
+      }
+
+      recordSessionActivity()
+      router.replace('/service-orders')
+      router.refresh()
+    } catch {
       setError('Email ou senha incorretos.')
       setIsLoading(false)
-      return
     }
-
-    router.replace('/service-orders')
-    router.refresh()
   }
 
   return (

@@ -26,6 +26,8 @@ Isso preserva o histórico de **por que** o sistema chegou no estado atual.
 | [004](004-proxy-ts-em-vez-de-middleware-ts.md) | `proxy.ts` em vez de `middleware.ts` | Aceita |
 | [005](005-rls-helpers-em-schema-privado.md) | Helpers privilegiados de RLS em schema privado | Aceita |
 | [006](006-rpcs-privilegiadas-sem-execucao-direta.md) | RPCs privilegiadas sem execução direta | Aceita |
+| [007](007-exposicao-de-notas-de-limpeza-para-todos-os-perfis.md) | Exposição de notas de limpeza para todos os perfis | Aceita |
+| [008](008-controles-seguranca-autenticacao.md) | Controles complementares de segurança de autenticação | Aceita |
 
 ## Formato
 
