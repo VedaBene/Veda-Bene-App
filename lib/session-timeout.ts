@@ -31,8 +31,18 @@ export function getSessionTimeoutState(
 ): SessionTimeoutState {
   const lastActivity = parseSessionActivityValue(value)
 
-  if (!lastActivity || lastActivity > now) {
+  if (!lastActivity) {
     return { lastActivity: null, isExpired: true, remainingMs: 0 }
+  }
+
+  // Se o relógio do cliente estiver no futuro em relação ao servidor devido a dessincronização,
+  // consideramos a sessão ativa (não expirada) para evitar expulsões indevidas.
+  if (lastActivity > now) {
+    return {
+      lastActivity,
+      isExpired: false,
+      remainingMs: SESSION_TIMEOUT_MS,
+    }
   }
 
   const remainingMs = SESSION_TIMEOUT_MS - (now - lastActivity)
