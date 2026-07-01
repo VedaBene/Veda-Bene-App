@@ -8,6 +8,11 @@ import {
   isLoginAttemptBlocked,
   recordFailedLogin,
 } from '@/lib/server/auth/login-lockout'
+import {
+  SESSION_ACTIVITY_COOKIE,
+  SESSION_ACTIVITY_COOKIE_MAX_AGE_SECONDS,
+  createSessionActivityValue,
+} from '@/lib/session-timeout'
 
 const LOGIN_ERROR_MESSAGE = 'Email ou senha incorretos.'
 
@@ -80,7 +85,15 @@ export async function POST(request: NextRequest) {
 
     await clearFailedLogin(identity.emailKey, identity.ipKey)
 
-    return NextResponse.json({ success: true })
+    const response = NextResponse.json({ success: true })
+    const now = Date.now()
+    response.cookies.set(SESSION_ACTIVITY_COOKIE, createSessionActivityValue(now), {
+      maxAge: SESSION_ACTIVITY_COOKIE_MAX_AGE_SECONDS,
+      path: '/',
+      sameSite: 'lax',
+    })
+
+    return response
   } catch (error) {
     Sentry.captureException(error, { tags: { area: 'auth-login' } })
     return jsonError('Não foi possível concluir o login.', 500)
