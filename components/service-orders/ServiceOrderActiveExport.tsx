@@ -3,6 +3,7 @@
 import { FileDown } from 'lucide-react'
 import type { ServiceOrderListItem } from '@/lib/types/view-models'
 import { formatDate, formatDateTime } from './display'
+import { compareIntervals } from './ServiceOrderList'
 
 const OCCUPANCY_FIELDS: { key: keyof ServiceOrderListItem; label: string }[] = [
   { key: 'real_guests', label: 'Ospiti' },
@@ -24,16 +25,17 @@ function escapeHtml(value: string): string {
 }
 
 function generatePDF(orders: ServiceOrderListItem[], date: string) {
+  const sortedOrders = [...orders].sort(compareIntervals)
   const dateLabel = date ? formatDate(date) : 'Tutte le date'
   const now = new Date().toLocaleString('it-IT', { timeZone: 'UTC' })
 
   const totals: Record<string, number> = {}
   for (const { key } of OCCUPANCY_FIELDS) {
-    totals[key as string] = orders.reduce((sum, o) => sum + ((o[key] as number) ?? 0), 0)
+    totals[key as string] = sortedOrders.reduce((sum, o) => sum + ((o[key] as number) ?? 0), 0)
   }
   const activeTotalFields = OCCUPANCY_FIELDS.filter(({ key }) => totals[key as string] > 0)
 
-  const rows = orders.map((o) => `
+  const rows = sortedOrders.map((o) => `
     <tr>
       <td>#${o.order_number}</td>
       <td>${escapeHtml(o.property?.name ?? '—')}</td>

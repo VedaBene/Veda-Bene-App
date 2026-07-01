@@ -74,6 +74,7 @@ export function ServiceOrderList({
   const allActive = active.filter(filterOrder)
   const inProgress = allActive.filter(o => o.status === 'in_progress')
   const open = allActive.filter(o => o.status === 'open')
+  const sortedOpen = [...open].sort(compareIntervals)
   const hasFilter = search !== '' || date !== ''
   const doneSearchParams: Record<string, string> = {}
   if (search) doneSearchParams.q = search
@@ -146,10 +147,10 @@ export function ServiceOrderList({
           title="Aperti"
           count={open.length}
           countClassName="bg-warning-bg text-warning"
-          action={<ActiveOrdersPdfButton orders={[...inProgress, ...open]} date={date} />}
+          action={<ActiveOrdersPdfButton orders={[...inProgress, ...sortedOpen]} date={date} />}
         />
         <ServiceOrderListTable
-          orders={open}
+          orders={sortedOpen}
           role={role}
           emptyText="Nessun O.L. aperto."
           userId={userId}
@@ -270,4 +271,27 @@ function FinishOrderDetails({ order }: { order: ServiceOrderListItem }) {
       )}
     </>
   )
+}
+
+export function compareIntervals(
+  a: { checkin_at?: string | null; checkout_at?: string | null; order_number?: number | null },
+  b: { checkin_at?: string | null; checkout_at?: string | null; order_number?: number | null }
+) {
+  const hasA = a.checkin_at && a.checkout_at
+  const hasB = b.checkin_at && b.checkout_at
+
+  if (hasA && hasB) {
+    const diffA = new Date(a.checkin_at!).getTime() - new Date(a.checkout_at!).getTime()
+    const diffB = new Date(b.checkin_at!).getTime() - new Date(b.checkout_at!).getTime()
+    
+    if (diffA !== diffB) {
+      return diffA - diffB
+    }
+    return (a.order_number ?? 0) - (b.order_number ?? 0)
+  }
+
+  if (hasA) return -1
+  if (hasB) return 1
+
+  return (a.order_number ?? 0) - (b.order_number ?? 0)
 }
