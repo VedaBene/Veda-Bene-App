@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 import * as Sentry from '@sentry/nextjs'
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
@@ -85,15 +86,15 @@ export async function POST(request: NextRequest) {
 
     await clearFailedLogin(identity.emailKey, identity.ipKey)
 
-    const response = NextResponse.json({ success: true })
+    const cookieStore = await cookies()
     const now = Date.now()
-    response.cookies.set(SESSION_ACTIVITY_COOKIE, createSessionActivityValue(now), {
+    cookieStore.set(SESSION_ACTIVITY_COOKIE, createSessionActivityValue(now), {
       maxAge: SESSION_ACTIVITY_COOKIE_MAX_AGE_SECONDS,
       path: '/',
       sameSite: 'lax',
     })
 
-    return response
+    return NextResponse.json({ success: true })
   } catch (error) {
     Sentry.captureException(error, { tags: { area: 'auth-login' } })
     return jsonError('Não foi possível concluir o login.', 500)
