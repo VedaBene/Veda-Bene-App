@@ -44,7 +44,7 @@ const SERVICE_ORDER_LIST_SELECT = `
   pricing_mode,
   cleaning_notes,
   property:properties(id, name, avg_cleaning_hours),
-  cleaning_staff:profiles!cleaning_staff_id(id, full_name),
+  cleaning_staff:profiles!service_order_cleaning_staff(id, full_name),
   consegna_staff:profiles!consegna_staff_id(id, full_name)
 `
 
@@ -183,15 +183,30 @@ export async function getServiceOrderDetail(
   viewer: Viewer,
   id: string,
 ): Promise<ServiceOrderFormData | null> {
-  const { data } = await supabase
-    .from('service_orders')
-    .select(getServiceOrderDetailSelect(viewer))
-    .eq('id', id)
-    .single()
+  const [{ data }, { data: staffRelations }] = await Promise.all([
+    supabase
+      .from('service_orders')
+      .select(getServiceOrderDetailSelect(viewer))
+      .eq('id', id)
+      .single(),
+    supabase
+      .from('service_order_cleaning_staff')
+      .select('profile_id')
+      .eq('service_order_id', id)
+  ])
 
   if (!data) return null
 
-  return toServiceOrderFormData(data as unknown as ServiceOrderFormData, viewer.role, viewer.userId)
+  const cleaning_staff_ids = (staffRelations ?? []).map((r: { profile_id: string }) => r.profile_id)
+
+  return toServiceOrderFormData(
+    {
+      ...(data as unknown as ServiceOrderFormData),
+      cleaning_staff_ids,
+    },
+    viewer.role,
+    viewer.userId,
+  )
 }
 
 export async function getServiceOrderFormOptions(

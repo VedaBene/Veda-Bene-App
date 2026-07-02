@@ -28,7 +28,7 @@ const intDef = (def = 0) =>
 
 const serviceOrderSchema = z.object({
   property_id: z.string().min(1, 'Immobile obbligatorio').pipe(uuidSchema),
-  cleaning_staff_id: optionalUuidSchema,
+  cleaning_staff_ids: z.array(uuidSchema).max(3, 'Massimo 3 responsabili').default([]),
   consegna_staff_id: optionalUuidSchema,
   cleaning_date: optionalDateOnlySchema,
   checkout_at: optStr,
@@ -57,7 +57,13 @@ const extraServicesActionSchema = z.object({
 async function createServiceOrderImpl(formData: FormData) {
   const { supabase } = await getAuthorizedClient()
 
-  const parsed = serviceOrderSchema.safeParse(Object.fromEntries(formData))
+  const rawData = Object.fromEntries(formData)
+  const cleaning_staff_ids = formData.getAll('cleaning_staff_ids').map(v => v.toString()).filter(Boolean)
+
+  const parsed = serviceOrderSchema.safeParse({
+    ...rawData,
+    cleaning_staff_ids,
+  })
   if (!parsed.success) return { success: false as const, error: parsed.error.issues[0].message }
 
   const { data } = parsed
@@ -80,11 +86,10 @@ async function createServiceOrderImpl(formData: FormData) {
       )
     : null
 
-  const { error } = await supabase
+  const { data: createdOrder, error } = await supabase
     .from('service_orders')
     .insert({
       property_id: data.property_id,
-      cleaning_staff_id: data.cleaning_staff_id ?? null,
       consegna_staff_id: data.consegna_staff_id ?? null,
       cleaning_date: data.cleaning_date ?? null,
       checkout_at: data.checkout_at ?? null,
@@ -104,8 +109,22 @@ async function createServiceOrderImpl(formData: FormData) {
       pricing_mode: data.pricing_mode,
       total_price,
     })
+    .select('id')
+    .single()
 
   if (error) return { success: false as const, error: error.message }
+
+  if (data.cleaning_staff_ids.length > 0 && createdOrder) {
+    const relations = data.cleaning_staff_ids.map(profileId => ({
+      service_order_id: createdOrder.id,
+      profile_id: profileId,
+    }))
+    const { error: relError } = await supabase
+      .from('service_order_cleaning_staff')
+      .insert(relations)
+    
+    if (relError) return { success: false as const, error: relError.message }
+  }
 
   revalidatePath('/service-orders')
   redirect('/service-orders')
@@ -117,7 +136,13 @@ async function updateServiceOrderImpl(id: string, formData: FormData) {
 
   const { supabase } = await getAuthorizedClient()
 
-  const parsed = serviceOrderSchema.safeParse(Object.fromEntries(formData))
+  const rawData = Object.fromEntries(formData)
+  const cleaning_staff_ids = formData.getAll('cleaning_staff_ids').map(v => v.toString()).filter(Boolean)
+
+  const parsed = serviceOrderSchema.safeParse({
+    ...rawData,
+    cleaning_staff_ids,
+  })
   if (!parsed.success) return { success: false as const, error: parsed.error.issues[0].message }
 
   const { data } = parsed
@@ -139,7 +164,6 @@ async function updateServiceOrderImpl(id: string, formData: FormData) {
     .from('service_orders')
     .update({
       property_id: data.property_id,
-      cleaning_staff_id: data.cleaning_staff_id ?? null,
       consegna_staff_id: data.consegna_staff_id ?? null,
       cleaning_date: data.cleaning_date ?? null,
       checkout_at: data.checkout_at ?? null,
@@ -161,6 +185,25 @@ async function updateServiceOrderImpl(id: string, formData: FormData) {
     .eq('id', parsedId.data)
 
   if (error) return { success: false as const, error: error.message }
+
+  const { error: delError } = await supabase
+    .from('service_order_cleaning_staff')
+    .delete()
+    .eq('service_order_id', parsedId.data)
+
+  if (delError) return { success: false as const, error: delError.message }
+
+  if (data.cleaning_staff_ids.length > 0) {
+    const relations = data.cleaning_staff_ids.map(profileId => ({
+      service_order_id: parsedId.data,
+      profile_id: profileId,
+    }))
+    const { error: relError } = await supabase
+      .from('service_order_cleaning_staff')
+      .insert(relations)
+    
+    if (relError) return { success: false as const, error: relError.message }
+  }
 
   revalidatePath('/service-orders')
   revalidatePath(`/service-orders/${parsedId.data}`)
@@ -344,7 +387,7 @@ async function getLastCleaningForPropertyImpl(propertyId: string) {
       order_number,
       cleaning_date,
       completed_at,
-      cleaning_staff:profiles!cleaning_staff_id(full_name)
+      cleaning_staff:profiles(full_name)
     `)
     .eq('property_id', parsed.data)
     .eq('status', 'done')
@@ -355,14 +398,18 @@ async function getLastCleaningForPropertyImpl(propertyId: string) {
 
   if (!data) return null
 
-  const cleaningStaff = (Array.isArray(data.cleaning_staff)
-    ? data.cleaning_staff[0]
-    : data.cleaning_staff) as unknown as { full_name: string } | null
+  const staffArr = Array.isArray(data.cleaning_staff)
+    ? data.cleaning_staff
+    : data.cleaning_staff
+      ? [data.cleaning_staff]
+      : []
+
+  const staffNames = (staffArr as unknown as { full_name: string }[]).map(s => s.full_name).join(', ')
 
   return {
     orderNumber: data.order_number,
     date: data.cleaning_date || data.completed_at?.split('T')[0] || '',
-    staffName: cleaningStaff?.full_name || 'Non assegnato'
+    staffName: staffNames || 'Non assegnato'
   }
 }
 

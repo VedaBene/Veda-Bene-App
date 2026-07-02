@@ -27,8 +27,8 @@ describe('canonical financial reporting producers', () => {
           status: 'done',
           completed_at: '2026-01-10',
           worked_minutes: 90,
-          cleaning_staff_id: 'staff-1',
-          consegna_staff_id: 'staff-1',
+          cleaning_staff: [{ id: 'staff-1' }],
+          consegna_staff_id: null,
           property: { name: 'Campo', avg_cleaning_hours: 4 },
         },
         {
@@ -37,7 +37,7 @@ describe('canonical financial reporting producers', () => {
           status: 'done',
           completed_at: '2026-01-11',
           worked_minutes: null,
-          cleaning_staff_id: 'staff-2',
+          cleaning_staff: [{ id: 'staff-2' }],
           consegna_staff_id: null,
           property: { name: 'Navona', avg_cleaning_hours: 2.25 },
         },
@@ -76,6 +76,55 @@ describe('canonical financial reporting producers', () => {
     ])
   })
 
+  it('divides cleaning hours equally among multiple cleaning staff on the same service order', async () => {
+    const fake = new FakeSupabase({
+      service_orders: [
+        {
+          id: 'order-1',
+          order_number: 1,
+          status: 'done',
+          completed_at: '2026-01-10',
+          worked_minutes: 90,
+          cleaning_staff: [{ id: 'staff-1' }, { id: 'staff-2' }],
+          consegna_staff_id: null,
+          property: { name: 'Campo', avg_cleaning_hours: 4 },
+        },
+      ],
+      profiles: [
+        { id: 'staff-1', full_name: 'Ana', hourly_rate: 20, monthly_salary: null },
+        { id: 'staff-2', full_name: 'Bruno', hourly_rate: 30, monthly_salary: null },
+      ],
+    })
+
+    // Esperado: 4 horas divididas por 2 = 2 horas para cada
+    await expect(getPayableDetailRows(asSupabase(fake), filters)).resolves.toEqual([
+      {
+        employee_id: 'staff-1',
+        employee_name: 'Ana',
+        order_id: 'order-1',
+        order_number: 1,
+        completed_at: '2026-01-10',
+        property_name: 'Campo',
+        hours: 2,
+        hourly_rate: 20,
+        monthly_salary: null,
+        os_total: 40,
+      },
+      {
+        employee_id: 'staff-2',
+        employee_name: 'Bruno',
+        order_id: 'order-1',
+        order_number: 1,
+        completed_at: '2026-01-10',
+        property_name: 'Campo',
+        hours: 2,
+        hourly_rate: 30,
+        monthly_salary: null,
+        os_total: 60,
+      },
+    ])
+  })
+
   it('aggregates payable rows using property average hours without changing salary and hourly formulas', async () => {
     const fake = new FakeSupabase({
       service_orders: [
@@ -85,7 +134,7 @@ describe('canonical financial reporting producers', () => {
           status: 'done',
           completed_at: '2026-01-10',
           worked_minutes: 90,
-          cleaning_staff_id: 'staff-1',
+          cleaning_staff: [{ id: 'staff-1' }],
           consegna_staff_id: null,
           property: { name: 'Campo', avg_cleaning_hours: 4 },
         },
@@ -95,7 +144,7 @@ describe('canonical financial reporting producers', () => {
           status: 'done',
           completed_at: '2026-01-11',
           worked_minutes: null,
-          cleaning_staff_id: 'staff-1',
+          cleaning_staff: [{ id: 'staff-1' }],
           consegna_staff_id: 'staff-2',
           property: { name: 'Navona', avg_cleaning_hours: 2 },
         },

@@ -19,8 +19,8 @@ type PayableOrder = {
   order_number: number
   completed_at: string | null
   worked_minutes: number | null
-  cleaning_staff_id: string | null
   consegna_staff_id: string | null
+  cleaning_staff: { id: string }[] | null
   property: { name?: string | null; avg_cleaning_hours: number | null } | null
 }
 
@@ -139,7 +139,8 @@ async function fetchPayableOrders(
     .from('service_orders')
     .select(`
       id, order_number, completed_at, worked_minutes,
-      cleaning_staff_id, consegna_staff_id,
+      consegna_staff_id,
+      cleaning_staff:profiles!service_order_cleaning_staff(id),
       ${propertySelect}
     `)
     .eq('status', 'done')
@@ -148,10 +149,6 @@ async function fetchPayableOrders(
 
   if (includePropertyName) {
     query = query.order('completed_at', { ascending: true })
-  }
-
-  if (filters.employeeId) {
-    query = query.or(`cleaning_staff_id.eq.${filters.employeeId},consegna_staff_id.eq.${filters.employeeId}`)
   }
 
   const { data } = await query
@@ -178,11 +175,15 @@ async function fetchStaffProfiles(
   return new Map((data ?? []).map(profile => [profile.id, profile]))
 }
 
-function payableStaffIds(orders: Pick<PayableOrder, 'cleaning_staff_id' | 'consegna_staff_id'>[]): string[] {
+function payableStaffIds(orders: Pick<PayableOrder, 'cleaning_staff' | 'consegna_staff_id'>[]): string[] {
   const staffIds = new Set<string>()
   for (const order of orders) {
-    if (order.cleaning_staff_id) staffIds.add(order.cleaning_staff_id)
     if (order.consegna_staff_id) staffIds.add(order.consegna_staff_id)
+    if (order.cleaning_staff) {
+      for (const s of order.cleaning_staff) {
+        staffIds.add(s.id)
+      }
+    }
   }
   return [...staffIds]
 }
@@ -268,20 +269,41 @@ export async function getPayableDetailRows(
   for (const order of orders) {
     const hours = resolveOrderPayableHours(order.property)
     const uniqueStaffIds = new Set<string>()
-    if (order.cleaning_staff_id) uniqueStaffIds.add(order.cleaning_staff_id)
     if (order.consegna_staff_id) uniqueStaffIds.add(order.consegna_staff_id)
+    
+    const cleaningStaff = order.cleaning_staff ?? []
+    const cleaningStaffCount = cleaningStaff.length
+
+    for (const cleaner of cleaningStaff) {
+      uniqueStaffIds.add(cleaner.id)
+    }
+
+    if (filters.employeeId && !uniqueStaffIds.has(filters.employeeId)) {
+      continue
+    }
 
     for (const staffId of uniqueStaffIds) {
       if (filters.employeeId && staffId !== filters.employeeId) continue
       const profile = profileById.get(staffId)
       if (!profile) continue
 
-      const roundedHours = roundMoney(hours)
+      const isConsegna = order.consegna_staff_id === staffId
+      const isCleaning = cleaningStaff.some(c => c.id === staffId)
+
+      let staffHours = 0
+      if (isCleaning) {
+        staffHours += hours / Math.max(1, cleaningStaffCount)
+      }
+      if (isConsegna) {
+        staffHours += hours
+      }
+
+      const roundedHours = roundMoney(staffHours)
       const osTotal =
         profile.monthly_salary != null
           ? null
           : profile.hourly_rate != null
-            ? roundMoney(profile.hourly_rate * hours)
+            ? roundMoney(profile.hourly_rate * staffHours)
             : null
 
       rows.push({
@@ -446,7 +468,7 @@ export async function getDashboardReportingData(supabase: SupabaseServerClient):
 
     supabase
       .from('service_orders')
-      .select('completed_at, total_price, cleaning_staff_id, consegna_staff_id, worked_minutes, property:properties(avg_cleaning_hours)')
+      .select('completed_at, total_price, consegna_staff_id, cleaning_staff:profiles!service_order_cleaning_staff(id), worked_minutes, property:properties(avg_cleaning_hours)')
       .eq('status', 'done')
       .gte('completed_at', threeMonthsAgoStart)
       .lte('completed_at', today),
@@ -480,8 +502,8 @@ export async function getDashboardReportingData(supabase: SupabaseServerClient):
   const recentOrders = unwrap<{
     completed_at: string | null
     total_price: number | null
-    cleaning_staff_id: string | null
     consegna_staff_id: string | null
+    cleaning_staff: { id: string }[] | null
     worked_minutes: number | null
     property: { avg_cleaning_hours: number | null } | null
   }>(recentOrdersRes, 'recent_orders')
@@ -509,15 +531,29 @@ export async function getDashboardReportingData(supabase: SupabaseServerClient):
 
     for (const order of monthOrders) {
       const hours = resolveOrderHours(order, order.property)
-      for (const staffId of [order.cleaning_staff_id, order.consegna_staff_id]) {
-        if (!staffId) continue
-        const profile = profilesMap.get(staffId)
+      const cleaningStaff = order.cleaning_staff ?? []
+      const cleaningStaffCount = cleaningStaff.length
+
+      for (const cleaner of cleaningStaff) {
+        const profile = profilesMap.get(cleaner.id)
         if (!profile) continue
 
+        const assignedHours = hours / Math.max(1, cleaningStaffCount)
         if (profile.monthly_salary != null) {
           cost += profile.monthly_salary / 22
         } else if (profile.hourly_rate != null) {
-          cost += profile.hourly_rate * hours
+          cost += profile.hourly_rate * assignedHours
+        }
+      }
+
+      if (order.consegna_staff_id) {
+        const profile = profilesMap.get(order.consegna_staff_id)
+        if (profile) {
+          if (profile.monthly_salary != null) {
+            cost += profile.monthly_salary / 22
+          } else if (profile.hourly_rate != null) {
+            cost += profile.hourly_rate * hours
+          }
         }
       }
     }

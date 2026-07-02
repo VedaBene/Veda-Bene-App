@@ -70,10 +70,10 @@ export function ServiceOrderForm({
   const isAdminOrSec = ['admin', 'secretaria'].includes(role)
   const canEdit = isAdminOrSec && !readOnly
   const canEditExtras = isAdminOrSec && order?.status === 'done'
-  const isAssignedWorker = role === 'limpeza' && !!userId && order?.cleaning_staff_id === userId
+  const isAssignedWorker = role === 'limpeza' && !!userId && order?.cleaning_staff_ids?.includes(userId)
 
   const [propertyId, setPropertyId] = useState(order?.property_id ?? '')
-  const [cleaningStaffId, setCleaningStaffId] = useState(order?.cleaning_staff_id ?? '')
+  const [cleaningStaffIds, setCleaningStaffIds] = useState<string[]>(order?.cleaning_staff_ids ?? [])
   const [consegnaStaffId, setConsegnaStaffId] = useState(order?.consegna_staff_id ?? '')
   const selectedProperty = properties.find(p => p.id === propertyId)
 
@@ -137,7 +137,7 @@ export function ServiceOrderForm({
     const fd = new FormData()
     fd.set('property_id', propertyId)
     if (!isCliente) {
-      fd.set('cleaning_staff_id', cleaningStaffId)
+      cleaningStaffIds.forEach(id => fd.append('cleaning_staff_ids', id))
       fd.set('consegna_staff_id', consegnaStaffId)
     }
     fd.set('cleaning_date', cleaningDate)
@@ -268,8 +268,8 @@ export function ServiceOrderForm({
         onToggle={() => toggle('imovel')}
         propertyId={propertyId}
         onPropertyIdChange={setPropertyId}
-        cleaningStaffId={cleaningStaffId}
-        onCleaningStaffIdChange={setCleaningStaffId}
+        cleaningStaffIds={cleaningStaffIds}
+        onCleaningStaffIdsChange={setCleaningStaffIds}
         consegnaStaffId={consegnaStaffId}
         onConsegnaStaffIdChange={setConsegnaStaffId}
         properties={properties}

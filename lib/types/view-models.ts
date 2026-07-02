@@ -75,59 +75,69 @@ export type ServiceOrderPropertyOption = Pick<
   base_price?: number | null
 }
 
-export type ServiceOrderListItem = Pick<
-  ServiceOrder,
-  | 'id'
-  | 'cleaning_staff_id'
-  | 'consegna_staff_id'
-  | 'cleaning_date'
-  | 'checkout_at'
-  | 'checkin_at'
-  | 'status'
-  | 'real_guests'
-  | 'double_beds'
-  | 'single_beds'
-  | 'sofa_beds'
-  | 'armchair_beds'
-  | 'bathrooms'
-  | 'bidets'
-  | 'cribs'
-  | 'order_number'
-  | 'is_urgent'
-  | 'started_at'
-  | 'worked_minutes'
-  | 'pricing_mode'
-  | 'cleaning_notes'
+export type ServiceOrderListItem = Omit<
+  Pick<
+    ServiceOrder,
+    | 'id'
+    | 'cleaning_staff_id'
+    | 'consegna_staff_id'
+    | 'cleaning_date'
+    | 'checkout_at'
+    | 'checkin_at'
+    | 'status'
+    | 'real_guests'
+    | 'double_beds'
+    | 'single_beds'
+    | 'sofa_beds'
+    | 'armchair_beds'
+    | 'bathrooms'
+    | 'bidets'
+    | 'cribs'
+    | 'order_number'
+    | 'is_urgent'
+    | 'started_at'
+    | 'worked_minutes'
+    | 'pricing_mode'
+    | 'cleaning_notes'
+  >,
+  'cleaning_staff_id'
 > & {
+  cleaning_staff_id?: string | null
   property: Pick<Property, 'id' | 'name' | 'avg_cleaning_hours'> | null
-  cleaning_staff: StaffOption | null
+  cleaning_staff: StaffOption[]
+  cleaning_staff_ids?: string[]
   consegna_staff: StaffOption | null
 }
 
-export type ServiceOrderFormData = Pick<
-  ServiceOrder,
-  | 'id'
-  | 'property_id'
-  | 'cleaning_staff_id'
-  | 'consegna_staff_id'
-  | 'cleaning_date'
-  | 'checkout_at'
-  | 'checkin_at'
-  | 'status'
-  | 'real_guests'
-  | 'double_beds'
-  | 'single_beds'
-  | 'sofa_beds'
-  | 'armchair_beds'
-  | 'bathrooms'
-  | 'bidets'
-  | 'cribs'
-  | 'order_number'
-  | 'is_urgent'
-  | 'started_at'
-  | 'completed_at'
-  | 'worked_minutes'
+export type ServiceOrderFormData = Omit<
+  Pick<
+    ServiceOrder,
+    | 'id'
+    | 'property_id'
+    | 'cleaning_staff_id'
+    | 'consegna_staff_id'
+    | 'cleaning_date'
+    | 'checkout_at'
+    | 'checkin_at'
+    | 'status'
+    | 'real_guests'
+    | 'double_beds'
+    | 'single_beds'
+    | 'sofa_beds'
+    | 'armchair_beds'
+    | 'bathrooms'
+    | 'bidets'
+    | 'cribs'
+    | 'order_number'
+    | 'is_urgent'
+    | 'started_at'
+    | 'completed_at'
+    | 'worked_minutes'
+  >,
+  'cleaning_staff_id'
 > & {
+  cleaning_staff_id?: string | null
+  cleaning_staff_ids: string[]
   pricing_mode: PricingMode
   completion_notes?: string | null
   cleaning_notes?: string | null

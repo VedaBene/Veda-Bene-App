@@ -41,8 +41,10 @@ const order: ServiceOrderFormData = {
   id: 'order-1',
   property_id: 'property-1',
   cleaning_staff_id: 'cleaner-1',
+  cleaning_staff_ids: ['cleaner-1'],
   consegna_staff_id: 'consegna-1',
   cleaning_date: '2026-01-10',
+
   checkout_at: '2026-01-10T09:00:00Z',
   checkin_at: '2026-01-10T13:00:00Z',
   status: 'done',
@@ -120,16 +122,16 @@ describe('view-model role visibility', () => {
     const listOrder: ServiceOrderListItem = {
       ...order,
       property: { id: 'property-1', name: 'Campo', avg_cleaning_hours: 3 },
-      cleaning_staff: { id: 'cleaner-1', full_name: 'Ana' },
+      cleaning_staff: [{ id: 'cleaner-1', full_name: 'Ana' }],
       consegna_staff: { id: 'consegna-1', full_name: 'Bruno' },
     }
 
     expect(toServiceOrderListItem(listOrder, 'admin')).toMatchObject({
-      cleaning_staff: { full_name: 'Ana' },
+      cleaning_staff: [{ full_name: 'Ana' }],
       consegna_staff: { full_name: 'Bruno' },
     })
     expect(toServiceOrderListItem(listOrder, 'cliente')).toMatchObject({
-      cleaning_staff: null,
+      cleaning_staff: [],
       consegna_staff: null,
     })
   })

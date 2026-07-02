@@ -11,7 +11,7 @@ import { PricingModeBadge, ServiceOrderStatusBadge, formatDate, formatDateTime }
 
 function isAssignedWorker(o: ServiceOrderListItem, role: Role, userId?: string): boolean {
   if (!userId) return false
-  return role === 'limpeza' && o.cleaning_staff_id === userId
+  return role === 'limpeza' && (o.cleaning_staff_ids?.includes(userId) || o.cleaning_staff_id === userId)
 }
 
 function EmptyList({ text }: { text: string }) {
@@ -128,8 +128,8 @@ export function ServiceOrderListTable({
                         Squadra
                       </span>
                       <div className="flex flex-col gap-0.5">
-                        <span className="truncate" title={os.cleaning_staff?.full_name ?? '—'}>
-                          <span className="opacity-60 font-medium">L:</span> {os.cleaning_staff?.full_name?.split(' ')[0] ?? '—'}
+                        <span className="truncate" title={os.cleaning_staff?.map(s => s.full_name).join(', ') || '—'}>
+                          <span className="opacity-60 font-medium">L:</span> {os.cleaning_staff?.map(s => s.full_name.split(' ')[0]).join(', ') || '—'}
                         </span>
                         <span className="truncate" title={os.consegna_staff?.full_name ?? '—'}>
                           <span className="opacity-60 font-medium">C:</span> {os.consegna_staff?.full_name?.split(' ')[0] ?? '—'}
@@ -221,7 +221,7 @@ export function ServiceOrderListTable({
                   <td className="px-5 py-3.5 text-foreground/70">{formatDateTime(os.checkin_at)}</td>
                   {!isCliente && (
                     <>
-                      <td className="px-5 py-3.5 text-foreground/70">{os.cleaning_staff?.full_name ?? '—'}</td>
+                      <td className="px-5 py-3.5 text-foreground/70">{os.cleaning_staff?.map(s => s.full_name).join(', ') || '—'}</td>
                       <td className="px-5 py-3.5 text-foreground/70">{os.consegna_staff?.full_name ?? '—'}</td>
                     </>
                   )}

@@ -1,6 +1,6 @@
 'use client'
 
-import { Building2, CalendarDays, ClipboardList, Users, Zap } from 'lucide-react'
+import { Building2, CalendarDays, ClipboardList, Trash2, Users, Zap } from 'lucide-react'
 import { Field } from '@/components/ui/Field'
 import { Section } from '@/components/ui/Section'
 import type { ServiceOrderPropertyOption, StaffOption } from '@/lib/types/view-models'
@@ -14,8 +14,8 @@ export function PropertyStaffSection({
   onToggle,
   propertyId,
   onPropertyIdChange,
-  cleaningStaffId,
-  onCleaningStaffIdChange,
+  cleaningStaffIds,
+  onCleaningStaffIdsChange,
   consegnaStaffId,
   onConsegnaStaffIdChange,
   properties,
@@ -29,8 +29,8 @@ export function PropertyStaffSection({
   onToggle: () => void
   propertyId: string
   onPropertyIdChange: (value: string) => void
-  cleaningStaffId: string
-  onCleaningStaffIdChange: (value: string) => void
+  cleaningStaffIds: string[]
+  onCleaningStaffIdsChange: (value: string[]) => void
   consegnaStaffId: string
   onConsegnaStaffIdChange: (value: string) => void
   properties: ServiceOrderPropertyOption[]
@@ -72,11 +72,54 @@ export function PropertyStaffSection({
 
       {!isCliente && (
         <>
-          <Field label="Responsabile Pulizia">
-            <select value={cleaningStaffId} onChange={e => onCleaningStaffIdChange(e.target.value)} disabled={!canEdit} className={inputCls}>
-              <option value="">— Non assegnato —</option>
-              {staff.map(s => (<option key={s.id} value={s.id}>{s.full_name}</option>))}
-            </select>
+          <Field label="Responsabile Pulizia" full>
+            <div className="space-y-2">
+              {(cleaningStaffIds.length === 0 ? [''] : cleaningStaffIds).map((id, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <select
+                    value={id}
+                    onChange={e => {
+                      const newIds = cleaningStaffIds.length === 0 ? [''] : [...cleaningStaffIds]
+                      newIds[index] = e.target.value
+                      onCleaningStaffIdsChange(newIds.filter(Boolean))
+                    }}
+                    disabled={!canEdit}
+                    className={inputCls}
+                  >
+                    <option value="">— Non assegnato —</option>
+                    {staff.map(s => (
+                      <option key={s.id} value={s.id}>
+                        {s.full_name}
+                      </option>
+                    ))}
+                  </select>
+                  {canEdit && cleaningStaffIds.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newIds = cleaningStaffIds.filter((_, i) => i !== index)
+                        onCleaningStaffIdsChange(newIds)
+                      }}
+                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Rimuovi"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  )}
+                </div>
+              ))}
+              {canEdit && cleaningStaffIds.length < 3 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onCleaningStaffIdsChange([...cleaningStaffIds, ''])
+                  }}
+                  className="text-xs font-semibold text-teal-600 hover:text-teal-700 transition-colors flex items-center gap-1 mt-1"
+                >
+                  + Aggiungi dipendente
+                </button>
+              )}
+            </div>
           </Field>
 
           <Field label="Responsabile Consegna">

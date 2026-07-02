@@ -100,12 +100,19 @@ export function toPropertyFormData(property: RawProperty, role: Role): PropertyF
 }
 
 export function toServiceOrderListItem(order: RawServiceOrderList, role: Role): ServiceOrderListItem {
+  const staffArr = Array.isArray(order.cleaning_staff)
+    ? order.cleaning_staff
+    : order.cleaning_staff
+      ? [order.cleaning_staff]
+      : []
+
   return {
     id: order.id,
     property: order.property,
-    cleaning_staff_id: order.cleaning_staff_id ?? null,
+    cleaning_staff_id: order.cleaning_staff_id ?? (staffArr[0]?.id || null),
     consegna_staff_id: order.consegna_staff_id ?? null,
-    cleaning_staff: role === 'cliente' ? null : order.cleaning_staff,
+    cleaning_staff: role === 'cliente' ? [] : staffArr,
+    cleaning_staff_ids: staffArr.map(s => s.id),
     consegna_staff: role === 'cliente' ? null : order.consegna_staff,
     cleaning_date: order.cleaning_date ?? null,
     checkout_at: order.checkout_at ?? null,
@@ -129,19 +136,21 @@ export function toServiceOrderListItem(order: RawServiceOrderList, role: Role): 
 }
 
 export function toServiceOrderFormData(
-  order: RawServiceOrderForm,
+  order: RawServiceOrderForm & { cleaning_staff_ids?: string[] },
   role: Role,
   userId?: string,
 ): ServiceOrderFormData {
+  const cleaning_staff_ids = order.cleaning_staff_ids ?? []
   const isAssignedWorker =
     !!userId &&
-    ((role === 'limpeza' && order.cleaning_staff_id === userId) ||
+    ((role === 'limpeza' && cleaning_staff_ids.includes(userId)) ||
       (role === 'consegna' && order.consegna_staff_id === userId))
 
   const dto: ServiceOrderFormData = {
     id: order.id,
     property_id: order.property_id,
-    cleaning_staff_id: order.cleaning_staff_id ?? null,
+    cleaning_staff_id: order.cleaning_staff_id ?? (cleaning_staff_ids[0] || null),
+    cleaning_staff_ids,
     consegna_staff_id: order.consegna_staff_id ?? null,
     cleaning_date: order.cleaning_date ?? null,
     checkout_at: order.checkout_at ?? null,

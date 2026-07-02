@@ -106,6 +106,13 @@ export type ServiceOrder = {
   created_at: string
 }
 
+export type ServiceOrderCleaningStaff = {
+  service_order_id: string
+  profile_id: string
+  created_at: string
+}
+
+
 // Tipo para o JWT payload com o app_role injetado pelo hook
 export type JwtWithRole = {
   app_role?: Role
