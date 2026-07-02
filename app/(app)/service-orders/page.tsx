@@ -4,7 +4,7 @@ import { PageHeader } from '@/components/ui/PageHeader'
 import { Button } from '@/components/ui/Button'
 import { Plus } from 'lucide-react'
 import { getCurrentViewer } from '@/lib/server/data-access/viewer'
-import { getServiceOrderList } from '@/lib/server/data-access/service-orders'
+import { getServiceOrderList, getServiceOrderFormOptions } from '@/lib/server/data-access/service-orders'
 import { serviceOrderListSearchParamsSchema } from '@/lib/server/validation/contracts'
 
 const DONE_PAGE_SIZE = 20
@@ -13,15 +13,24 @@ export default async function ServiceOrdersPage(props: PageProps<never>) {
   const parsedFilters = serviceOrderListSearchParamsSchema.safeParse(await props.searchParams)
   const filters = parsedFilters.success
     ? parsedFilters.data
-    : { donePage: 1, q: undefined, date: undefined }
+    : { donePage: 1, q: undefined, propertyId: undefined, startDate: undefined, endDate: undefined }
 
   const { supabase, viewer } = await getCurrentViewer()
-  const { active, done, doneTotalPages } = await getServiceOrderList(supabase, viewer, {
-    donePage: filters.donePage,
-    donePageSize: DONE_PAGE_SIZE,
-    q: filters.q,
-    date: filters.date,
-  })
+
+  const [
+    { active, done, doneTotalPages },
+    { properties }
+  ] = await Promise.all([
+    getServiceOrderList(supabase, viewer, {
+      donePage: filters.donePage,
+      donePageSize: DONE_PAGE_SIZE,
+      q: filters.q,
+      propertyId: filters.propertyId,
+      startDate: filters.startDate,
+      endDate: filters.endDate,
+    }),
+    getServiceOrderFormOptions(supabase, viewer),
+  ])
 
   return (
     <div className="animate-fade-in-up">
@@ -44,7 +53,10 @@ export default async function ServiceOrdersPage(props: PageProps<never>) {
         donePage={filters.donePage}
         doneTotalPages={doneTotalPages}
         initialQ={filters.q ?? ''}
-        initialDate={filters.date ?? ''}
+        initialPropertyId={filters.propertyId ?? ''}
+        initialStartDate={filters.startDate ?? ''}
+        initialEndDate={filters.endDate ?? ''}
+        properties={properties}
       />
     </div>
   )

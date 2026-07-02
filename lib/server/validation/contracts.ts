@@ -130,7 +130,9 @@ export const propertyListSearchParamsSchema = z.object({
 export const serviceOrderListSearchParamsSchema = z.object({
   donePage: pageNumberSchema,
   q: optionalSearchSchema,
-  date: optionalDateOnlySchema,
+  propertyId: optionalUuidSchema,
+  startDate: optionalDateOnlySchema,
+  endDate: optionalDateOnlySchema,
 })
 
 const dateRangeSchema = z

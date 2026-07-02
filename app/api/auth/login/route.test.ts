@@ -2,6 +2,12 @@ import { NextRequest } from 'next/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { POST } from './route'
 
+vi.mock('next/headers', () => ({
+  cookies: vi.fn(async () => ({
+    set: vi.fn(),
+  })),
+}))
+
 const mocks = vi.hoisted(() => ({
   signInWithPassword: vi.fn(),
   isLoginAttemptBlocked: vi.fn(),

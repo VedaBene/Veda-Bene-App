@@ -15,6 +15,8 @@ import { FinishCleaningModal, StartCleaningModal } from './ServiceOrderTimeContr
 import { LiveTimer } from './LiveTimer'
 import { formatDateTime } from './display'
 
+import type { ServiceOrderPropertyOption } from '@/lib/types/view-models'
+
 export function ServiceOrderList({
   active,
   done,
@@ -23,7 +25,10 @@ export function ServiceOrderList({
   donePage,
   doneTotalPages,
   initialQ,
-  initialDate,
+  initialPropertyId,
+  initialStartDate,
+  initialEndDate,
+  properties,
 }: {
   active: ServiceOrderListItem[]
   done: ServiceOrderListItem[]
@@ -32,26 +37,35 @@ export function ServiceOrderList({
   donePage: number
   doneTotalPages: number
   initialQ: string
-  initialDate: string
+  initialPropertyId: string
+  initialStartDate: string
+  initialEndDate: string
+  properties: ServiceOrderPropertyOption[]
 }) {
   const router = useRouter()
   const pathname = usePathname()
   const [, startTransition] = useTransition()
   const [search, setSearch] = useState(initialQ)
-  const [date, setDate] = useState(initialDate)
+  const [propertyId, setPropertyId] = useState(initialPropertyId)
+  const [startDate, setStartDate] = useState(initialStartDate)
+  const [endDate, setEndDate] = useState(initialEndDate)
   const [startModalOrder, setStartModalOrder] = useState<ServiceOrderListItem | null>(null)
   const [finishModalOrder, setFinishModalOrder] = useState<ServiceOrderListItem | null>(null)
   const [finishNotes, setFinishNotes] = useState('')
   const [isTrackingAction, setIsTrackingAction] = useState(false)
 
   useEffect(() => { setSearch(initialQ) }, [initialQ])
-  useEffect(() => { setDate(initialDate) }, [initialDate])
+  useEffect(() => { setPropertyId(initialPropertyId) }, [initialPropertyId])
+  useEffect(() => { setStartDate(initialStartDate) }, [initialStartDate])
+  useEffect(() => { setEndDate(initialEndDate) }, [initialEndDate])
 
   const pushFilters = useCallback(
-    (q: string, d: string) => {
+    (q: string, propId: string, startD: string, endD: string) => {
       const params = new URLSearchParams()
       if (q) params.set('q', q)
-      if (d) params.set('date', d)
+      if (propId) params.set('propertyId', propId)
+      if (startD) params.set('startDate', startD)
+      if (endD) params.set('endDate', endD)
       params.set('donePage', '1')
       router.replace(`${pathname}?${params.toString()}`)
     },
@@ -60,25 +74,36 @@ export function ServiceOrderList({
 
   useEffect(() => {
     const t = setTimeout(() => {
-      if (search !== initialQ || date !== initialDate) pushFilters(search, date)
+      if (
+        search !== initialQ ||
+        propertyId !== initialPropertyId ||
+        startDate !== initialStartDate ||
+        endDate !== initialEndDate
+      ) {
+        pushFilters(search, propertyId, startDate, endDate)
+      }
     }, 300)
     return () => clearTimeout(t)
-  }, [search, date, initialQ, initialDate, pushFilters])
+  }, [search, propertyId, startDate, endDate, initialQ, initialPropertyId, initialStartDate, initialEndDate, pushFilters])
 
   const filterOrder = (o: ServiceOrderListItem) => {
     const matchName = !search || (o.property?.name ?? '').toLowerCase().includes(search.toLowerCase())
-    const matchDate = !date || o.cleaning_date === date
-    return matchName && matchDate
+    const matchProperty = !propertyId || o.property?.id === propertyId
+    return matchName && matchProperty
   }
 
   const allActive = active.filter(filterOrder)
   const inProgress = allActive.filter(o => o.status === 'in_progress')
   const open = allActive.filter(o => o.status === 'open')
   const sortedOpen = [...open].sort(compareIntervals)
-  const hasFilter = search !== '' || date !== ''
+  
+  const hasFilter = search !== '' || propertyId !== '' || startDate !== '' || endDate !== ''
+  
   const doneSearchParams: Record<string, string> = {}
   if (search) doneSearchParams.q = search
-  if (date) doneSearchParams.date = date
+  if (propertyId) doneSearchParams.propertyId = propertyId
+  if (startDate) doneSearchParams.startDate = startDate
+  if (endDate) doneSearchParams.endDate = endDate
 
   async function handleStartCleaning() {
     if (!startModalOrder) return
@@ -122,11 +147,21 @@ export function ServiceOrderList({
     <div className="space-y-5">
       <ServiceOrderFilters
         search={search}
-        date={date}
+        propertyId={propertyId}
+        startDate={startDate}
+        endDate={endDate}
+        properties={properties}
         hasFilter={hasFilter}
         onSearchChange={setSearch}
-        onDateChange={setDate}
-        onClear={() => { setSearch(''); setDate('') }}
+        onPropertyChange={setPropertyId}
+        onStartDateChange={setStartDate}
+        onEndDateChange={setEndDate}
+        onClear={() => {
+          setSearch('')
+          setPropertyId('')
+          setStartDate('')
+          setEndDate('')
+        }}
       />
 
       {inProgress.length > 0 && (
@@ -147,7 +182,7 @@ export function ServiceOrderList({
           title="Aperti"
           count={open.length}
           countClassName="bg-warning-bg text-warning"
-          action={<ActiveOrdersPdfButton orders={[...inProgress, ...sortedOpen]} date={date} />}
+          action={<ActiveOrdersPdfButton orders={[...inProgress, ...sortedOpen]} date={startDate || endDate || ''} />}
         />
         <ServiceOrderListTable
           orders={sortedOpen}
@@ -166,12 +201,14 @@ export function ServiceOrderList({
           emptyText="Nessun O.L. completato."
           userId={userId}
         />
-        <Pagination
-          currentPage={donePage}
-          totalPages={doneTotalPages}
-          basePath="/service-orders"
-          searchParams={doneSearchParams}
-        />
+        {hasFilter && (
+          <Pagination
+            currentPage={donePage}
+            totalPages={doneTotalPages}
+            basePath="/service-orders"
+            searchParams={doneSearchParams}
+          />
+        )}
       </Card>
 
       {startModalOrder && (

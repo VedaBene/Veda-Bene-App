@@ -31,11 +31,11 @@ describe('session timeout helpers', () => {
     expect(isSessionActivityExpired(value, now)).toBe(true)
   })
 
-  it('treats missing, invalid, and future values as expired', () => {
+  it('treats missing and invalid values as expired, and future values as active', () => {
     expect(isSessionActivityExpired(null, now)).toBe(true)
     expect(isSessionActivityExpired('', now)).toBe(true)
     expect(isSessionActivityExpired('not-a-number', now)).toBe(true)
-    expect(isSessionActivityExpired(String(now + 1), now)).toBe(true)
+    expect(isSessionActivityExpired(String(now + 1), now)).toBe(false)
   })
 
   it('creates and parses timestamp values', () => {

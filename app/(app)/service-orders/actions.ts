@@ -355,7 +355,9 @@ async function getLastCleaningForPropertyImpl(propertyId: string) {
 
   if (!data) return null
 
-  const cleaningStaff = data.cleaning_staff as { full_name: string } | null
+  const cleaningStaff = (Array.isArray(data.cleaning_staff)
+    ? data.cleaning_staff[0]
+    : data.cleaning_staff) as unknown as { full_name: string } | null
 
   return {
     orderNumber: data.order_number,

@@ -112,9 +112,8 @@ export async function getServiceOrderList(
   viewer: Viewer,
   filters: ServiceOrderListFilters,
 ): Promise<ServiceOrderListResult> {
-  const donePage = Math.max(1, filters.donePage)
-  const doneFrom = (donePage - 1) * filters.donePageSize
-  const doneTo = doneFrom + filters.donePageSize - 1
+  const todayStr = new Intl.DateTimeFormat('fr-CA', { timeZone: 'Europe/Rome' }).format(new Date())
+  const isFilterActive = !!(filters.propertyId || filters.startDate || filters.endDate || filters.q)
 
   const activeQuery = supabase
     .from('service_orders')
@@ -122,30 +121,51 @@ export async function getServiceOrderList(
     .in('status', ['open', 'in_progress'])
     .order('cleaning_date', { ascending: false, nullsFirst: false })
 
-  const propertyIds = await getMatchingPropertyIds(supabase, filters.q)
-
   let doneQuery = supabase
     .from('service_orders')
     .select(SERVICE_ORDER_LIST_SELECT, { count: 'exact' })
     .eq('status', 'done')
     .order('cleaning_date', { ascending: false, nullsFirst: false })
-    .range(doneFrom, doneTo)
 
-  if (propertyIds !== null) {
-    doneQuery = doneQuery.in(
-      'property_id',
-      propertyIds.length > 0 ? propertyIds : ['00000000-0000-0000-0000-000000000000'],
-    )
-  }
+  if (isFilterActive) {
+    const donePage = Math.max(1, filters.donePage)
+    const doneFrom = (donePage - 1) * filters.donePageSize
+    const doneTo = doneFrom + filters.donePageSize - 1
 
-  if (filters.date) {
-    doneQuery = doneQuery.eq('cleaning_date', filters.date)
+    if (filters.propertyId) {
+      doneQuery = doneQuery.eq('property_id', filters.propertyId)
+    }
+
+    if (filters.q) {
+      const propertyIds = await getMatchingPropertyIds(supabase, filters.q)
+      doneQuery = doneQuery.in(
+        'property_id',
+        propertyIds && propertyIds.length > 0 ? propertyIds : ['00000000-0000-0000-0000-000000000000'],
+      )
+    }
+
+    if (filters.startDate) {
+      doneQuery = doneQuery.gte('cleaning_date', filters.startDate)
+    }
+
+    if (filters.endDate) {
+      doneQuery = doneQuery.lte('cleaning_date', filters.endDate)
+    }
+
+    doneQuery = doneQuery.range(doneFrom, doneTo)
+  } else {
+    // Modo diário por padrão: apenas concluídas hoje, sem paginação física (limite de segurança de 100 itens)
+    doneQuery = doneQuery.eq('cleaning_date', todayStr).range(0, 99)
   }
 
   const [{ data: activeOrders }, { data: doneOrders, count: doneCount }] = await Promise.all([
     activeQuery,
     doneQuery,
   ])
+
+  const doneTotalPages = isFilterActive
+    ? Math.ceil((doneCount ?? 0) / filters.donePageSize)
+    : 1
 
   return {
     active: ((activeOrders ?? []) as unknown as ServiceOrderListItem[]).map(order =>
@@ -154,7 +174,7 @@ export async function getServiceOrderList(
     done: ((doneOrders ?? []) as unknown as ServiceOrderListItem[]).map(order =>
       toServiceOrderListItem(order, viewer.role),
     ),
-    doneTotalPages: Math.ceil((doneCount ?? 0) / filters.donePageSize),
+    doneTotalPages,
   }
 }
 
