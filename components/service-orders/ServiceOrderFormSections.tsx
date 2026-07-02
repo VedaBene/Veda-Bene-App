@@ -4,6 +4,7 @@ import { Building2, CalendarDays, ClipboardList, Users, Zap } from 'lucide-react
 import { Field } from '@/components/ui/Field'
 import { Section } from '@/components/ui/Section'
 import type { ServiceOrderPropertyOption, StaffOption } from '@/lib/types/view-models'
+import { formatDate } from './display'
 
 export const inputCls =
   'w-full px-3 py-2.5 border border-input-border rounded-lg text-sm text-foreground bg-white transition-all duration-200 focus:ring-2 focus:ring-input-focus/20 focus:border-input-focus disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed outline-none placeholder:text-muted-foreground/50'
@@ -22,6 +23,7 @@ export function PropertyStaffSection({
   selectedProperty,
   canEdit,
   isCliente,
+  lastCleaning,
 }: {
   isOpen: boolean
   onToggle: () => void
@@ -36,12 +38,18 @@ export function PropertyStaffSection({
   selectedProperty?: ServiceOrderPropertyOption
   canEdit: boolean
   isCliente: boolean
+  lastCleaning?: {
+    orderNumber: number
+    date: string
+    staffName: string
+  } | null
 }) {
   return (
     <Section title="1. Immobile e Personale" icon={<Building2 size={18} />} isOpen={isOpen} onToggle={onToggle}>
       <Field label="Immobile" required full>
         <select value={propertyId} onChange={e => onPropertyIdChange(e.target.value)} disabled={!canEdit} required={canEdit} className={inputCls}>
-          {properties.length === 0 && <option value="">Nessun immobile disponibile</option>}
+          <option value="">— Seleziona un immobile —</option>
+          {properties.length === 0 && <option value="" disabled>Nessun immobile disponibile</option>}
           {properties.map(p => (<option key={p.id} value={p.id}>{p.name}</option>))}
         </select>
         {selectedProperty && (
@@ -51,6 +59,12 @@ export function PropertyStaffSection({
             )}
             {selectedProperty.min_guests != null && selectedProperty.max_guests != null && (
               <span>Ospiti: {selectedProperty.min_guests}–{selectedProperty.max_guests}</span>
+            )}
+            {lastCleaning && (
+              <span>
+                {" · "}
+                Ultima pulizia: <strong className="font-semibold text-foreground/80">#{lastCleaning.orderNumber}</strong> ({formatDate(lastCleaning.date)}) da <strong className="font-semibold text-foreground/80">{lastCleaning.staffName}</strong>
+              </span>
             )}
           </p>
         )}
@@ -102,8 +116,8 @@ export function VisitDetailsSection({
 }) {
   return (
     <Section title="2. Dettagli Visita" icon={<CalendarDays size={18} />} isOpen={isOpen} onToggle={onToggle}>
-      <Field label="Data Pulizia" required>
-        <input type="date" value={cleaningDate} onChange={e => onCleaningDateChange(e.target.value)} disabled={!canEdit} required={canEdit} className={inputCls} />
+      <Field label="Data Pulizia">
+        <input type="date" value={cleaningDate} onChange={e => onCleaningDateChange(e.target.value)} disabled={!canEdit} className={inputCls} />
       </Field>
 
       <div />

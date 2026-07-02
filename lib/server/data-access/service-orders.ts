@@ -120,7 +120,7 @@ export async function getServiceOrderList(
     .from('service_orders')
     .select(SERVICE_ORDER_LIST_SELECT)
     .in('status', ['open', 'in_progress'])
-    .order('cleaning_date', { ascending: false })
+    .order('cleaning_date', { ascending: false, nullsFirst: false })
 
   const propertyIds = await getMatchingPropertyIds(supabase, filters.q)
 
@@ -128,7 +128,7 @@ export async function getServiceOrderList(
     .from('service_orders')
     .select(SERVICE_ORDER_LIST_SELECT, { count: 'exact' })
     .eq('status', 'done')
-    .order('cleaning_date', { ascending: false })
+    .order('cleaning_date', { ascending: false, nullsFirst: false })
     .range(doneFrom, doneTo)
 
   if (propertyIds !== null) {

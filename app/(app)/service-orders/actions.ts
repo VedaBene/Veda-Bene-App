@@ -331,3 +331,40 @@ export async function updateExtraServices(
 export async function deleteServiceOrder(id: string) {
   return withLogging('deleteServiceOrder', () => deleteServiceOrderImpl(id))
 }
+
+async function getLastCleaningForPropertyImpl(propertyId: string) {
+  const parsed = uuidSchema.safeParse(propertyId)
+  if (!parsed.success) return null
+
+  const { supabase } = await getAuthorizedClient(['admin', 'secretaria'])
+
+  const { data } = await supabase
+    .from('service_orders')
+    .select(`
+      order_number,
+      cleaning_date,
+      completed_at,
+      cleaning_staff:profiles!cleaning_staff_id(full_name)
+    `)
+    .eq('property_id', parsed.data)
+    .eq('status', 'done')
+    .order('cleaning_date', { ascending: false, nullsFirst: false })
+    .order('completed_at', { ascending: false, nullsFirst: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (!data) return null
+
+  const cleaningStaff = data.cleaning_staff as { full_name: string } | null
+
+  return {
+    orderNumber: data.order_number,
+    date: data.cleaning_date || data.completed_at?.split('T')[0] || '',
+    staffName: cleaningStaff?.full_name || 'Non assegnato'
+  }
+}
+
+export async function getLastCleaningForProperty(propertyId: string) {
+  return withLogging('getLastCleaningForProperty', () => getLastCleaningForPropertyImpl(propertyId))
+}
+

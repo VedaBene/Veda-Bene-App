@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useTransition, type FormEvent } from 'react'
+import { useEffect, useState, useTransition, type FormEvent } from 'react'
 import {
   createServiceOrder,
   finishCleaning,
+  getLastCleaningForProperty,
   startCleaning,
   updateExtraServices,
   updateServiceOrder,
@@ -71,10 +72,39 @@ export function ServiceOrderForm({
   const canEditExtras = isAdminOrSec && order?.status === 'done'
   const isAssignedWorker = role === 'limpeza' && !!userId && order?.cleaning_staff_id === userId
 
-  const [propertyId, setPropertyId] = useState(order?.property_id ?? properties[0]?.id ?? '')
+  const [propertyId, setPropertyId] = useState(order?.property_id ?? '')
   const [cleaningStaffId, setCleaningStaffId] = useState(order?.cleaning_staff_id ?? '')
   const [consegnaStaffId, setConsegnaStaffId] = useState(order?.consegna_staff_id ?? '')
   const selectedProperty = properties.find(p => p.id === propertyId)
+
+  const [lastCleaning, setLastCleaning] = useState<{
+    orderNumber: number
+    date: string
+    staffName: string
+  } | null>(null)
+
+  const [prevPropertyId, setPrevPropertyId] = useState(propertyId)
+  if (propertyId !== prevPropertyId) {
+    setPrevPropertyId(propertyId)
+    setLastCleaning(null)
+  }
+
+  useEffect(() => {
+    if (!propertyId) return
+
+    let active = true
+    getLastCleaningForProperty(propertyId)
+      .then(data => {
+        if (active) setLastCleaning(data)
+      })
+      .catch(() => {
+        if (active) setLastCleaning(null)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [propertyId])
 
   const [cleaningDate, setCleaningDate] = useState(order?.cleaning_date ?? '')
   const [checkoutAt, setCheckoutAt] = useState(order?.checkout_at ? order.checkout_at.slice(0, 16) : '')
@@ -247,6 +277,7 @@ export function ServiceOrderForm({
         selectedProperty={selectedProperty}
         canEdit={canEdit}
         isCliente={isCliente}
+        lastCleaning={lastCleaning}
       />
 
       <VisitDetailsSection
