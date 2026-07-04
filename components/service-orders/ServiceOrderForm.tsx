@@ -90,7 +90,8 @@ export function ServiceOrderForm({
   }
 
   useEffect(() => {
-    if (!propertyId) return
+    // Evita chamar a Server Action se o usuário não for admin ou secretaria, poupando requisições e prevenindo erros de autorização no Sentry.
+    if (!propertyId || !isAdminOrSec) return
 
     let active = true
     getLastCleaningForProperty(propertyId)
@@ -104,7 +105,7 @@ export function ServiceOrderForm({
     return () => {
       active = false
     }
-  }, [propertyId])
+  }, [propertyId, isAdminOrSec])
 
   const [cleaningDate, setCleaningDate] = useState(order?.cleaning_date ?? '')
   const [checkoutAt, setCheckoutAt] = useState(order?.checkout_at ? order.checkout_at.slice(0, 16) : '')
