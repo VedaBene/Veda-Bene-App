@@ -116,6 +116,18 @@ export function ServiceOrderList({
         setStartModalOrder(null)
         startTransition(() => router.refresh())
       }
+    } catch (error: any) {
+      console.error('Error starting cleaning:', error)
+      const errorMsg = error?.message || String(error)
+      if (
+        errorMsg.includes('UnrecognizedActionError') ||
+        errorMsg.includes('Server Action') ||
+        errorMsg.includes('was not found')
+      ) {
+        window.location.reload()
+      } else {
+        alert('Si è verificato un errore: ' + errorMsg)
+      }
     } finally {
       setIsTrackingAction(false)
     }
@@ -132,6 +144,18 @@ export function ServiceOrderList({
         setFinishModalOrder(null)
         setFinishNotes('')
         startTransition(() => router.refresh())
+      }
+    } catch (error: any) {
+      console.error('Error finishing cleaning:', error)
+      const errorMsg = error?.message || String(error)
+      if (
+        errorMsg.includes('UnrecognizedActionError') ||
+        errorMsg.includes('Server Action') ||
+        errorMsg.includes('was not found')
+      ) {
+        window.location.reload()
+      } else {
+        alert('Si è verificato un errore: ' + errorMsg)
       }
     } finally {
       setIsTrackingAction(false)
