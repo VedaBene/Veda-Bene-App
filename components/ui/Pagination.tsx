@@ -46,13 +46,14 @@ export function Pagination({ currentPage, totalPages, basePath, searchParams = {
     <div className="flex items-center justify-center gap-1 py-4">
       {currentPage > 1 ? (
         <Link
+          key="prev-link"
           href={buildUrl(basePath, searchParams, currentPage - 1)}
           className={`${base} ${normal}`}
         >
           <ChevronLeft size={16} />
         </Link>
       ) : (
-        <span className={`${base} ${disabled}`}>
+        <span key="prev-disabled" className={`${base} ${disabled}`}>
           <ChevronLeft size={16} />
         </span>
       )}
@@ -75,13 +76,14 @@ export function Pagination({ currentPage, totalPages, basePath, searchParams = {
 
       {currentPage < totalPages ? (
         <Link
+          key="next-link"
           href={buildUrl(basePath, searchParams, currentPage + 1)}
           className={`${base} ${normal}`}
         >
           <ChevronRight size={16} />
         </Link>
       ) : (
-        <span className={`${base} ${disabled}`}>
+        <span key="next-disabled" className={`${base} ${disabled}`}>
           <ChevronRight size={16} />
         </span>
       )}

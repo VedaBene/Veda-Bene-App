@@ -213,6 +213,7 @@ export function ServiceOrderList({
 
       {startModalOrder && (
         <StartCleaningModal
+          key={`start-modal-${startModalOrder.id}`}
           propertyName={startModalOrder.property?.name}
           isLoading={isTrackingAction}
           onCancel={() => setStartModalOrder(null)}
@@ -224,6 +225,7 @@ export function ServiceOrderList({
 
       {finishModalOrder && (
         <FinishCleaningModal
+          key={`finish-modal-${finishModalOrder.id}`}
           propertyName={finishModalOrder.property?.name}
           notes={finishNotes}
           isLoading={isTrackingAction}
