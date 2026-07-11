@@ -3,36 +3,44 @@
 import { Search, X } from 'lucide-react'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
-import type { ServiceOrderPropertyOption } from '@/lib/types/view-models'
+import type { StaffOption } from '@/lib/types/view-models'
 
 export function ServiceOrderFilters({
   search,
-  propertyId,
+  cleaningStaffId,
+  consegnaStaffId,
   startDate,
   endDate,
-  properties,
+  staff,
   hasFilter,
   onSearchChange,
-  onPropertyChange,
+  onCleaningStaffChange,
+  onConsegnaStaffChange,
   onStartDateChange,
   onEndDateChange,
   onClear,
 }: {
   search: string
-  propertyId: string
+  cleaningStaffId: string
+  consegnaStaffId: string
   startDate: string
   endDate: string
-  properties: ServiceOrderPropertyOption[]
+  staff: StaffOption[]
   hasFilter: boolean
   onSearchChange: (value: string) => void
-  onPropertyChange: (value: string) => void
+  onCleaningStaffChange: (value: string) => void
+  onConsegnaStaffChange: (value: string) => void
   onStartDateChange: (value: string) => void
   onEndDateChange: (value: string) => void
   onClear: () => void
 }) {
-  const propertyOptions = [
-    { value: '', label: 'Tutti gli immobili' },
-    ...properties.map((p) => ({ value: p.id, label: p.name })),
+  const cleaningOptions = [
+    { value: '', label: 'Tutti — Pulizia' },
+    ...staff.filter((person) => person.role === 'limpeza').map((person) => ({ value: person.id, label: person.full_name })),
+  ]
+  const consegnaOptions = [
+    { value: '', label: 'Tutti — Consegna' },
+    ...staff.filter((person) => person.role === 'consegna').map((person) => ({ value: person.id, label: person.full_name })),
   ]
 
   return (
@@ -46,14 +54,25 @@ export function ServiceOrderFilters({
         className="max-w-xs w-full sm:w-auto"
       />
 
-      <div className="w-full sm:w-auto min-w-[200px] max-w-xs">
+      {staff.length > 0 && <div className="w-full sm:w-auto min-w-[190px] max-w-xs">
         <Select
-          options={propertyOptions}
-          value={propertyId}
-          onChange={(e) => onPropertyChange(e.target.value)}
+          options={cleaningOptions}
+          value={cleaningStaffId}
+          onChange={(e) => onCleaningStaffChange(e.target.value)}
+          aria-label="Responsabile Pulizia"
           className="w-full"
         />
-      </div>
+      </div>}
+
+      {staff.length > 0 && <div className="w-full sm:w-auto min-w-[190px] max-w-xs">
+        <Select
+          options={consegnaOptions}
+          value={consegnaStaffId}
+          onChange={(e) => onConsegnaStaffChange(e.target.value)}
+          aria-label="Responsabile Consegna"
+          className="w-full"
+        />
+      </div>}
 
       <div className="flex items-center gap-2 w-full sm:w-auto">
         <span className="text-xs font-medium text-muted-foreground">Dal:</span>

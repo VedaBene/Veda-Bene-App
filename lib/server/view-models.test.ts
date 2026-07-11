@@ -129,6 +129,8 @@ describe('view-model role visibility', () => {
     expect(toServiceOrderListItem(listOrder, 'admin')).toMatchObject({
       cleaning_staff: [{ full_name: 'Ana' }],
       consegna_staff: { full_name: 'Bruno' },
+      completed_at: '2026-01-10T12:00:00Z',
+      worked_minutes: 120,
     })
     expect(toServiceOrderListItem(listOrder, 'cliente')).toMatchObject({
       cleaning_staff: [],

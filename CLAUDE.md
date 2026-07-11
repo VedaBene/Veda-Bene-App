@@ -32,7 +32,7 @@ As decisões com maior peso e nuance estão registradas em [`docs/decisions/`](d
 
 Outras convenções importantes:
 - **`is_urgent`** na tabela `service_orders`: coluna `GENERATED ALWAYS AS STORED` — não pode ser inserida manualmente. É `true` quando `(checkin_at - checkout_at) <= 3h` (3 horas ou menos).
-- **Ordenação de OSs em Aberto**: Na listagem do aplicativo (seção "Aperti") e nos PDFs consolidados de ordens ativas, as ordens de serviço em aberto são ordenadas em ordem crescente com base no intervalo disponível de limpeza (`checkin_at - checkout_at`). Ordens com menor janela de tempo aparecem primeiro; ordens sem horários de check-in/check-out definidos aparecem por último (critério de desempate por `order_number` crescente).
+- **Ordenação de OSs em Aberto**: Na listagem do aplicativo (seção "Aperti") e nos PDFs consolidados de ordens ativas, as ordens de serviço são ordenadas primeiro por `cleaning_date` crescente. Dentro da mesma data, a prioridade é o menor intervalo disponível de limpeza (`checkin_at - checkout_at`). Ordens sem data aparecem por último; dentro de uma data, ordens sem horários de check-in/check-out definidos aparecem após as que possuem uma janela calculável. O desempate final usa `order_number` crescente.
 - **Supabase clients**: `utils/supabase/{client,server,middleware}.ts` para uso comum. `utils/supabase/admin.ts` é um adapter admin server-only; não exporta o client service-role bruto e expõe apenas operações administrativas explícitas. O `middleware.ts` aqui é convenção do `@supabase/ssr`, não do Next.js — o arquivo de proxy do Next.js está na raiz como `proxy.ts` (ver ADR 004).
 - **Segurança de autenticação**: login por senha passa por `POST /api/auth/login` para aplicar bloqueio server-side após falhas; sessões autenticadas expiram após 45 minutos de inatividade. Ver ADR 008 antes de alterar login, sessão, cookies de atividade ou `public.auth_login_attempts`.
 - **Funções privilegiadas**: helpers de RLS com `SECURITY DEFINER` devem ficar em schema privado; RPCs privilegiadas em `public` não devem conceder `EXECUTE` direto a `anon`/`authenticated` sem ADR/revisão explícita.
@@ -41,6 +41,7 @@ Outras convenções importantes:
 - **Horas de uma OS**: para métricas operacionais, dashboards de produtividade e histórico, use `resolveOrderHours(order, property)` em `lib/server/hours.ts` — retorna `worked_minutes/60` quando registrado, ou `avg_cleaning_hours` do imóvel como fallback. Para remuneração/extrato a pagar, use `resolveOrderPayableHours(property)`, que considera sempre o `avg_cleaning_hours` do imóvel.
 
 ## Documentos de referência
+- [`docs/service-orders.md`](docs/service-orders.md) — regras atuais da listagem, filtros, prioridade operacional e PDFs de Ordens de Serviço
 - `~/Downloads/prd-veda-bene.md` — PRD completo (schema SQL, RLS, padrões de código)
 - `~/Downloads/Spec_1.md` — Plano tático de implementação arquivo a arquivo (derivado do PRD)
 

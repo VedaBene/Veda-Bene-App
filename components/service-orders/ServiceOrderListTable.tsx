@@ -115,6 +115,14 @@ export function ServiceOrderListTable({
                 </div>
 
                 <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-xs text-muted-foreground">
+                  {os.cleaning_notes && (
+                    <div className="col-span-2 rounded-lg bg-muted/50 px-3 py-2">
+                      <span className="block text-[10px] font-bold uppercase tracking-wider mb-0.5 text-muted-foreground/60">
+                        Note Pulizia
+                      </span>
+                      <span className="text-foreground/80 whitespace-pre-wrap break-words">{os.cleaning_notes}</span>
+                    </div>
+                  )}
                   <div>
                     <span className="block text-[10px] font-bold uppercase tracking-wider mb-0.5 text-muted-foreground/60">
                       Pulizia
@@ -163,12 +171,18 @@ export function ServiceOrderListTable({
                     </div>
                   )}
 
-                  {!isCliente && os.status === 'done' && os.worked_minutes != null && (
+                  {!isCliente && os.status === 'done' && (os.completed_at || os.worked_minutes != null) && (
                     <div className="col-span-2">
                       <span className="block text-[10px] font-bold uppercase tracking-wider mb-0.5 text-muted-foreground/60">
-                        Tempo totale
+                        Conclusa
                       </span>
-                      <span className="font-semibold text-foreground/80">{formatWorkedTime(os.worked_minutes)}</span>
+                      <span className="font-semibold text-foreground/80">{formatDateTime(os.completed_at)}</span>
+                      <span className="block text-[10px] font-bold uppercase tracking-wider mt-2 mb-0.5 text-muted-foreground/60">
+                        Tempo pulizia
+                      </span>
+                      <span className="font-semibold text-foreground/80">
+                        {os.worked_minutes != null ? formatWorkedTime(os.worked_minutes) : '—'}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -188,19 +202,20 @@ export function ServiceOrderListTable({
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border/50 bg-muted/30">
-              <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">O.L. #</th>
-              <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Immobile</th>
-              <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Data</th>
-              <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Check-out</th>
-              <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Check-in</th>
+              <th className="text-left px-3 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">O.L. #</th>
+              <th className="text-left px-3 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Immobile</th>
+              <th className="text-left px-3 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Note Pulizia</th>
+              <th className="text-center px-3 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Data</th>
+              <th className="text-center px-3 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Check-out</th>
+              <th className="text-center px-3 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Check-in</th>
               {!isCliente && (
                 <>
-                  <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Pulizia</th>
-                  <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Consegna</th>
+                  <th className="text-center px-3 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Pulizia</th>
+                  <th className="text-center px-3 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Consegna</th>
                 </>
               )}
-              <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Stato</th>
-              <th className="px-5 py-3" />
+              <th className="text-center px-3 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Stato</th>
+              <th className="px-3 py-3" />
             </tr>
           </thead>
           <tbody className="divide-y divide-border/30">
@@ -208,25 +223,26 @@ export function ServiceOrderListTable({
               const assigned = isAssignedWorker(os, role, userId)
               return (
                 <tr key={os.id} className="transition-colors hover:bg-muted/30">
-                  <td className="px-5 py-3.5 text-foreground/50 text-xs font-mono">#{os.order_number}</td>
-                  <td className="px-5 py-3.5">
+                  <td className="px-3 py-3 text-foreground/50 text-xs font-mono">#{os.order_number}</td>
+                  <td className="px-3 py-3">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium text-foreground">{os.property?.name ?? '—'}</span>
                       <UrgencyBadge isUrgent={os.is_urgent && os.status !== 'done'} />
                       <PricingModeBadge mode={os.pricing_mode} />
                     </div>
                   </td>
-                  <td className="px-5 py-3.5 text-foreground/70">{formatDate(os.cleaning_date)}</td>
-                  <td className="px-5 py-3.5 text-foreground/70">{formatDateTime(os.checkout_at)}</td>
-                  <td className="px-5 py-3.5 text-foreground/70">{formatDateTime(os.checkin_at)}</td>
+                  <td className="px-3 py-3 text-xs text-foreground/70 max-w-[180px] whitespace-pre-wrap break-words">{os.cleaning_notes || '—'}</td>
+                  <td className="px-3 py-3 text-center text-foreground/70">{formatDate(os.cleaning_date)}</td>
+                  <td className="px-3 py-3 text-center text-foreground/70">{formatDateTime(os.checkout_at)}</td>
+                  <td className="px-3 py-3 text-center text-foreground/70">{formatDateTime(os.checkin_at)}</td>
                   {!isCliente && (
                     <>
-                      <td className="px-5 py-3.5 text-foreground/70">{os.cleaning_staff?.map(s => s.full_name).join(', ') || '—'}</td>
-                      <td className="px-5 py-3.5 text-foreground/70">{os.consegna_staff?.full_name ?? '—'}</td>
+                      <td className="px-3 py-3 text-center text-foreground/70">{os.cleaning_staff?.map(s => s.full_name).join(', ') || '—'}</td>
+                      <td className="px-3 py-3 text-center text-foreground/70">{os.consegna_staff?.full_name ?? '—'}</td>
                     </>
                   )}
-                  <td className="px-5 py-3.5">
-                    <div className="flex items-center gap-2">
+                  <td className="px-3 py-3">
+                    <div className="flex items-center justify-center gap-2">
                       <ServiceOrderStatusBadge status={os.status} />
                       {!isCliente && os.status === 'in_progress' && os.started_at && (
                         <div className="flex items-center gap-1">
@@ -234,12 +250,15 @@ export function ServiceOrderListTable({
                           <LiveTimer startedAt={os.started_at} />
                         </div>
                       )}
-                      {!isCliente && os.status === 'done' && os.worked_minutes != null && (
-                        <span className="text-xs text-muted-foreground">{formatWorkedTime(os.worked_minutes)}</span>
+                      {!isCliente && os.status === 'done' && (os.completed_at || os.worked_minutes != null) && (
+                        <span className="text-[11px] leading-4 text-muted-foreground text-left whitespace-nowrap">
+                          <span className="block"><span className="font-medium">Conclusa:</span> {formatDateTime(os.completed_at)}</span>
+                          <span className="block"><span className="font-medium">Tempo:</span> {os.worked_minutes != null ? formatWorkedTime(os.worked_minutes) : '—'}</span>
+                        </span>
                       )}
                     </div>
                   </td>
-                  <td className="px-5 py-3.5 text-right">
+                  <td className="px-3 py-3 text-right">
                     <div className="flex items-center justify-end gap-2">
                       {isWorker && <WorkerActions order={os} assigned={assigned} onStart={onStart} onFinish={onFinish} compact />}
                       <Link href={`/service-orders/${os.id}`} className="text-xs font-medium text-accent hover:text-accent/80 transition-colors">

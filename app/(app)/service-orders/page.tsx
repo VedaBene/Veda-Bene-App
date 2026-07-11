@@ -13,19 +13,21 @@ export default async function ServiceOrdersPage(props: PageProps<never>) {
   const parsedFilters = serviceOrderListSearchParamsSchema.safeParse(await props.searchParams)
   const filters = parsedFilters.success
     ? parsedFilters.data
-    : { donePage: 1, q: undefined, propertyId: undefined, startDate: undefined, endDate: undefined }
+    : { donePage: 1, q: undefined, propertyId: undefined, cleaningStaffId: undefined, consegnaStaffId: undefined, startDate: undefined, endDate: undefined }
 
   const { supabase, viewer } = await getCurrentViewer()
 
   const [
-    { active, done, doneTotalPages },
-    { properties }
+    { active, done, doneForExport, doneTotalPages },
+    { staff }
   ] = await Promise.all([
     getServiceOrderList(supabase, viewer, {
       donePage: filters.donePage,
       donePageSize: DONE_PAGE_SIZE,
       q: filters.q,
       propertyId: filters.propertyId,
+      cleaningStaffId: filters.cleaningStaffId,
+      consegnaStaffId: filters.consegnaStaffId,
       startDate: filters.startDate,
       endDate: filters.endDate,
     }),
@@ -48,15 +50,17 @@ export default async function ServiceOrdersPage(props: PageProps<never>) {
       <ServiceOrderList
         active={active}
         done={done}
+        doneForExport={doneForExport}
         role={viewer.role}
         userId={viewer.userId}
         donePage={filters.donePage}
         doneTotalPages={doneTotalPages}
         initialQ={filters.q ?? ''}
-        initialPropertyId={filters.propertyId ?? ''}
+        initialCleaningStaffId={filters.cleaningStaffId ?? ''}
+        initialConsegnaStaffId={filters.consegnaStaffId ?? ''}
         initialStartDate={filters.startDate ?? ''}
         initialEndDate={filters.endDate ?? ''}
-        properties={properties}
+        staff={viewer.role === 'cliente' ? [] : staff}
       />
     </div>
   )

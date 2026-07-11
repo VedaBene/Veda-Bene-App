@@ -3,15 +3,16 @@
 import { FileDown } from 'lucide-react'
 import type { ServiceOrderListItem } from '@/lib/types/view-models'
 import { formatDate, formatDateTime } from './display'
-import { compareIntervals } from './ServiceOrderList'
+import { formatWorkedTime } from './LiveTimer'
+import { compareServiceOrderPriority } from './ordering'
 
 const OCCUPANCY_FIELDS: { key: keyof ServiceOrderListItem; label: string }[] = [
-  { key: 'real_guests', label: 'Ospiti' },
-  { key: 'double_beds', label: 'Letti Matrimoniali' },
-  { key: 'single_beds', label: 'Letti Singoli' },
-  { key: 'sofa_beds', label: 'Divani Letto' },
-  { key: 'bathrooms', label: 'Bagni' },
-  { key: 'bidets', label: 'Bidet' },
+  { key: 'real_guests', label: 'PX' },
+  { key: 'double_beds', label: 'M' },
+  { key: 'single_beds', label: 'S' },
+  { key: 'sofa_beds', label: 'DC' },
+  { key: 'bathrooms', label: 'WC' },
+  { key: 'bidets', label: 'BID' },
   { key: 'cribs', label: 'Culle' },
 ]
 
@@ -24,8 +25,8 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;')
 }
 
-function generatePDF(orders: ServiceOrderListItem[], date: string) {
-  const sortedOrders = [...orders].sort(compareIntervals)
+function generatePDF(orders: ServiceOrderListItem[], date: string, status: 'active' | 'done') {
+  const sortedOrders = status === 'active' ? [...orders].sort(compareServiceOrderPriority) : orders
   const dateLabel = date ? formatDate(date) : 'Tutte le date'
   const now = new Date().toLocaleString('it-IT', { timeZone: 'UTC' })
 
@@ -42,6 +43,10 @@ function generatePDF(orders: ServiceOrderListItem[], date: string) {
       <td>${formatDateTime(o.checkin_at)}</td>
       <td>${formatDateTime(o.checkout_at)}</td>
       <td class="notes-cell">${o.cleaning_notes ? escapeHtml(o.cleaning_notes) : '—'}</td>
+      ${status === 'done' ? `<td class="completion-cell">
+        <span><strong>Conclusa:</strong> ${formatDateTime(o.completed_at)}</span>
+        <span><strong>Tempo:</strong> ${o.worked_minutes != null ? formatWorkedTime(o.worked_minutes) : '—'}</span>
+      </td>` : ''}
       ${OCCUPANCY_FIELDS.map(({ key }) => {
         const val = (o[key] as number) ?? 0
         return `<td class="${val > 0 ? 'highlight' : 'dim'}">${val > 0 ? val : '—'}</td>`
@@ -68,8 +73,9 @@ function generatePDF(orders: ServiceOrderListItem[], date: string) {
     h1 { font-size: 18px; margin-bottom: 2px; }
     .meta { font-size: 10px; color: #555; margin-bottom: 20px; }
     table { width: 100%; border-collapse: collapse; margin-bottom: 28px; }
-    th { background: #f0f0f0; text-align: left; padding: 6px 8px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 2px solid #ccc; }
-    td { padding: 5px 8px; border-bottom: 1px solid #e5e5e5; vertical-align: middle; }
+    th { background: #f0f0f0; text-align: center; padding: 5px 4px; font-size: 9px; text-transform: uppercase; letter-spacing: 0.03em; border-bottom: 2px solid #ccc; }
+    td { padding: 4px; border-bottom: 1px solid #e5e5e5; vertical-align: middle; text-align: center; }
+    th:nth-child(2), td:nth-child(2), th:nth-child(5), td:nth-child(5) { text-align: left; }
     tr:last-child td { border-bottom: none; }
     .highlight { font-weight: 700; color: #111; }
     .dim { color: #aaa; }
@@ -77,12 +83,14 @@ function generatePDF(orders: ServiceOrderListItem[], date: string) {
     .totals-table { max-width: 300px; }
     .totals-table td:first-child { color: #555; }
     .totals-table td:last-child { font-weight: 700; text-align: right; }
-    .notes-cell { max-width: 250px; white-space: normal; word-break: break-word; font-size: 10px; color: #333; }
+    .notes-cell { width: 22%; max-width: 220px; white-space: normal; word-break: break-word; font-size: 9px; color: #333; }
+    .completion-cell { min-width: 105px; font-size: 9px; line-height: 1.35; }
+    .completion-cell span { display: block; white-space: nowrap; }
     @media print { body { padding: 0; } }
   </style>
 </head>
 <body>
-  <h1>Veda Bene — Ordini di Lavoro Aperti</h1>
+  <h1>Veda Bene — Ordini di Lavoro ${status === 'active' ? 'Aperti' : 'Completati'}</h1>
   <p class="meta">Data: ${dateLabel} &nbsp;|&nbsp; Generato il: ${now}</p>
   <table>
     <thead>
@@ -92,11 +100,12 @@ function generatePDF(orders: ServiceOrderListItem[], date: string) {
         <th>Check-in</th>
         <th>Check-out</th>
         <th>Note Pulizia</th>
+        ${status === 'done' ? '<th>Conclusione / Tempo</th>' : ''}
         ${OCCUPANCY_FIELDS.map(({ label }) => `<th>${label}</th>`).join('')}
       </tr>
     </thead>
     <tbody>
-      ${rows || '<tr><td colspan="12" style="text-align:center;color:#999;padding:16px">Nessun O.L. trovato</td></tr>'}
+      ${rows || `<tr><td colspan="${12 + (status === 'done' ? 1 : 0)}" style="text-align:center;color:#999;padding:16px">Nessun O.L. trovato</td></tr>`}
     </tbody>
   </table>
   ${activeTotalFields.length > 0 ? `
@@ -114,16 +123,18 @@ function generatePDF(orders: ServiceOrderListItem[], date: string) {
   win.document.close()
 }
 
-export function ActiveOrdersPdfButton({
+export function OrdersPdfButton({
   orders,
   date,
+  status,
 }: {
   orders: ServiceOrderListItem[]
   date: string
+  status: 'active' | 'done'
 }) {
   return (
     <button
-      onClick={() => generatePDF(orders, date)}
+      onClick={() => generatePDF(orders, date, status)}
       className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5 rounded-md border border-border/60 hover:border-border hover:bg-muted/40"
     >
       <FileDown size={14} />

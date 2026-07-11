@@ -131,6 +131,8 @@ export const serviceOrderListSearchParamsSchema = z.object({
   donePage: pageNumberSchema,
   q: optionalSearchSchema,
   propertyId: optionalUuidSchema,
+  cleaningStaffId: optionalUuidSchema,
+  consegnaStaffId: optionalUuidSchema,
   startDate: optionalDateOnlySchema,
   endDate: optionalDateOnlySchema,
 })

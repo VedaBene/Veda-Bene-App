@@ -55,7 +55,7 @@ export type PropertyFormData = {
   notes?: string | null
 }
 
-export type StaffOption = Pick<Profile, 'id' | 'full_name'>
+export type StaffOption = Pick<Profile, 'id' | 'full_name'> & Partial<Pick<Profile, 'role'>>
 
 export type ServiceOrderPropertyOption = Pick<
   Property,
@@ -96,6 +96,7 @@ export type ServiceOrderListItem = Omit<
     | 'order_number'
     | 'is_urgent'
     | 'started_at'
+    | 'completed_at'
     | 'worked_minutes'
     | 'pricing_mode'
     | 'cleaning_notes'

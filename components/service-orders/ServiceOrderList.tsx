@@ -8,45 +8,51 @@ import { Card } from '@/components/ui/Card'
 import { Pagination } from '@/components/ui/Pagination'
 import type { Role } from '@/lib/types/database'
 import type { ServiceOrderListItem } from '@/lib/types/view-models'
-import { ActiveOrdersPdfButton } from './ServiceOrderActiveExport'
+import { OrdersPdfButton } from './ServiceOrderActiveExport'
 import { ServiceOrderFilters } from './ServiceOrderFilters'
 import { ServiceOrderListTable } from './ServiceOrderListTable'
 import { FinishCleaningModal, StartCleaningModal } from './ServiceOrderTimeControls'
 import { LiveTimer } from './LiveTimer'
 import { formatDateTime } from './display'
+import { compareServiceOrderPriority } from './ordering'
 
-import type { ServiceOrderPropertyOption } from '@/lib/types/view-models'
+import type { StaffOption } from '@/lib/types/view-models'
 
 export function ServiceOrderList({
   active,
   done,
+  doneForExport,
   role,
   userId,
   donePage,
   doneTotalPages,
   initialQ,
-  initialPropertyId,
+  initialCleaningStaffId,
+  initialConsegnaStaffId,
   initialStartDate,
   initialEndDate,
-  properties,
+  staff,
 }: {
   active: ServiceOrderListItem[]
   done: ServiceOrderListItem[]
+  doneForExport: ServiceOrderListItem[]
   role: Role
   userId?: string
   donePage: number
   doneTotalPages: number
   initialQ: string
-  initialPropertyId: string
+  initialCleaningStaffId: string
+  initialConsegnaStaffId: string
   initialStartDate: string
   initialEndDate: string
-  properties: ServiceOrderPropertyOption[]
+  staff: StaffOption[]
 }) {
   const router = useRouter()
   const pathname = usePathname()
   const [, startTransition] = useTransition()
   const [search, setSearch] = useState(initialQ)
-  const [propertyId, setPropertyId] = useState(initialPropertyId)
+  const [cleaningStaffId, setCleaningStaffId] = useState(initialCleaningStaffId)
+  const [consegnaStaffId, setConsegnaStaffId] = useState(initialConsegnaStaffId)
   const [startDate, setStartDate] = useState(initialStartDate)
   const [endDate, setEndDate] = useState(initialEndDate)
   const [startModalOrder, setStartModalOrder] = useState<ServiceOrderListItem | null>(null)
@@ -55,15 +61,17 @@ export function ServiceOrderList({
   const [isTrackingAction, setIsTrackingAction] = useState(false)
 
   useEffect(() => { setSearch(initialQ) }, [initialQ])
-  useEffect(() => { setPropertyId(initialPropertyId) }, [initialPropertyId])
+  useEffect(() => { setCleaningStaffId(initialCleaningStaffId) }, [initialCleaningStaffId])
+  useEffect(() => { setConsegnaStaffId(initialConsegnaStaffId) }, [initialConsegnaStaffId])
   useEffect(() => { setStartDate(initialStartDate) }, [initialStartDate])
   useEffect(() => { setEndDate(initialEndDate) }, [initialEndDate])
 
   const pushFilters = useCallback(
-    (q: string, propId: string, startD: string, endD: string) => {
+    (q: string, cleaningId: string, consegnaId: string, startD: string, endD: string) => {
       const params = new URLSearchParams()
       if (q) params.set('q', q)
-      if (propId) params.set('propertyId', propId)
+      if (cleaningId) params.set('cleaningStaffId', cleaningId)
+      if (consegnaId) params.set('consegnaStaffId', consegnaId)
       if (startD) params.set('startDate', startD)
       if (endD) params.set('endDate', endD)
       params.set('donePage', '1')
@@ -76,32 +84,37 @@ export function ServiceOrderList({
     const t = setTimeout(() => {
       if (
         search !== initialQ ||
-        propertyId !== initialPropertyId ||
+        cleaningStaffId !== initialCleaningStaffId ||
+        consegnaStaffId !== initialConsegnaStaffId ||
         startDate !== initialStartDate ||
         endDate !== initialEndDate
       ) {
-        pushFilters(search, propertyId, startDate, endDate)
+        pushFilters(search, cleaningStaffId, consegnaStaffId, startDate, endDate)
       }
     }, 300)
     return () => clearTimeout(t)
-  }, [search, propertyId, startDate, endDate, initialQ, initialPropertyId, initialStartDate, initialEndDate, pushFilters])
+  }, [search, cleaningStaffId, consegnaStaffId, startDate, endDate, initialQ, initialCleaningStaffId, initialConsegnaStaffId, initialStartDate, initialEndDate, pushFilters])
 
   const filterOrder = (o: ServiceOrderListItem) => {
     const matchName = !search || (o.property?.name ?? '').toLowerCase().includes(search.toLowerCase())
-    const matchProperty = !propertyId || o.property?.id === propertyId
-    return matchName && matchProperty
+    const matchCleaning = !cleaningStaffId || o.cleaning_staff_ids?.includes(cleaningStaffId)
+    const matchConsegna = !consegnaStaffId || o.consegna_staff_id === consegnaStaffId
+    return matchName && matchCleaning && matchConsegna
   }
 
   const allActive = active.filter(filterOrder)
-  const inProgress = allActive.filter(o => o.status === 'in_progress')
+  const inProgress = allActive
+    .filter(o => o.status === 'in_progress')
+    .sort(compareServiceOrderPriority)
   const open = allActive.filter(o => o.status === 'open')
-  const sortedOpen = [...open].sort(compareIntervals)
+  const sortedOpen = [...open].sort(compareServiceOrderPriority)
   
-  const hasFilter = search !== '' || propertyId !== '' || startDate !== '' || endDate !== ''
+  const hasFilter = search !== '' || cleaningStaffId !== '' || consegnaStaffId !== '' || startDate !== '' || endDate !== ''
   
   const doneSearchParams: Record<string, string> = {}
   if (search) doneSearchParams.q = search
-  if (propertyId) doneSearchParams.propertyId = propertyId
+  if (cleaningStaffId) doneSearchParams.cleaningStaffId = cleaningStaffId
+  if (consegnaStaffId) doneSearchParams.consegnaStaffId = consegnaStaffId
   if (startDate) doneSearchParams.startDate = startDate
   if (endDate) doneSearchParams.endDate = endDate
 
@@ -116,9 +129,9 @@ export function ServiceOrderList({
         setStartModalOrder(null)
         startTransition(() => router.refresh())
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error starting cleaning:', error)
-      const errorMsg = error?.message || String(error)
+      const errorMsg = error instanceof Error ? error.message : String(error)
       if (
         errorMsg.includes('UnrecognizedActionError') ||
         errorMsg.includes('Server Action') ||
@@ -145,9 +158,9 @@ export function ServiceOrderList({
         setFinishNotes('')
         startTransition(() => router.refresh())
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error finishing cleaning:', error)
-      const errorMsg = error?.message || String(error)
+      const errorMsg = error instanceof Error ? error.message : String(error)
       if (
         errorMsg.includes('UnrecognizedActionError') ||
         errorMsg.includes('Server Action') ||
@@ -171,18 +184,21 @@ export function ServiceOrderList({
     <div className="space-y-5">
       <ServiceOrderFilters
         search={search}
-        propertyId={propertyId}
+        cleaningStaffId={cleaningStaffId}
+        consegnaStaffId={consegnaStaffId}
         startDate={startDate}
         endDate={endDate}
-        properties={properties}
+        staff={staff}
         hasFilter={hasFilter}
         onSearchChange={setSearch}
-        onPropertyChange={setPropertyId}
+        onCleaningStaffChange={setCleaningStaffId}
+        onConsegnaStaffChange={setConsegnaStaffId}
         onStartDateChange={setStartDate}
         onEndDateChange={setEndDate}
         onClear={() => {
           setSearch('')
-          setPropertyId('')
+          setCleaningStaffId('')
+          setConsegnaStaffId('')
           setStartDate('')
           setEndDate('')
         }}
@@ -206,7 +222,7 @@ export function ServiceOrderList({
           title="Aperti"
           count={open.length}
           countClassName="bg-warning-bg text-warning"
-          action={<ActiveOrdersPdfButton orders={[...inProgress, ...sortedOpen]} date={startDate || endDate || ''} />}
+          action={<OrdersPdfButton orders={[...inProgress, ...sortedOpen]} date={startDate || endDate || ''} status="active" />}
         />
         <ServiceOrderListTable
           orders={sortedOpen}
@@ -218,7 +234,12 @@ export function ServiceOrderList({
       </Card>
 
       <Card>
-        <ListHeader title="Completati" count={done.length} countClassName="bg-success-bg text-success" />
+        <ListHeader
+          title="Completati"
+          count={done.length}
+          countClassName="bg-success-bg text-success"
+          action={<OrdersPdfButton orders={doneForExport} date={startDate || endDate || ''} status="done" />}
+        />
         <ServiceOrderListTable
           orders={done}
           role={role}
@@ -334,27 +355,4 @@ function FinishOrderDetails({ order }: { order: ServiceOrderListItem }) {
       )}
     </>
   )
-}
-
-export function compareIntervals(
-  a: { checkin_at?: string | null; checkout_at?: string | null; order_number?: number | null },
-  b: { checkin_at?: string | null; checkout_at?: string | null; order_number?: number | null }
-) {
-  const hasA = a.checkin_at && a.checkout_at
-  const hasB = b.checkin_at && b.checkout_at
-
-  if (hasA && hasB) {
-    const diffA = new Date(a.checkin_at!).getTime() - new Date(a.checkout_at!).getTime()
-    const diffB = new Date(b.checkin_at!).getTime() - new Date(b.checkout_at!).getTime()
-    
-    if (diffA !== diffB) {
-      return diffA - diffB
-    }
-    return (a.order_number ?? 0) - (b.order_number ?? 0)
-  }
-
-  if (hasA) return -1
-  if (hasB) return 1
-
-  return (a.order_number ?? 0) - (b.order_number ?? 0)
 }

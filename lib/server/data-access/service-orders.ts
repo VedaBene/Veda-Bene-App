@@ -13,6 +13,7 @@ import type { SupabaseServerClient, Viewer } from './viewer'
 export type ServiceOrderListResult = {
   active: ServiceOrderListItem[]
   done: ServiceOrderListItem[]
+  doneForExport: ServiceOrderListItem[]
   doneTotalPages: number
 }
 
@@ -40,6 +41,7 @@ const SERVICE_ORDER_LIST_SELECT = `
   order_number,
   is_urgent,
   started_at,
+  completed_at,
   worked_minutes,
   pricing_mode,
   cleaning_notes,
@@ -113,9 +115,26 @@ export async function getServiceOrderList(
   filters: ServiceOrderListFilters,
 ): Promise<ServiceOrderListResult> {
   const todayStr = new Intl.DateTimeFormat('fr-CA', { timeZone: 'Europe/Rome' }).format(new Date())
-  const isFilterActive = !!(filters.propertyId || filters.startDate || filters.endDate || filters.q)
+  const isFilterActive = !!(
+    filters.propertyId || filters.cleaningStaffId || filters.consegnaStaffId ||
+    filters.startDate || filters.endDate || filters.q
+  )
 
-  const activeQuery = supabase
+  let cleaningOrderIds: string[] | null = null
+  if (filters.cleaningStaffId) {
+    const { data } = await supabase
+      .from('service_order_cleaning_staff')
+      .select('service_order_id')
+      .eq('profile_id', filters.cleaningStaffId)
+    cleaningOrderIds = (data ?? []).map((row: { service_order_id: string }) => row.service_order_id)
+  }
+
+  const matchingPropertyIds = filters.q
+    ? await getMatchingPropertyIds(supabase, filters.q)
+    : null
+  const noMatchesId = '00000000-0000-0000-0000-000000000000'
+
+  let activeQuery = supabase
     .from('service_orders')
     .select(SERVICE_ORDER_LIST_SELECT)
     .in('status', ['open', 'in_progress'])
@@ -127,40 +146,46 @@ export async function getServiceOrderList(
     .eq('status', 'done')
     .order('cleaning_date', { ascending: false, nullsFirst: false })
 
+  let doneExportQuery = supabase
+    .from('service_orders')
+    .select(SERVICE_ORDER_LIST_SELECT)
+    .eq('status', 'done')
+    .order('cleaning_date', { ascending: false, nullsFirst: false })
+
+  for (const queryName of ['active', 'done', 'doneExport'] as const) {
+    let query = queryName === 'active' ? activeQuery : queryName === 'done' ? doneQuery : doneExportQuery
+    if (filters.propertyId) query = query.eq('property_id', filters.propertyId)
+    if (filters.consegnaStaffId) query = query.eq('consegna_staff_id', filters.consegnaStaffId)
+    if (filters.cleaningStaffId) {
+      query = query.in('id', cleaningOrderIds?.length ? cleaningOrderIds : [noMatchesId])
+    }
+    if (filters.q) {
+      query = query.in('property_id', matchingPropertyIds?.length ? matchingPropertyIds : [noMatchesId])
+    }
+    if (filters.startDate) query = query.gte('cleaning_date', filters.startDate)
+    if (filters.endDate) query = query.lte('cleaning_date', filters.endDate)
+
+    if (queryName === 'active') activeQuery = query
+    else if (queryName === 'done') doneQuery = query
+    else doneExportQuery = query
+  }
+
   if (isFilterActive) {
     const donePage = Math.max(1, filters.donePage)
     const doneFrom = (donePage - 1) * filters.donePageSize
     const doneTo = doneFrom + filters.donePageSize - 1
 
-    if (filters.propertyId) {
-      doneQuery = doneQuery.eq('property_id', filters.propertyId)
-    }
-
-    if (filters.q) {
-      const propertyIds = await getMatchingPropertyIds(supabase, filters.q)
-      doneQuery = doneQuery.in(
-        'property_id',
-        propertyIds && propertyIds.length > 0 ? propertyIds : ['00000000-0000-0000-0000-000000000000'],
-      )
-    }
-
-    if (filters.startDate) {
-      doneQuery = doneQuery.gte('cleaning_date', filters.startDate)
-    }
-
-    if (filters.endDate) {
-      doneQuery = doneQuery.lte('cleaning_date', filters.endDate)
-    }
-
     doneQuery = doneQuery.range(doneFrom, doneTo)
   } else {
     // Modo diário por padrão: apenas concluídas hoje, sem paginação física (limite de segurança de 100 itens)
     doneQuery = doneQuery.eq('cleaning_date', todayStr).range(0, 99)
+    doneExportQuery = doneExportQuery.eq('cleaning_date', todayStr).range(0, 99)
   }
 
-  const [{ data: activeOrders }, { data: doneOrders, count: doneCount }] = await Promise.all([
+  const [{ data: activeOrders }, { data: doneOrders, count: doneCount }, { data: doneExportOrders }] = await Promise.all([
     activeQuery,
     doneQuery,
+    doneExportQuery,
   ])
 
   const doneTotalPages = isFilterActive
@@ -172,6 +197,9 @@ export async function getServiceOrderList(
       toServiceOrderListItem(order, viewer.role),
     ),
     done: ((doneOrders ?? []) as unknown as ServiceOrderListItem[]).map(order =>
+      toServiceOrderListItem(order, viewer.role),
+    ),
+    doneForExport: ((doneExportOrders ?? []) as unknown as ServiceOrderListItem[]).map(order =>
       toServiceOrderListItem(order, viewer.role),
     ),
     doneTotalPages,
@@ -220,7 +248,7 @@ export async function getServiceOrderFormOptions(
       .order('name'),
     supabase
       .from('profiles')
-      .select('id, full_name')
+      .select('id, full_name, role')
       .in('role', ['limpeza', 'consegna'])
       .order('full_name'),
   ])

@@ -81,7 +81,7 @@ npm run lint     # ESLint
 
 - **RLS**: roles injetadas no JWT via `custom_access_token_hook` como `app_role`. A função `get_my_role()` lê o JWT como JSONB — retorna com aspas duplas embutidas (ex: `'"admin"'`), então policies usam `= '"admin"'`, **não** `= 'admin'`.
 - **Column Level Security**: RLS protege linhas no Supabase/Postgres, mas a proteção de colunas sensíveis hoje fica na aplicação. Server Components, Server Actions, filtros explícitos de `select()` e DTOs devem selecionar apenas os campos permitidos por role. As views `properties_public` e `profiles_public` foram removidas e **não** são o mecanismo ativo. Ver [ADR 002](docs/decisions/002-cls-via-filtro-select.md).
-- **`is_urgent`** em `service_orders`: coluna `GENERATED ALWAYS AS STORED` — não pode ser inserida manualmente. É `true` quando `(checkin_at - checkout_at) < 4h`.
+- **`is_urgent`** em `service_orders`: coluna `GENERATED ALWAYS AS STORED` — não pode ser inserida manualmente. É `true` quando `(checkin_at - checkout_at) <= 3h`.
 - **Supabase clients**: `utils/supabase/{client,server,middleware}.ts` para uso comum. `utils/supabase/admin.ts` é um adapter admin server-only; não exporta o client service-role bruto e expõe apenas operações administrativas explícitas.
 - **Preço da OS**: calculado no Server Action ao criar (busca `base_price` + `extra_per_person` do imóvel), nunca pelo cliente.
 - **Horas da OS**: métricas operacionais usam o tempo real registrado (`worked_minutes`) via `resolveOrderHours`; remuneração/extrato a pagar usa sempre o tempo médio do imóvel (`avg_cleaning_hours`) via `resolveOrderPayableHours`.
@@ -111,7 +111,13 @@ Ao criar ou alterar qualquer acesso a `profiles`, `properties` ou `service_order
 
 Este projeto roda no Next.js 16, que tem **breaking changes** em relação a versões anteriores. Antes de escrever código (ou pedir para uma IA escrever), confira `node_modules/next/dist/docs/` ou os deprecation notices do build — APIs, convenções e estrutura podem divergir do que você lembra.
 
-## Documentos internos (não versionados)
+## Documentação do projeto
+
+- [Ordens de Serviço — regras de listagem e exportação](docs/service-orders.md) — filtros, prioridade operacional, informações exibidas e PDFs por status.
+- [Architecture Decision Records](docs/decisions/README.md) — decisões arquiteturais duráveis e seus motivos.
+- [Histórico da evolução técnica](docs/evolution/README.md) — etapas concluídas da evolução arquitetural.
+
+### Documentos internos não versionados
 
 - `~/Downloads/prd-veda-bene.md` — PRD completo (schema SQL, RLS, padrões de código)
 - `~/Downloads/Spec_1.md` — plano tático de implementação arquivo a arquivo
