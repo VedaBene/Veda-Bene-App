@@ -54,6 +54,22 @@ apenas por possuir uma janela de limpeza menor.
 - Esses valores são apenas formatados para exibição. A conclusão e o cálculo do
   tempo continuam pertencendo ao fluxo de finalização da ordem.
 
+## Rastreamento do tempo de limpeza
+
+- `admin`, `secretaria` e o funcionário de `limpeza` associado à OS usam os
+  mesmos pop-ups de início e finalização na listagem e no detalhe da ordem.
+- Iniciar registra `started_at` e move a OS para `in_progress`; finalizar
+  registra `completed_at` e as notas de conclusão. `worked_minutes` é calculado
+  automaticamente pelo banco a partir desses dois horários.
+- Uma OS `in_progress` sem `started_at`, criada pelo fluxo legado de mudança
+  direta de status, oferece novamente a ação de início para recuperar o
+  rastreamento antes de permitir a conclusão.
+- As transições são condicionais no servidor para que operações simultâneas não
+  sobrescrevam os horários já registrados.
+- Administrador e secretária podem reabrir uma OS. A reabertura limpa
+  `started_at`, `completed_at` e as notas de conclusão para iniciar um novo ciclo
+  de rastreamento.
+
 ## PDFs por status
 
 - A exportação de ordens ativas contém somente `open` e `in_progress`.
@@ -78,4 +94,3 @@ apenas por possuir uma janela de limpeza menor.
 - Impressão/PDF: `components/service-orders/ServiceOrderActiveExport.tsx`.
 - Ordenação compartilhada: `components/service-orders/ordering.ts` e seu teste
   `components/service-orders/ordering.test.ts`.
-

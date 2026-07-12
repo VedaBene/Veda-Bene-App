@@ -8,10 +8,11 @@ import {
   startCleaning,
   updateExtraServices,
   updateServiceOrder,
-  updateServiceOrderStatus,
+  reopenServiceOrder,
 } from '@/app/(app)/service-orders/actions'
 import { Button } from '@/components/ui/Button'
-import type { OSStatus, PricingMode, Role } from '@/lib/types/database'
+import type { PricingMode, Role } from '@/lib/types/database'
+import { canOperateCleaningTracking } from '@/lib/service-order-tracking'
 import type {
   ServiceOrderFormData,
   ServiceOrderPropertyOption,
@@ -70,7 +71,7 @@ export function ServiceOrderForm({
   const isAdminOrSec = ['admin', 'secretaria'].includes(role)
   const canEdit = isAdminOrSec && !readOnly
   const canEditExtras = isAdminOrSec && order?.status === 'done'
-  const isAssignedWorker = role === 'limpeza' && !!userId && order?.cleaning_staff_ids?.includes(userId)
+  const canOperateTracking = !!order && canOperateCleaningTracking(role, userId, order)
 
   const [propertyId, setPropertyId] = useState(order?.property_id ?? '')
   const [cleaningStaffIds, setCleaningStaffIds] = useState<string[]>(order?.cleaning_staff_ids ?? [])
@@ -164,11 +165,11 @@ export function ServiceOrderForm({
     })
   }
 
-  async function handleStatusChange(newStatus: OSStatus) {
+  async function handleReopen() {
     if (!order) return
     setIsUpdatingStatus(true)
     setError(null)
-    const result = await updateServiceOrderStatus(order.id, newStatus)
+    const result = await reopenServiceOrder(order.id)
     if (result && !result.success) setError(result.error)
     setIsUpdatingStatus(false)
   }
@@ -224,11 +225,11 @@ export function ServiceOrderForm({
           isUrgent={order.is_urgent}
           canEdit={canEdit}
           isUpdating={isUpdatingStatus}
-          onStatusChange={handleStatusChange}
+          onReopen={handleReopen}
         />
       )}
 
-      {order && isAssignedWorker && (
+      {order && canOperateTracking && (
         <TimeTrackingPanel
           status={order.status}
           startedAt={order.started_at}

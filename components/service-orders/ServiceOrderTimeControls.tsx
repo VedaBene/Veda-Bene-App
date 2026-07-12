@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { CheckCircle, FileText, Flag, Play, Timer, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import type { OSStatus } from '@/lib/types/database'
+import { getCleaningTrackingAction } from '@/lib/service-order-tracking'
 import { LiveTimer, formatWorkedTime } from './LiveTimer'
 
 export function TimeTrackingPanel({
@@ -21,6 +22,12 @@ export function TimeTrackingPanel({
   onOpenStart: () => void
   onOpenFinish: () => void
 }) {
+  const availableAction = getCleaningTrackingAction({
+    status,
+    started_at: startedAt,
+    completed_at: null,
+  })
+
   return (
     <div className="p-4 bg-card rounded-xl border border-border shadow-card space-y-3">
       <div className="flex items-center gap-2">
@@ -28,7 +35,7 @@ export function TimeTrackingPanel({
         <span className="text-sm font-semibold text-foreground">Controllo Tempo</span>
       </div>
 
-      {status === 'open' && (
+      {availableAction === 'start' && (
         <div className="flex items-center gap-3">
           <p className="text-sm text-muted-foreground flex-1">
             Clicca sotto per avviare la pulizia e registrare l&apos;orario di inizio.
@@ -39,7 +46,7 @@ export function TimeTrackingPanel({
         </div>
       )}
 
-      {status === 'in_progress' && (
+      {availableAction === 'finish' && (
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 text-info flex-1">
             <span className="text-xs text-muted-foreground">In corso da</span>

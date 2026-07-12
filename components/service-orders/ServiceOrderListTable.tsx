@@ -5,14 +5,10 @@ import { ClipboardList, Flag, Play, Timer } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import type { Role } from '@/lib/types/database'
 import type { ServiceOrderListItem } from '@/lib/types/view-models'
+import { canOperateCleaningTracking, getCleaningTrackingAction } from '@/lib/service-order-tracking'
 import { LiveTimer, formatWorkedTime } from './LiveTimer'
 import { UrgencyBadge } from './UrgencyBadge'
 import { PricingModeBadge, ServiceOrderStatusBadge, formatDate, formatDateTime } from './display'
-
-function isAssignedWorker(o: ServiceOrderListItem, role: Role, userId?: string): boolean {
-  if (!userId) return false
-  return role === 'limpeza' && (o.cleaning_staff_ids?.includes(userId) || o.cleaning_staff_id === userId)
-}
 
 function EmptyList({ text }: { text: string }) {
   return (
@@ -27,20 +23,22 @@ function EmptyList({ text }: { text: string }) {
   )
 }
 
-function WorkerActions({
+function TrackingActions({
   order,
-  assigned,
+  canOperate,
   onStart,
   onFinish,
   compact = false,
 }: {
   order: ServiceOrderListItem
-  assigned: boolean
+  canOperate: boolean
   onStart?: (o: ServiceOrderListItem) => void
   onFinish?: (o: ServiceOrderListItem) => void
   compact?: boolean
 }) {
-  if (assigned && order.status === 'open' && onStart) {
+  const action = canOperate ? getCleaningTrackingAction(order) : null
+
+  if (action === 'start' && onStart) {
     return (
       <Button
         variant="accent"
@@ -53,7 +51,7 @@ function WorkerActions({
       </Button>
     )
   }
-  if (assigned && order.status === 'in_progress' && onFinish) {
+  if (action === 'finish' && onFinish) {
     return (
       <Button
         variant="danger"
@@ -85,7 +83,6 @@ export function ServiceOrderListTable({
   onFinish?: (o: ServiceOrderListItem) => void
 }) {
   const isCliente = role === 'cliente'
-  const isWorker = role === 'limpeza'
 
   if (orders.length === 0) {
     return <EmptyList text={emptyText} />
@@ -95,7 +92,7 @@ export function ServiceOrderListTable({
     <>
       <div className="flex flex-col gap-3 px-3 py-3 md:hidden">
         {orders.map((os) => {
-          const assigned = isAssignedWorker(os, role, userId)
+          const canOperate = canOperateCleaningTracking(role, userId, os)
           return (
             <div key={os.id} className="bg-card rounded-xl border border-border p-4 shadow-sm">
               <Link href={`/service-orders/${os.id}`} className="block active:scale-[0.98] transition-transform">
@@ -188,9 +185,9 @@ export function ServiceOrderListTable({
                 </div>
               </Link>
 
-              {isWorker && assigned && (onStart || onFinish) && (
+              {canOperate && (onStart || onFinish) && (
                 <div className="mt-3 pt-3 border-t border-border/50">
-                  <WorkerActions order={os} assigned={assigned} onStart={onStart} onFinish={onFinish} />
+                  <TrackingActions order={os} canOperate={canOperate} onStart={onStart} onFinish={onFinish} />
                 </div>
               )}
             </div>
@@ -220,7 +217,7 @@ export function ServiceOrderListTable({
           </thead>
           <tbody className="divide-y divide-border/30">
             {orders.map((os) => {
-              const assigned = isAssignedWorker(os, role, userId)
+              const canOperate = canOperateCleaningTracking(role, userId, os)
               return (
                 <tr key={os.id} className="transition-colors hover:bg-muted/30">
                   <td className="px-3 py-3 text-foreground/50 text-xs font-mono">#{os.order_number}</td>
@@ -260,7 +257,7 @@ export function ServiceOrderListTable({
                   </td>
                   <td className="px-3 py-3 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      {isWorker && <WorkerActions order={os} assigned={assigned} onStart={onStart} onFinish={onFinish} compact />}
+                      {canOperate && <TrackingActions order={os} canOperate={canOperate} onStart={onStart} onFinish={onFinish} compact />}
                       <Link href={`/service-orders/${os.id}`} className="text-xs font-medium text-accent hover:text-accent/80 transition-colors">
                         Vedi
                       </Link>

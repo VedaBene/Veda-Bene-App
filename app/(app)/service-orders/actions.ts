@@ -6,17 +6,17 @@ import { z } from 'zod'
 import { getAuthorizedClient } from '@/lib/server/authz'
 import { calculateTotalPrice, loadOrderPricingContext, recalculateOrderPricing } from '@/lib/server/pricing'
 import { withLogging } from '@/lib/server/logger'
+import { validateCleaningTrackingTransition } from '@/lib/service-order-tracking'
 import {
   nonNegativeMoneySchema,
   optionalDateOnlySchema,
   optionalNotesSchema,
   optionalUuidSchema,
-  osStatusSchema,
   pricingModeSchema,
   uuidSchema,
   validationMessage,
 } from '@/lib/server/validation/contracts'
-import type { OSStatus, PricingMode } from '@/lib/types/database'
+import type { PricingMode } from '@/lib/types/database'
 
 const optStr = z.preprocess(v => (v === '' ? undefined : v), z.string().optional())
 const optNum = z.preprocess(
@@ -210,27 +210,31 @@ async function updateServiceOrderImpl(id: string, formData: FormData) {
   return { success: true as const }
 }
 
-async function updateServiceOrderStatusImpl(id: string, status: OSStatus) {
+async function reopenServiceOrderImpl(id: string) {
   const parsedId = uuidSchema.safeParse(id)
   if (!parsedId.success) return { success: false as const, error: validationMessage(parsedId.error) }
-
-  const parsedStatus = osStatusSchema.safeParse(status)
-  if (!parsedStatus.success) return { success: false as const, error: validationMessage(parsedStatus.error) }
 
   const { supabase } = await getAuthorizedClient()
 
   const { error } = await supabase
     .from('service_orders')
     .update({
-      status: parsedStatus.data,
-      completed_at: parsedStatus.data === 'done' ? new Date().toISOString() : null,
+      status: 'open',
+      started_at: null,
+      completed_at: null,
+      completion_notes: null,
     })
     .eq('id', parsedId.data)
 
   if (error) return { success: false as const, error: error.message }
 
+  await recalculateOrderPricing(supabase, parsedId.data)
+
   revalidatePath('/service-orders')
   revalidatePath(`/service-orders/${parsedId.data}`)
+  revalidatePath('/statements/receivable')
+  revalidatePath('/statements/payable')
+  revalidatePath('/dashboard')
   return { success: true as const }
 }
 
@@ -240,15 +244,33 @@ async function startCleaningImpl(id: string) {
 
   const { supabase } = await getAuthorizedClient(['admin', 'secretaria', 'limpeza'])
 
-  const { error } = await supabase
+  const { data: order, error: loadError } = await supabase
+    .from('service_orders')
+    .select('status, started_at, completed_at')
+    .eq('id', parsedId.data)
+    .maybeSingle()
+
+  if (loadError) return { success: false as const, error: loadError.message }
+  if (!order) return { success: false as const, error: 'O.L. non trovato o non autorizzato.' }
+
+  const transitionError = validateCleaningTrackingTransition('start', order)
+  if (transitionError) return { success: false as const, error: transitionError }
+
+  const { data: updatedOrder, error } = await supabase
     .from('service_orders')
     .update({
       status: 'in_progress',
       started_at: new Date().toISOString(),
     })
     .eq('id', parsedId.data)
+    .in('status', ['open', 'in_progress'])
+    .is('started_at', null)
+    .is('completed_at', null)
+    .select('id')
+    .maybeSingle()
 
   if (error) return { success: false as const, error: error.message }
+  if (!updatedOrder) return { success: false as const, error: 'La pulizia è già stata avviata da un altro operatore.' }
 
   revalidatePath('/service-orders')
   revalidatePath(`/service-orders/${parsedId.data}`)
@@ -264,7 +286,19 @@ async function finishCleaningImpl(id: string, notes: string) {
 
   const { supabase } = await getAuthorizedClient(['admin', 'secretaria', 'limpeza'])
 
-  const { error } = await supabase
+  const { data: order, error: loadError } = await supabase
+    .from('service_orders')
+    .select('status, started_at, completed_at')
+    .eq('id', parsedId.data)
+    .maybeSingle()
+
+  if (loadError) return { success: false as const, error: loadError.message }
+  if (!order) return { success: false as const, error: 'O.L. non trovato o non autorizzato.' }
+
+  const transitionError = validateCleaningTrackingTransition('finish', order)
+  if (transitionError) return { success: false as const, error: transitionError }
+
+  const { data: updatedOrder, error } = await supabase
     .from('service_orders')
     .update({
       status: 'done',
@@ -272,14 +306,22 @@ async function finishCleaningImpl(id: string, notes: string) {
       completion_notes: parsedNotes.data.trim() || null,
     })
     .eq('id', parsedId.data)
+    .eq('status', 'in_progress')
+    .not('started_at', 'is', null)
+    .is('completed_at', null)
+    .select('id')
+    .maybeSingle()
 
   if (error) return { success: false as const, error: error.message }
+  if (!updatedOrder) return { success: false as const, error: 'La pulizia è già stata completata da un altro operatore.' }
 
   await recalculateOrderPricing(supabase, parsedId.data)
 
   revalidatePath('/service-orders')
   revalidatePath(`/service-orders/${parsedId.data}`)
   revalidatePath('/statements/receivable')
+  revalidatePath('/statements/payable')
+  revalidatePath('/dashboard')
   return { success: true as const }
 }
 
@@ -348,8 +390,8 @@ export async function updateServiceOrder(id: string, formData: FormData) {
   return withLogging('updateServiceOrder', () => updateServiceOrderImpl(id, formData))
 }
 
-export async function updateServiceOrderStatus(id: string, status: OSStatus) {
-  return withLogging('updateServiceOrderStatus', () => updateServiceOrderStatusImpl(id, status))
+export async function reopenServiceOrder(id: string) {
+  return withLogging('reopenServiceOrder', () => reopenServiceOrderImpl(id))
 }
 
 export async function startCleaning(id: string) {
