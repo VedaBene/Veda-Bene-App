@@ -15,6 +15,7 @@ export type ServiceOrderListResult = {
   done: ServiceOrderListItem[]
   doneForExport: ServiceOrderListItem[]
   doneTotalPages: number
+  doneTotalCount: number
 }
 
 export type ServiceOrderFormOptions = {
@@ -178,9 +179,9 @@ export async function getServiceOrderList(
 
     doneQuery = doneQuery.range(doneFrom, doneTo)
   } else {
-    // Modo diário por padrão: apenas concluídas hoje, sem paginação física (limite de segurança de 100 itens)
-    doneQuery = doneQuery.eq('cleaning_date', todayStr).range(0, 99)
-    doneExportQuery = doneExportQuery.eq('cleaning_date', todayStr).range(0, 99)
+    // Modo diário por padrão: apenas concluídas hoje
+    doneQuery = doneQuery.eq('cleaning_date', todayStr)
+    doneExportQuery = doneExportQuery.eq('cleaning_date', todayStr)
   }
 
   const [{ data: activeOrders }, { data: doneOrders, count: doneCount }, { data: doneExportOrders }] = await Promise.all([
@@ -204,6 +205,7 @@ export async function getServiceOrderList(
       toServiceOrderListItem(order, viewer.role),
     ),
     doneTotalPages,
+    doneTotalCount: doneCount ?? 0,
   }
 }
 

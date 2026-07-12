@@ -25,10 +25,46 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;')
 }
 
-function generatePDF(orders: ServiceOrderListItem[], date: string, status: 'active' | 'done') {
-  const sortedOrders = status === 'active' ? [...orders].sort(compareServiceOrderPriority) : orders
-  const dateLabel = date ? formatDate(date) : 'Tutte le date'
-  const now = new Date().toLocaleString('it-IT', { timeZone: 'UTC' })
+const STATUS_TITLES: Record<'open' | 'in_progress' | 'done', string> = {
+  open: 'Aperti',
+  in_progress: 'In corso',
+  done: 'Completati',
+}
+
+function generatePDF(orders: ServiceOrderListItem[], date: string, status: 'open' | 'in_progress' | 'done') {
+  const sortedOrders = status !== 'done' ? [...orders].sort(compareServiceOrderPriority) : orders
+  
+  let dateLabel = 'Tutte le date'
+  if (date) {
+    dateLabel = formatDate(date)
+  } else if (status === 'done') {
+    const todayStr = new Intl.DateTimeFormat('fr-CA', { timeZone: 'Europe/Rome' }).format(new Date())
+    dateLabel = formatDate(todayStr) + ' (Oggi)'
+  }
+
+  const now = new Date().toLocaleString('it-IT', { timeZone: 'Europe/Rome' })
+
+  const openCount = orders.filter((o) => o.status === 'open').length
+  const inProgressCount = orders.filter((o) => o.status === 'in_progress').length
+  const doneCount = orders.filter((o) => o.status === 'done').length
+
+  let statusSummaryHtml = ''
+  if (status !== 'done') {
+    const badges: string[] = []
+    if (inProgressCount > 0) {
+      badges.push(`<span style="display: inline-block; padding: 4px 8px; border-radius: 4px; background: #e0f2fe; color: #0369a1; font-weight: bold; margin-right: 8px; font-size: 11px;">In corso: ${inProgressCount}</span>`)
+    }
+    if (openCount > 0) {
+      badges.push(`<span style="display: inline-block; padding: 4px 8px; border-radius: 4px; background: #fef3c7; color: #b45309; font-weight: bold; margin-right: 8px; font-size: 11px;">Aperti: ${openCount}</span>`)
+    }
+    if (badges.length > 0) {
+      statusSummaryHtml = `<div style="margin-bottom: 16px;">${badges.join('')}</div>`
+    }
+  } else if (status === 'done') {
+    statusSummaryHtml = `<div style="margin-bottom: 16px;">
+      <span style="display: inline-block; padding: 4px 8px; border-radius: 4px; background: #dcfce7; color: #15803d; font-weight: bold; font-size: 11px;">Completati: ${doneCount}</span>
+    </div>`
+  }
 
   const totals: Record<string, number> = {}
   for (const { key } of OCCUPANCY_FIELDS) {
@@ -90,8 +126,9 @@ function generatePDF(orders: ServiceOrderListItem[], date: string, status: 'acti
   </style>
 </head>
 <body>
-  <h1>Veda Bene — Ordini di Lavoro ${status === 'active' ? 'Aperti' : 'Completati'}</h1>
+  <h1>Veda Bene — Ordini di Lavoro ${STATUS_TITLES[status]}</h1>
   <p class="meta">Data: ${dateLabel} &nbsp;|&nbsp; Generato il: ${now}</p>
+  ${statusSummaryHtml}
   <table>
     <thead>
       <tr>
@@ -127,15 +164,22 @@ export function OrdersPdfButton({
   orders,
   date,
   status,
+  disabled = false,
 }: {
   orders: ServiceOrderListItem[]
   date: string
-  status: 'active' | 'done'
+  status: 'open' | 'in_progress' | 'done'
+  disabled?: boolean
 }) {
   return (
     <button
+      disabled={disabled}
       onClick={() => generatePDF(orders, date, status)}
-      className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5 rounded-md border border-border/60 hover:border-border hover:bg-muted/40"
+      className={`flex items-center gap-1.5 text-xs font-medium transition-colors px-3 py-1.5 rounded-md border ${
+        disabled
+          ? 'opacity-40 cursor-not-allowed text-muted-foreground border-border/40 bg-muted/20'
+          : 'text-muted-foreground hover:text-foreground border-border/60 hover:border-border hover:bg-muted/40'
+      }`}
     >
       <FileDown size={14} />
       PDF

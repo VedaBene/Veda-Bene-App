@@ -18,7 +18,7 @@ export default async function ServiceOrdersPage(props: PageProps<never>) {
   const { supabase, viewer } = await getCurrentViewer()
 
   const [
-    { active, done, doneForExport, doneTotalPages },
+    { active, done, doneForExport, doneTotalPages, doneTotalCount },
     { staff }
   ] = await Promise.all([
     getServiceOrderList(supabase, viewer, {
@@ -55,6 +55,7 @@ export default async function ServiceOrdersPage(props: PageProps<never>) {
         userId={viewer.userId}
         donePage={filters.donePage}
         doneTotalPages={doneTotalPages}
+        doneTotalCount={doneTotalCount}
         initialQ={filters.q ?? ''}
         initialCleaningStaffId={filters.cleaningStaffId ?? ''}
         initialConsegnaStaffId={filters.consegnaStaffId ?? ''}

@@ -16,3 +16,12 @@ history or when work touches the evolved architecture areas: DAL/data access,
 authorization/validation, service orders, reporting/exports/dashboard,
 Supabase/Postgres/RLS, privileged helpers/RPCs, or the documented stage records.
 <!-- END:veda-bene-evolution-rules -->
+
+<!-- BEGIN:timezone-rules -->
+# Timezone de Referência do Sistema
+
+Qualquer rotina, helper, utilitário ou componente do frontend que manipule, compare ou formate datas e horas deve utilizar obrigatoriamente o timezone da Itália: `Europe/Rome`.
+- Não force fuso UTC para exibições e relatórios (como em formatadores de strings de data/hora do PDF e da tela).
+- Converta timestamps TIMESTAMPTZ de forma explícita especificando `{ timeZone: 'Europe/Rome' }`.
+- O relógio de cabeçalho (`DateTimeDisplay.tsx`) deve ser inicializado apenas no cliente (dentro de `useEffect`) para prevenir hydration mismatches do Next.js e formatado com a timezone italiana (`Europe/Rome`).
+<!-- END:timezone-rules -->

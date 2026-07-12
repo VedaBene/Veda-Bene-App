@@ -22,7 +22,7 @@ export function formatDateTime(value: string | null | undefined) {
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-    timeZone: 'UTC',
+    timeZone: 'Europe/Rome',
   })
 }
 

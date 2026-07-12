@@ -30,6 +30,7 @@ Isso preserva o histórico de **por que** o sistema chegou no estado atual.
 | [008](008-controles-seguranca-autenticacao.md) | Controles complementares de segurança de autenticação | Aceita |
 | [009](009-multiplos-funcionarios-limpeza-na-os.md) | Associação de múltiplos funcionários de limpeza na OS | Proposta |
 | [010](010-resolucao-erro-stolen-lock-supabase.md) | Resolução de Erro de Concorrência de Autenticação (Lock Stolen) | Aceita |
+| [011](011-taxa-fixa-consegna-na-receita.md) | Taxa fixa de Consegna na receita da OS | Aceita |
 
 
 

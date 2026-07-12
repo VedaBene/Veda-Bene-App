@@ -26,6 +26,7 @@ export function ServiceOrderList({
   userId,
   donePage,
   doneTotalPages,
+  doneTotalCount,
   initialQ,
   initialCleaningStaffId,
   initialConsegnaStaffId,
@@ -40,6 +41,7 @@ export function ServiceOrderList({
   userId?: string
   donePage: number
   doneTotalPages: number
+  doneTotalCount: number
   initialQ: string
   initialCleaningStaffId: string
   initialConsegnaStaffId: string
@@ -49,7 +51,7 @@ export function ServiceOrderList({
 }) {
   const router = useRouter()
   const pathname = usePathname()
-  const [, startTransition] = useTransition()
+  const [isPending, startTransition] = useTransition()
   const [search, setSearch] = useState(initialQ)
   const [cleaningStaffId, setCleaningStaffId] = useState(initialCleaningStaffId)
   const [consegnaStaffId, setConsegnaStaffId] = useState(initialConsegnaStaffId)
@@ -75,7 +77,9 @@ export function ServiceOrderList({
       if (startD) params.set('startDate', startD)
       if (endD) params.set('endDate', endD)
       params.set('donePage', '1')
-      router.replace(`${pathname}?${params.toString()}`)
+      startTransition(() => {
+        router.replace(`${pathname}?${params.toString()}`)
+      })
     },
     [router, pathname],
   )
@@ -110,6 +114,15 @@ export function ServiceOrderList({
   const sortedOpen = [...open].sort(compareServiceOrderPriority)
   
   const hasFilter = search !== '' || cleaningStaffId !== '' || consegnaStaffId !== '' || startDate !== '' || endDate !== ''
+  
+  const isFiltersDirty =
+    search !== initialQ ||
+    cleaningStaffId !== initialCleaningStaffId ||
+    consegnaStaffId !== initialConsegnaStaffId ||
+    startDate !== initialStartDate ||
+    endDate !== initialEndDate
+
+  const isSyncing = isFiltersDirty || isPending
   
   const doneSearchParams: Record<string, string> = {}
   if (search) doneSearchParams.q = search
@@ -206,7 +219,12 @@ export function ServiceOrderList({
 
       {inProgress.length > 0 && (
         <Card>
-          <ListHeader title="In corso" count={inProgress.length} countClassName="bg-info/10 text-info" />
+          <ListHeader
+            title="In corso"
+            count={inProgress.length}
+            countClassName="bg-info/10 text-info"
+            action={<OrdersPdfButton orders={inProgress} date={startDate || endDate || ''} status="in_progress" disabled={isSyncing} />}
+          />
           <ServiceOrderListTable
             orders={inProgress}
             role={role}
@@ -222,7 +240,7 @@ export function ServiceOrderList({
           title="Aperti"
           count={open.length}
           countClassName="bg-warning-bg text-warning"
-          action={<OrdersPdfButton orders={[...inProgress, ...sortedOpen]} date={startDate || endDate || ''} status="active" />}
+          action={<OrdersPdfButton orders={sortedOpen} date={startDate || endDate || ''} status="open" disabled={isSyncing} />}
         />
         <ServiceOrderListTable
           orders={sortedOpen}
@@ -236,9 +254,9 @@ export function ServiceOrderList({
       <Card>
         <ListHeader
           title="Completati"
-          count={done.length}
+          count={doneTotalCount}
           countClassName="bg-success-bg text-success"
-          action={<OrdersPdfButton orders={doneForExport} date={startDate || endDate || ''} status="done" />}
+          action={<OrdersPdfButton orders={doneForExport} date={startDate || endDate || ''} status="done" disabled={isSyncing} />}
         />
         <ServiceOrderListTable
           orders={done}

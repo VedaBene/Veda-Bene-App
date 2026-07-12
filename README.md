@@ -85,6 +85,7 @@ npm run lint     # ESLint
 - **Supabase clients**: `utils/supabase/{client,server,middleware}.ts` para uso comum. `utils/supabase/admin.ts` é um adapter admin server-only; não exporta o client service-role bruto e expõe apenas operações administrativas explícitas.
 - **Preço da OS**: calculado no Server Action ao criar (busca `base_price` + `extra_per_person` do imóvel) e inclui a taxa fixa de Consegna de €10, nunca pelo cliente. Essa taxa é receita da empresa e não remunera funcionários.
 - **Horas da OS**: métricas operacionais usam o tempo real registrado (`worked_minutes`) via `resolveOrderHours`; remuneração/extrato a pagar usa sempre o tempo médio do imóvel (`avg_cleaning_hours`) via `resolveOrderPayableHours`.
+- **Timezone de Referência**: Todo o tratamento de datas e horas de exibição na tela (incluindo o relógio do cabeçalho `DateTimeDisplay.tsx` cuja formatação ocorre após a montagem no cliente) e nos PDFs gerados (inclusive nos relatórios operacionais e extratos Payable/Receivable) utiliza obrigatoriamente o timezone da Itália: `Europe/Rome`. Timestamps `TIMESTAMPTZ` do banco devem ser formatados especificando `timeZone: 'Europe/Rome'`.
 
 ### Checklist para acesso a dados sensíveis
 

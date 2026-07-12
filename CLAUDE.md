@@ -39,6 +39,7 @@ Outras convenções importantes:
 - **Preço da OS**: calculado no Server Action ao criar/atualizar (busca `base_price` + `extra_per_person` do imóvel), nunca pelo cliente. `secretaria` pode escolher `pricing_mode`, mas não recebe `base_price` nem valores calculados no navegador.
   - Fórmula centralizada em `calculateTotalPrice` (`lib/server/pricing.ts`). Para OS **já existente**, carregue o contexto com `loadOrderPricingContext(supabase, orderId, overridePropertyId?)` antes de chamar — não replique os fetches inline.
 - **Horas de uma OS**: para métricas operacionais, dashboards de produtividade e histórico, use `resolveOrderHours(order, property)` em `lib/server/hours.ts` — retorna `worked_minutes/60` quando registrado, ou `avg_cleaning_hours` do imóvel como fallback. Para remuneração/extrato a pagar, use `resolveOrderPayableHours(property)`, que considera sempre o `avg_cleaning_hours` do imóvel.
+- **Timezone de Referência**: Todo o tratamento de datas e horas de exibição na tela (incluindo o relógio do cabeçalho `DateTimeDisplay.tsx` cuja formatação ocorre após a montagem no cliente) e nos PDFs gerados (inclusive nos relatórios operacionais e extratos Payable/Receivable) utiliza obrigatoriamente o timezone da Itália: `Europe/Rome`. Timestamps `TIMESTAMPTZ` do banco devem ser convertidos e formatados especificando `timeZone: 'Europe/Rome'`.
 
 ## Documentos de referência
 - [`docs/service-orders.md`](docs/service-orders.md) — regras atuais da listagem, filtros, prioridade operacional e PDFs de Ordens de Serviço

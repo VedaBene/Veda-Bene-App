@@ -17,9 +17,7 @@ tela e os PDFs.
 - O filtro de Pulizia considera a relação de múltiplos responsáveis em
   `service_order_cleaning_staff`; o filtro de Consegna usa
   `service_orders.consegna_staff_id`.
-- Sem filtros, **Completati** exibe apenas as ordens concluídas na data corrente
-  de Roma. Com filtros, a seção é paginada, mas o PDF de concluídas recebe o
-  conjunto filtrado para exportação, não apenas a página visível.
+- Sem filtros, **Completati** exibe a totalidade das ordens concluídas na data corrente de Roma (Modo Diário), sem limite de paginação física no banco de dados. O indicador de contagem exibe a quantidade total de ordens concluídas encontradas (`doneTotalCount`), mantendo a perfeita simetria com as linhas exibidas e os relatórios. Com filtros ativos, a listagem da tela é paginada em lotes de 20 itens, mas o PDF de concluídas recebe a totalidade dos registros filtrados (`doneForExport`), sem paginação.
 - O perfil `cliente` não recebe a lista de funcionários usada nos filtros e
   continua sem visualizar nomes de responsáveis, conforme o contrato de
   visibilidade do sistema.
@@ -72,11 +70,13 @@ apenas por possuir uma janela de limpeza menor.
 
 ## PDFs por status
 
-- A exportação de ordens ativas contém somente `open` e `in_progress`.
 - A exportação de concluídas contém somente `done`.
+- O PDF de concluídas sem filtros ativos (Modo Diário) exibe a data corrente de Roma formatada como "DD/MM/YYYY (Oggi)" em seu cabeçalho.
+- A exportação de ordens em aberto ("Aperti") contém apenas ordens com status `open`.
+- A exportação de ordens em andamento ("In corso") contém apenas ordens com status `in_progress`.
 - Cada botão exporta os dados já submetidos aos filtros correntes.
-- O PDF de ordens ativas usa a prioridade operacional descrita acima; o de
-  concluídas preserva a ordem retornada pela consulta de concluídas.
+- Os PDFs de ordens ativas ("Aperti" e "In corso") usam a prioridade operacional descrita acima; o de concluídas preserva a ordem retornada pela consulta de concluídas.
+- Os botões de exportação de PDF de todas as seções são desabilitados visualmente e funcionalmente (via flag `isSyncing`) caso o estado de filtros local do cliente esteja desalinhado com o servidor (durante o debounce de digitação ou o tempo de carregamento da transição assíncrona com `useTransition`), blindando o sistema contra geração de relatórios com dados inconsistentes.
 - Para manter o documento compacto, os campos de ocupação usam:
   - `OSPITI` → `PX`
   - `LETTI MATRIMONIALI` → `M`
@@ -94,3 +94,10 @@ apenas por possuir uma janela de limpeza menor.
 - Impressão/PDF: `components/service-orders/ServiceOrderActiveExport.tsx`.
 - Ordenação compartilhada: `components/service-orders/ordering.ts` e seu teste
   `components/service-orders/ordering.test.ts`.
+
+## Fuso Horário de Referência (Timezone)
+
+Todo o sistema utiliza o fuso horário oficial da Itália, `Europe/Rome`, como referência para manipulação, armazenamento e exibição de dados temporais.
+- A exibição e formatação de datas e horas na tela e nos relatórios PDF (inclusive de extratos a pagar/receber) utilizam `Europe/Rome` na conversão de timestamps TIMESTAMPTZ, garantindo que o fuso horário do usuário (ex: no Brasil) não desloque as datas das limpezas.
+- O cálculo do Modo Diário no servidor (todayStr) utiliza o fuso `Europe/Rome`.
+- O relógio em tempo real exibido no cabeçalho do painel (`DateTimeDisplay.tsx`) também é sincronizado com o fuso da Itália (`Europe/Rome`) e renderiza um placeholder inicial, adiando a formatação e atualização do relógio para após a montagem no cliente para evitar hydration mismatches do Next.js.
