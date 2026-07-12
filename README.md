@@ -83,7 +83,7 @@ npm run lint     # ESLint
 - **Column Level Security**: RLS protege linhas no Supabase/Postgres, mas a proteção de colunas sensíveis hoje fica na aplicação. Server Components, Server Actions, filtros explícitos de `select()` e DTOs devem selecionar apenas os campos permitidos por role. As views `properties_public` e `profiles_public` foram removidas e **não** são o mecanismo ativo. Ver [ADR 002](docs/decisions/002-cls-via-filtro-select.md).
 - **`is_urgent`** em `service_orders`: coluna `GENERATED ALWAYS AS STORED` — não pode ser inserida manualmente. É `true` quando `(checkin_at - checkout_at) <= 3h`.
 - **Supabase clients**: `utils/supabase/{client,server,middleware}.ts` para uso comum. `utils/supabase/admin.ts` é um adapter admin server-only; não exporta o client service-role bruto e expõe apenas operações administrativas explícitas.
-- **Preço da OS**: calculado no Server Action ao criar (busca `base_price` + `extra_per_person` do imóvel), nunca pelo cliente.
+- **Preço da OS**: calculado no Server Action ao criar (busca `base_price` + `extra_per_person` do imóvel) e inclui a taxa fixa de Consegna de €10, nunca pelo cliente. Essa taxa é receita da empresa e não remunera funcionários.
 - **Horas da OS**: métricas operacionais usam o tempo real registrado (`worked_minutes`) via `resolveOrderHours`; remuneração/extrato a pagar usa sempre o tempo médio do imóvel (`avg_cleaning_hours`) via `resolveOrderPayableHours`.
 
 ### Checklist para acesso a dados sensíveis

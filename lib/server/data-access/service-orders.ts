@@ -77,6 +77,7 @@ function getServiceOrderDetailSelect(viewer: Viewer): string {
     'completion_notes',
     'worked_minutes',
     'pricing_mode',
+    'consegna_fee',
     'cleaning_notes',
     ...(isAdminOrSecretaria
       ? ['extra_services_description', 'extra_services_price']

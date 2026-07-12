@@ -125,7 +125,7 @@ describe('canonical financial reporting producers', () => {
     ])
   })
 
-  it('aggregates payable rows using property average hours without changing salary and hourly formulas', async () => {
+  it('counts only cleaning hours when the same employee also performs delivery', async () => {
     const fake = new FakeSupabase({
       service_orders: [
         {
@@ -145,13 +145,12 @@ describe('canonical financial reporting producers', () => {
           completed_at: '2026-01-11',
           worked_minutes: null,
           cleaning_staff: [{ id: 'staff-1' }],
-          consegna_staff_id: 'staff-2',
+          consegna_staff_id: 'staff-1',
           property: { name: 'Navona', avg_cleaning_hours: 2 },
         },
       ],
       profiles: [
         { id: 'staff-1', full_name: 'Ana', hourly_rate: 20, monthly_salary: null },
-        { id: 'staff-2', full_name: 'Bruno', hourly_rate: 30, monthly_salary: 1200 },
       ],
     })
 
@@ -165,16 +164,29 @@ describe('canonical financial reporting producers', () => {
         monthly_salary: null,
         total_amount: 120,
       },
-      {
-        employee_id: 'staff-2',
-        full_name: 'Bruno',
-        os_count: 1,
-        total_hours: 2,
-        hourly_rate: 30,
-        monthly_salary: 1200,
-        total_amount: 1200,
-      },
     ])
+  })
+
+  it('excludes delivery-only assignees from the payable statement', async () => {
+    const fake = new FakeSupabase({
+      service_orders: [
+        {
+          id: 'order-1',
+          order_number: 1,
+          status: 'done',
+          completed_at: '2026-01-10',
+          cleaning_staff: [],
+          consegna_staff_id: 'staff-1',
+          property: { name: 'Campo', avg_cleaning_hours: 4 },
+        },
+      ],
+      profiles: [
+        { id: 'staff-1', full_name: 'Ana', hourly_rate: 20, monthly_salary: null },
+      ],
+    })
+
+    await expect(getPayableDetailRows(asSupabase(fake), filters)).resolves.toEqual([])
+    await expect(getPayableStatementRows(asSupabase(fake), filters)).resolves.toEqual([])
   })
 
   it('builds receivable detail rows from persisted total_price and filters by client', async () => {
@@ -187,6 +199,7 @@ describe('canonical financial reporting producers', () => {
           completed_at: '2026-01-10',
           real_guests: 3,
           extra_services_price: 10,
+          consegna_fee: 10,
           total_price: 123.456,
           property: {
             id: 'property-1',
@@ -229,7 +242,9 @@ describe('canonical financial reporting producers', () => {
         client_type: 'rental',
         client_name: 'Agency',
         real_guests: 3,
+        cleaning_price: 103.46,
         extra_services_price: 10,
+        consegna_fee: 10,
         total_price: 123.46,
       },
     ])

@@ -74,7 +74,11 @@ export function exportReceivablePDF(
       <td>${r.client_type === 'rental' ? 'Agência' : 'Particular'}</td>
       <td>${escapeHtml(r.client_name)}</td>
       <td class="num">${r.real_guests ?? '—'}</td>
-      <td class="num">${money(r.extra_services_price)}</td>
+      <td>
+        <div>Limpeza: ${money(r.cleaning_price)}</div>
+        <div>Serviços extras: ${money(r.extra_services_price)}</div>
+        <div>Consegna: ${money(r.consegna_fee)}</div>
+      </td>
       <td class="num">${money(r.total_price)}</td>
     </tr>`).join('')
 
@@ -89,7 +93,7 @@ export function exportReceivablePDF(
           <th>Tipo</th>
           <th>Cliente</th>
           <th class="num">Hóspedes</th>
-          <th class="num">Valor Extra</th>
+          <th>Composição da cobrança</th>
           <th class="num">Total</th>
         </tr>
       </thead>

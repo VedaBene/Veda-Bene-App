@@ -2,6 +2,7 @@ import 'server-only'
 
 import { captureQueryError } from '@/lib/server/logger'
 import { resolveOrderHours, resolveOrderPayableHours } from '@/lib/server/hours'
+import { CONSEGNA_FEE } from '@/lib/server/pricing'
 import type { DashboardData, MonthStat, TopProperty } from '@/lib/types/dashboard'
 import type {
   ClientOption,
@@ -18,8 +19,6 @@ type PayableOrder = {
   id: string
   order_number: number
   completed_at: string | null
-  worked_minutes: number | null
-  consegna_staff_id: string | null
   cleaning_staff: { id: string }[] | null
   property: { name?: string | null; avg_cleaning_hours: number | null } | null
 }
@@ -30,6 +29,7 @@ type ReceivableOrder = {
   completed_at: string | null
   real_guests: number | null
   extra_services_price: number | null
+  consegna_fee: number | null
   total_price: number | null
   property: {
     id: string
@@ -107,7 +107,7 @@ async function fetchReceivableOrders(
   let query = supabase
     .from('service_orders')
     .select(`
-      id, order_number, completed_at, real_guests, extra_services_price, total_price,
+      id, order_number, completed_at, real_guests, extra_services_price, consegna_fee, total_price,
       property:properties(
         id, name, client_type,
         agency:agencies(id, name),
@@ -138,8 +138,7 @@ async function fetchPayableOrders(
   let query = supabase
     .from('service_orders')
     .select(`
-      id, order_number, completed_at, worked_minutes,
-      consegna_staff_id,
+      id, order_number, completed_at,
       cleaning_staff:profiles!service_order_cleaning_staff(id),
       ${propertySelect}
     `)
@@ -175,10 +174,9 @@ async function fetchStaffProfiles(
   return new Map((data ?? []).map(profile => [profile.id, profile]))
 }
 
-function payableStaffIds(orders: Pick<PayableOrder, 'cleaning_staff' | 'consegna_staff_id'>[]): string[] {
+function cleaningStaffIds(orders: Pick<PayableOrder, 'cleaning_staff'>[]): string[] {
   const staffIds = new Set<string>()
   for (const order of orders) {
-    if (order.consegna_staff_id) staffIds.add(order.consegna_staff_id)
     if (order.cleaning_staff) {
       for (const s of order.cleaning_staff) {
         staffIds.add(s.id)
@@ -261,7 +259,7 @@ export async function getPayableDetailRows(
   const orders = await fetchPayableOrders(supabase, filters, true)
   if (orders.length === 0) return []
 
-  const profileById = await fetchStaffProfiles(supabase, payableStaffIds(orders))
+  const profileById = await fetchStaffProfiles(supabase, cleaningStaffIds(orders))
   if (profileById.size === 0) return []
 
   const rows: PayableDetailRow[] = []
@@ -269,8 +267,6 @@ export async function getPayableDetailRows(
   for (const order of orders) {
     const hours = resolveOrderPayableHours(order.property)
     const uniqueStaffIds = new Set<string>()
-    if (order.consegna_staff_id) uniqueStaffIds.add(order.consegna_staff_id)
-    
     const cleaningStaff = order.cleaning_staff ?? []
     const cleaningStaffCount = cleaningStaff.length
 
@@ -287,16 +283,7 @@ export async function getPayableDetailRows(
       const profile = profileById.get(staffId)
       if (!profile) continue
 
-      const isConsegna = order.consegna_staff_id === staffId
-      const isCleaning = cleaningStaff.some(c => c.id === staffId)
-
-      let staffHours = 0
-      if (isCleaning) {
-        staffHours += hours / Math.max(1, cleaningStaffCount)
-      }
-      if (isConsegna) {
-        staffHours += hours
-      }
+      const staffHours = hours / Math.max(1, cleaningStaffCount)
 
       const roundedHours = roundMoney(staffHours)
       const osTotal =
@@ -371,6 +358,10 @@ export async function getReceivableDetailRows(
     const property = order.property
     if (!property || !matchesReceivableFilters(property, filters)) continue
 
+    const totalPrice = order.total_price ?? 0
+    const extraServicesPrice = order.extra_services_price ?? 0
+    const consegnaFee = order.total_price == null ? 0 : order.consegna_fee ?? CONSEGNA_FEE
+
     rows.push({
       order_id: order.id,
       order_number: order.order_number,
@@ -381,7 +372,9 @@ export async function getReceivableDetailRows(
       client_name: clientName(property),
       real_guests: order.real_guests,
       extra_services_price: order.extra_services_price,
-      total_price: roundMoney(order.total_price ?? 0),
+      cleaning_price: roundMoney(Math.max(0, totalPrice - extraServicesPrice - consegnaFee)),
+      consegna_fee: roundMoney(consegnaFee),
+      total_price: roundMoney(totalPrice),
     })
   }
 
@@ -468,7 +461,7 @@ export async function getDashboardReportingData(supabase: SupabaseServerClient):
 
     supabase
       .from('service_orders')
-      .select('completed_at, total_price, consegna_staff_id, cleaning_staff:profiles!service_order_cleaning_staff(id), worked_minutes, property:properties(avg_cleaning_hours)')
+      .select('completed_at, total_price, cleaning_staff:profiles!service_order_cleaning_staff(id), worked_minutes, property:properties(avg_cleaning_hours)')
       .eq('status', 'done')
       .gte('completed_at', threeMonthsAgoStart)
       .lte('completed_at', today),
@@ -502,7 +495,6 @@ export async function getDashboardReportingData(supabase: SupabaseServerClient):
   const recentOrders = unwrap<{
     completed_at: string | null
     total_price: number | null
-    consegna_staff_id: string | null
     cleaning_staff: { id: string }[] | null
     worked_minutes: number | null
     property: { avg_cleaning_hours: number | null } | null
@@ -523,7 +515,7 @@ export async function getDashboardReportingData(supabase: SupabaseServerClient):
     ),
   }))
 
-  const profilesMap = await fetchStaffProfiles(supabase, payableStaffIds(recentOrders), 'dashboard')
+  const profilesMap = await fetchStaffProfiles(supabase, cleaningStaffIds(recentOrders), 'dashboard')
 
   const staffCostByMonth: MonthStat[] = months.map(({ key, label }) => {
     const monthOrders = recentOrders.filter(order => datePrefix(order.completed_at) === key)
@@ -546,16 +538,6 @@ export async function getDashboardReportingData(supabase: SupabaseServerClient):
         }
       }
 
-      if (order.consegna_staff_id) {
-        const profile = profilesMap.get(order.consegna_staff_id)
-        if (profile) {
-          if (profile.monthly_salary != null) {
-            cost += profile.monthly_salary / 22
-          } else if (profile.hourly_rate != null) {
-            cost += profile.hourly_rate * hours
-          }
-        }
-      }
     }
 
     return { month: key, label, value: roundMoney(cost) }

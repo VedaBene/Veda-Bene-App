@@ -37,7 +37,9 @@ export type ReceivableDetailRow = {
   client_type: ClientType
   client_name: string
   real_guests: number | null
+  cleaning_price: number
   extra_services_price: number | null
+  consegna_fee: number
   total_price: number
 }
 

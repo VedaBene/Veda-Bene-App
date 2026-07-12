@@ -3,6 +3,7 @@ import type { SupabaseServerClient } from '@/lib/server/authz'
 
 const RIPASSO_RATE = 0.6
 const OUT_LONG_STAY_HOURLY_RATE = 25
+export const CONSEGNA_FEE = 10
 
 type PricingCtx = {
   basePrice: number | null
@@ -41,7 +42,7 @@ export function calculateTotalPrice(
   workedMinutes: number | null = null,
 ): number | null {
   const extras = extraServicesPrice ?? 0
-  return PRICING_STRATEGIES[pricingMode]({
+  const cleaningPrice = PRICING_STRATEGIES[pricingMode]({
     basePrice,
     extraPerPerson,
     realGuests,
@@ -49,6 +50,7 @@ export function calculateTotalPrice(
     extras,
     workedMinutes,
   })
+  return cleaningPrice == null ? null : cleaningPrice + CONSEGNA_FEE
 }
 
 // Recalcula `total_price` da OS quando worked_minutes acabou de ficar disponível

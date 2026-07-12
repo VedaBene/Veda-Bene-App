@@ -167,7 +167,7 @@ No método `getPayableDetailRows`:
 1. Carregar para cada OS os funcionários de limpeza vinculados através de uma relação join.
 2. Contar a quantidade total de funcionários vinculados àquela limpeza ($N$).
 3. Dividir as horas brutas: `const assignedHours = avg_cleaning_hours / cleaningStaffCount`.
-4. Gerar as linhas de remuneração proporcionalmente para cada um dos prestadores de limpeza vinculados (e integrar com o cálculo normal para o entregador - `consegna_staff_id`, cujas horas permanecem integrais ou não divididas, a depender da regra comercial existente).
+4. Gerar linhas de remuneração somente para os prestadores de limpeza vinculados. A `consegna_staff_id` não compõe horas nem valores a pagar; sua remuneração seguirá uma regra própria, fora deste cálculo.
 
 #### Exemplo de Fluxo:
 * Imóvel X tem tempo médio de **3 horas**.

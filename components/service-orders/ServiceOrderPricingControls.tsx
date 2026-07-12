@@ -156,6 +156,9 @@ export function ServiceOrderExtrasSection({
           Somma aggiuntiva al valore calcolato dalla modalità selezionata.
         </p>
       </Field>
+      <p className="sm:col-span-2 text-xs text-muted-foreground">
+        La Consegna di €10,00 viene aggiunta automaticamente al totale dell&apos;O.L. e non modifica il compenso del personale.
+      </p>
       {canSaveExtras && (
         <div className="sm:col-span-2">
           <Button type="button" variant="accent" isLoading={isSavingExtras} onClick={onSaveExtras}>
