@@ -94,10 +94,12 @@ apenas por possuir uma janela de limpeza menor.
 - Impressão/PDF: `components/service-orders/ServiceOrderActiveExport.tsx`.
 - Ordenação compartilhada: `components/service-orders/ordering.ts` e seu teste
   `components/service-orders/ordering.test.ts`.
+- Formatação de data/hora de Roma: `lib/utils/date-rome.ts`. O relógio do
+  cabeçalho fica em `components/ui/DateTimeDisplay.tsx`.
 
 ## Fuso Horário de Referência (Timezone)
 
 Todo o sistema utiliza o fuso horário oficial da Itália, `Europe/Rome`, como referência para manipulação, armazenamento e exibição de dados temporais.
 - A exibição e formatação de datas e horas na tela e nos relatórios PDF (inclusive de extratos a pagar/receber) utilizam `Europe/Rome` na conversão de timestamps TIMESTAMPTZ, garantindo que o fuso horário do usuário (ex: no Brasil) não desloque as datas das limpezas.
 - O cálculo do Modo Diário no servidor (todayStr) utiliza o fuso `Europe/Rome`.
-- O relógio em tempo real exibido no cabeçalho do painel (`DateTimeDisplay.tsx`) também é sincronizado com o fuso da Itália (`Europe/Rome`) e renderiza um placeholder inicial, adiando a formatação e atualização do relógio para após a montagem no cliente para evitar hydration mismatches do Next.js.
+- O relógio em tempo real exibido no cabeçalho do painel (`DateTimeDisplay.tsx`) também é sincronizado com o fuso da Itália (`Europe/Rome`). Ele usa `useSyncExternalStore`: o snapshot do servidor retorna `null`, mantendo o mesmo placeholder durante SSR e hidratação; no cliente, um snapshot por segundo passa a alimentar a formatação. Não use uma flag `mounted` atualizada sincronicamente em `useEffect`, pois esse padrão viola o lint e introduz uma renderização em cascata evitável.

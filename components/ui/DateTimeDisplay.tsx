@@ -1,22 +1,33 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useSyncExternalStore } from 'react'
 import { formatInRomeTimezone } from '@/lib/utils/date-rome'
 
+function subscribeToClock(onStoreChange: () => void) {
+  const timer = window.setInterval(onStoreChange, 1000)
+  return () => window.clearInterval(timer)
+}
+
+function getClockSnapshot() {
+  return Math.floor(Date.now() / 1000)
+}
+
+function getServerClockSnapshot() {
+  return null
+}
+
 export function DateTimeDisplay() {
-  const [mounted, setMounted] = useState(false)
-  const [date, setDate] = useState(() => new Date())
+  const epochSecond = useSyncExternalStore(
+    subscribeToClock,
+    getClockSnapshot,
+    getServerClockSnapshot,
+  )
 
-  useEffect(() => {
-    setMounted(true)
-    const timer = setInterval(() => setDate(new Date()), 1000)
-
-    return () => clearInterval(timer)
-  }, [])
-
-  if (!mounted) {
+  if (epochSecond === null) {
     return <div className="h-9 w-24 flex items-center justify-end text-right" />
   }
+
+  const date = new Date(epochSecond * 1000)
 
   // Formato: 14:30 no fuso de Roma (pt-BR)
   const timeStr = formatInRomeTimezone(date, { hour: '2-digit', minute: '2-digit' }, 'pt-BR')

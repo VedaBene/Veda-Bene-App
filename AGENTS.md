@@ -23,5 +23,5 @@ Supabase/Postgres/RLS, privileged helpers/RPCs, or the documented stage records.
 Qualquer rotina, helper, utilitário ou componente do frontend que manipule, compare ou formate datas e horas deve utilizar obrigatoriamente o timezone da Itália: `Europe/Rome`.
 - Não force fuso UTC para exibições e relatórios (como em formatadores de strings de data/hora do PDF e da tela).
 - Converta timestamps TIMESTAMPTZ de forma explícita especificando `{ timeZone: 'Europe/Rome' }`.
-- O relógio de cabeçalho (`DateTimeDisplay.tsx`) deve ser inicializado apenas no cliente (dentro de `useEffect`) para prevenir hydration mismatches do Next.js e formatado com a timezone italiana (`Europe/Rome`).
+- O relógio de cabeçalho (`DateTimeDisplay.tsx`) deve usar `useSyncExternalStore`: o snapshot de servidor retorna `null` para preservar o placeholder na hidratação e o snapshot do cliente atualiza a cada segundo. Não use uma flag `mounted` atualizada sincronicamente em `useEffect`, pois isso viola a regra `react-hooks/set-state-in-effect`.
 <!-- END:timezone-rules -->
