@@ -62,11 +62,34 @@ export function ServiceOrderList({
   const [finishNotes, setFinishNotes] = useState('')
   const [isTrackingAction, setIsTrackingAction] = useState(false)
 
-  useEffect(() => { setSearch(initialQ) }, [initialQ])
-  useEffect(() => { setCleaningStaffId(initialCleaningStaffId) }, [initialCleaningStaffId])
-  useEffect(() => { setConsegnaStaffId(initialConsegnaStaffId) }, [initialConsegnaStaffId])
-  useEffect(() => { setStartDate(initialStartDate) }, [initialStartDate])
-  useEffect(() => { setEndDate(initialEndDate) }, [initialEndDate])
+  const [prevInitial, setPrevInitial] = useState({
+    q: initialQ,
+    cleaningStaffId: initialCleaningStaffId,
+    consegnaStaffId: initialConsegnaStaffId,
+    startDate: initialStartDate,
+    endDate: initialEndDate,
+  })
+
+  if (
+    prevInitial.q !== initialQ ||
+    prevInitial.cleaningStaffId !== initialCleaningStaffId ||
+    prevInitial.consegnaStaffId !== initialConsegnaStaffId ||
+    prevInitial.startDate !== initialStartDate ||
+    prevInitial.endDate !== initialEndDate
+  ) {
+    setPrevInitial({
+      q: initialQ,
+      cleaningStaffId: initialCleaningStaffId,
+      consegnaStaffId: initialConsegnaStaffId,
+      startDate: initialStartDate,
+      endDate: initialEndDate,
+    })
+    setSearch(initialQ)
+    setCleaningStaffId(initialCleaningStaffId)
+    setConsegnaStaffId(initialConsegnaStaffId)
+    setStartDate(initialStartDate)
+    setEndDate(initialEndDate)
+  }
 
   const pushFilters = useCallback(
     (q: string, cleaningId: string, consegnaId: string, startD: string, endD: string) => {
@@ -85,16 +108,17 @@ export function ServiceOrderList({
   )
 
   useEffect(() => {
+    const isDirty =
+      search !== initialQ ||
+      cleaningStaffId !== initialCleaningStaffId ||
+      consegnaStaffId !== initialConsegnaStaffId ||
+      startDate !== initialStartDate ||
+      endDate !== initialEndDate
+
+    if (!isDirty) return
+
     const t = setTimeout(() => {
-      if (
-        search !== initialQ ||
-        cleaningStaffId !== initialCleaningStaffId ||
-        consegnaStaffId !== initialConsegnaStaffId ||
-        startDate !== initialStartDate ||
-        endDate !== initialEndDate
-      ) {
-        pushFilters(search, cleaningStaffId, consegnaStaffId, startDate, endDate)
-      }
+      pushFilters(search, cleaningStaffId, consegnaStaffId, startDate, endDate)
     }, 300)
     return () => clearTimeout(t)
   }, [search, cleaningStaffId, consegnaStaffId, startDate, endDate, initialQ, initialCleaningStaffId, initialConsegnaStaffId, initialStartDate, initialEndDate, pushFilters])

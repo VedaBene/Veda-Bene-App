@@ -5,4 +5,11 @@ Sentry.init({
   environment: process.env.NEXT_PUBLIC_SENTRY_ENVIRONMENT ?? process.env.NODE_ENV,
   enabled: Boolean(process.env.NEXT_PUBLIC_SENTRY_DSN),
   tracesSampleRate: 0,
+  normalizeDepth: 3,
+  beforeSend(event) {
+    if (event.exception?.values?.some(v => v.type === 'RangeError' && v.value?.includes('stack size'))) {
+      return null
+    }
+    return event
+  },
 })
