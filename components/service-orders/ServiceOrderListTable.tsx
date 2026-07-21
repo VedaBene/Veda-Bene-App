@@ -228,14 +228,14 @@ export function ServiceOrderListTable({
                       <PricingModeBadge mode={os.pricing_mode} />
                     </div>
                   </td>
-                  <td className="px-3 py-3 text-xs text-foreground/70 max-w-[180px] whitespace-pre-wrap break-words">{os.cleaning_notes || '—'}</td>
-                  <td className="px-3 py-3 text-center text-foreground/70">{formatDate(os.cleaning_date)}</td>
-                  <td className="px-3 py-3 text-center text-foreground/70">{formatDateTime(os.checkout_at)}</td>
-                  <td className="px-3 py-3 text-center text-foreground/70">{formatDateTime(os.checkin_at)}</td>
+                  <td className="px-3 py-3 text-xs text-foreground/70 max-w-[180px] whitespace-pre-wrap break-words"><span>{os.cleaning_notes || '—'}</span></td>
+                  <td className="px-3 py-3 text-center text-foreground/70"><span>{formatDate(os.cleaning_date)}</span></td>
+                  <td className="px-3 py-3 text-center text-foreground/70"><span>{formatDateTime(os.checkout_at)}</span></td>
+                  <td className="px-3 py-3 text-center text-foreground/70"><span>{formatDateTime(os.checkin_at)}</span></td>
                   {!isCliente && (
                     <>
-                      <td className="px-3 py-3 text-center text-foreground/70">{os.cleaning_staff?.map(s => s.full_name).join(', ') || '—'}</td>
-                      <td className="px-3 py-3 text-center text-foreground/70">{os.consegna_staff?.full_name ?? '—'}</td>
+                      <td className="px-3 py-3 text-center text-foreground/70"><span>{os.cleaning_staff?.map(s => s.full_name).join(', ') || '—'}</span></td>
+                      <td className="px-3 py-3 text-center text-foreground/70"><span>{os.consegna_staff?.full_name ?? '—'}</span></td>
                     </>
                   )}
                   <td className="px-3 py-3">

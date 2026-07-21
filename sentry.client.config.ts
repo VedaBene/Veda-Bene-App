@@ -6,6 +6,12 @@ Sentry.init({
   enabled: Boolean(process.env.NEXT_PUBLIC_SENTRY_DSN),
   tracesSampleRate: 0,
   normalizeDepth: 3,
+  ignoreErrors: [
+    /NotFoundError/i,
+    /The object can not be found here/i,
+    /Failed to execute 'removeChild'/i,
+    /The node to be removed is not a child of this node/i,
+  ],
   beforeSend(event) {
     if (event.exception?.values?.some(v => v.type === 'RangeError' && v.value?.includes('stack size'))) {
       return null
