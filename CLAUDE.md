@@ -43,6 +43,7 @@ Outras convenções importantes:
   - O relógio do cabeçalho (`DateTimeDisplay.tsx`) é uma fonte externa de tempo: usa `useSyncExternalStore`, retorna `null` no snapshot de servidor e só formata a data após a hidratação. Não substitua esse padrão por uma flag `mounted` atualizada sincronicamente em `useEffect`, pois ele gera erro de lint e uma renderização em cascata evitável.
 - **Sincronização de Filtros de URL**: Em `ServiceOrderList.tsx`, as props recebidas do servidor (`initialQ`, `initialStartDate`, etc.) são sincronizadas com o estado local durante a fase de renderização (*render-phase prop sync*), evitando espelhamento via `useEffect`. Isso previne loops de navegação reentrante via `router.replace` e erros de estouro de pilha (`JAVASCRIPT-NEXTJS-F`).
 - **Proteção contra Tradução Automática (DOM)**: Em `ServiceOrderListTable.tsx` e componentes de listagem, textos dinâmicos (datas, status e nomes) são envolvidos em tags `<span>` e exceções de DOM causadas por extensões/Google Translate são ignoradas em `sentry.client.config.ts` (`JAVASCRIPT-NEXTJS-G`).
+- **Key Boundaries para Componentes com Hooks**: Em `ServiceOrderListTable.tsx`, elementos renderizados condicionalmente contendo hooks internos (como `LiveTimer.tsx` e `TrackingActions`) possuem delimitadores `key` explícitos por item para prevenir falhas de reconciliação de hooks no React 19 (`JAVASCRIPT-NEXTJS-C`).
 
 ## Documentos de referência
 - [`docs/service-orders.md`](docs/service-orders.md) — regras atuais da listagem, filtros, prioridade operacional e PDFs de Ordens de Serviço

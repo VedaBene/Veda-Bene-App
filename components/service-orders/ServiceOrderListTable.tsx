@@ -163,7 +163,7 @@ export function ServiceOrderListTable({
                       </span>
                       <div className="flex items-center gap-1.5">
                         <Timer size={13} className="text-info" />
-                        <LiveTimer startedAt={os.started_at} />
+                        <LiveTimer key={`live-timer-mobile-${os.id}`} startedAt={os.started_at} />
                       </div>
                     </div>
                   )}
@@ -187,7 +187,7 @@ export function ServiceOrderListTable({
 
               {canOperate && (onStart || onFinish) && (
                 <div className="mt-3 pt-3 border-t border-border/50">
-                  <TrackingActions order={os} canOperate={canOperate} onStart={onStart} onFinish={onFinish} />
+                  <TrackingActions key={`tracking-actions-mobile-${os.id}`} order={os} canOperate={canOperate} onStart={onStart} onFinish={onFinish} />
                 </div>
               )}
             </div>
@@ -244,7 +244,7 @@ export function ServiceOrderListTable({
                       {!isCliente && os.status === 'in_progress' && os.started_at && (
                         <div className="flex items-center gap-1">
                           <Timer size={13} className="text-info" />
-                          <LiveTimer startedAt={os.started_at} />
+                          <LiveTimer key={`live-timer-desktop-${os.id}`} startedAt={os.started_at} />
                         </div>
                       )}
                       {!isCliente && os.status === 'done' && (os.completed_at || os.worked_minutes != null) && (
@@ -257,7 +257,7 @@ export function ServiceOrderListTable({
                   </td>
                   <td className="px-3 py-3 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      {canOperate && <TrackingActions order={os} canOperate={canOperate} onStart={onStart} onFinish={onFinish} compact />}
+                      {canOperate && <TrackingActions key={`tracking-actions-desktop-${os.id}`} order={os} canOperate={canOperate} onStart={onStart} onFinish={onFinish} compact />}
                       <Link href={`/service-orders/${os.id}`} className="text-xs font-medium text-accent hover:text-accent/80 transition-colors">
                         Vedi
                       </Link>
