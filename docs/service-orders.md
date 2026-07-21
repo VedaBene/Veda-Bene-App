@@ -90,7 +90,7 @@ apenas por possuir uma janela de limpeza menor.
 - Consulta, filtros e DTOs: `lib/server/data-access/service-orders.ts` e
   `lib/server/validation/contracts.ts`.
 - Orquestração da listagem: `components/service-orders/ServiceOrderList.tsx` (a sincronização entre props de URL e estado local é feita durante a fase de renderização, sem `useEffect`, evitando loops de navegação reentrante).
-- Tabela e cartões: `components/service-orders/ServiceOrderListTable.tsx`.
+- Tabela e cartões: `components/service-orders/ServiceOrderListTable.tsx` (textos dinâmicos são envelopados em `<span>` para proteção contra desalinhamentos DOM do tradutor automático do navegador).
 - Impressão/PDF: `components/service-orders/ServiceOrderActiveExport.tsx`.
 - Ordenação compartilhada: `components/service-orders/ordering.ts` e seu teste
   `components/service-orders/ordering.test.ts`.

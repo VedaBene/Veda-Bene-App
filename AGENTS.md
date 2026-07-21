@@ -25,4 +25,5 @@ Qualquer rotina, helper, utilitário ou componente do frontend que manipule, com
 - Converta timestamps TIMESTAMPTZ de forma explícita especificando `{ timeZone: 'Europe/Rome' }`.
 - O relógio de cabeçalho (`DateTimeDisplay.tsx`) deve usar `useSyncExternalStore`: o snapshot de servidor retorna `null` para preservar o placeholder na hidratação e o snapshot do cliente atualiza a cada segundo. Não use uma flag `mounted` atualizada sincronicamente em `useEffect`, pois isso viola a regra `react-hooks/set-state-in-effect`.
 - Filtros e sincronização de estado (`ServiceOrderList.tsx`): Não utilize `useEffect` para espelhar props de URL (`initialQ`, etc.) no estado local. Faça a sincronização durante a fase de renderização comparando a prop anterior com a atual para evitar loops de navegação reentrante e estouro de pilha (`RangeError` / `JAVASCRIPT-NEXTJS-F`).
+- Proteção contra Tradução Automática (Google Translate): Em componentes de tabelas e listas (`ServiceOrderListTable.tsx`), envolva textos dinâmicos em tags `<span>` para evitar exceções DOM (`NotFoundError` / `JAVASCRIPT-NEXTJS-G`) quando o navegador modifica nós da árvore do React.
 <!-- END:timezone-rules -->
