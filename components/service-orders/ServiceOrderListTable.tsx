@@ -47,7 +47,9 @@ function TrackingActions({
         onClick={() => onStart(order)}
         className={compact ? '' : 'w-full'}
       >
-        {compact ? 'Avvia' : 'Avvia Pulizia'}
+        <span className="notranslate" translate="no">
+          {compact ? 'Avvia' : 'Avvia Pulizia'}
+        </span>
       </Button>
     )
   }
@@ -60,7 +62,9 @@ function TrackingActions({
         onClick={() => onFinish(order)}
         className={compact ? '' : 'w-full'}
       >
-        {compact ? 'Completa' : 'Completa Pulizia'}
+        <span className="notranslate" translate="no">
+          {compact ? 'Completa' : 'Completa Pulizia'}
+        </span>
       </Button>
     )
   }
@@ -90,11 +94,12 @@ export function ServiceOrderListTable({
 
   return (
     <>
-      <div className="flex flex-col gap-3 px-3 py-3 md:hidden">
+      <div className="notranslate flex flex-col gap-3 px-3 py-3 md:hidden" translate="no">
         {orders.map((os) => {
           const canOperate = canOperateCleaningTracking(role, userId, os)
+          const trackingAction = canOperate ? getCleaningTrackingAction(os) : null
           return (
-            <div key={os.id} className="bg-card rounded-xl border border-border p-4 shadow-sm">
+            <div key={`${os.id}:${os.status}`} className="bg-card rounded-xl border border-border p-4 shadow-sm">
               <Link href={`/service-orders/${os.id}`} className="block active:scale-[0.98] transition-transform">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-[11px] font-mono text-muted-foreground bg-muted/60 px-2 py-1 rounded-md shrink-0 font-medium">
@@ -163,7 +168,7 @@ export function ServiceOrderListTable({
                       </span>
                       <div className="flex items-center gap-1.5">
                         <Timer size={13} className="text-info" />
-                        <LiveTimer key={`live-timer-mobile-${os.id}`} startedAt={os.started_at} />
+                        <LiveTimer key={`live-timer-mobile-${os.id}-${os.status}-${os.started_at}`} startedAt={os.started_at} />
                       </div>
                     </div>
                   )}
@@ -187,7 +192,7 @@ export function ServiceOrderListTable({
 
               {canOperate && (onStart || onFinish) && (
                 <div className="mt-3 pt-3 border-t border-border/50">
-                  <TrackingActions key={`tracking-actions-mobile-${os.id}`} order={os} canOperate={canOperate} onStart={onStart} onFinish={onFinish} />
+                  <TrackingActions key={`tracking-actions-mobile-${os.id}-${os.status}-${trackingAction ?? 'none'}`} order={os} canOperate={canOperate} onStart={onStart} onFinish={onFinish} />
                 </div>
               )}
             </div>
@@ -195,7 +200,7 @@ export function ServiceOrderListTable({
         })}
       </div>
 
-      <div className="hidden md:block overflow-x-auto">
+      <div className="notranslate hidden md:block overflow-x-auto" translate="no">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border/50 bg-muted/30">
@@ -218,8 +223,9 @@ export function ServiceOrderListTable({
           <tbody className="divide-y divide-border/30">
             {orders.map((os) => {
               const canOperate = canOperateCleaningTracking(role, userId, os)
+              const trackingAction = canOperate ? getCleaningTrackingAction(os) : null
               return (
-                <tr key={os.id} className="transition-colors hover:bg-muted/30">
+                <tr key={`${os.id}:${os.status}`} className="transition-colors hover:bg-muted/30">
                   <td className="px-3 py-3 text-foreground/50 text-xs font-mono">#{os.order_number}</td>
                   <td className="px-3 py-3">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -244,7 +250,7 @@ export function ServiceOrderListTable({
                       {!isCliente && os.status === 'in_progress' && os.started_at && (
                         <div className="flex items-center gap-1">
                           <Timer size={13} className="text-info" />
-                          <LiveTimer key={`live-timer-desktop-${os.id}`} startedAt={os.started_at} />
+                          <LiveTimer key={`live-timer-desktop-${os.id}-${os.status}-${os.started_at}`} startedAt={os.started_at} />
                         </div>
                       )}
                       {!isCliente && os.status === 'done' && (os.completed_at || os.worked_minutes != null) && (
@@ -257,7 +263,7 @@ export function ServiceOrderListTable({
                   </td>
                   <td className="px-3 py-3 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      {canOperate && <TrackingActions key={`tracking-actions-desktop-${os.id}`} order={os} canOperate={canOperate} onStart={onStart} onFinish={onFinish} compact />}
+                      {canOperate && <TrackingActions key={`tracking-actions-desktop-${os.id}-${os.status}-${trackingAction ?? 'none'}`} order={os} canOperate={canOperate} onStart={onStart} onFinish={onFinish} compact />}
                       <Link href={`/service-orders/${os.id}`} className="text-xs font-medium text-accent hover:text-accent/80 transition-colors">
                         Vedi
                       </Link>

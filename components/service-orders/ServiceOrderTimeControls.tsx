@@ -29,7 +29,7 @@ export function TimeTrackingPanel({
   })
 
   return (
-    <div className="p-4 bg-card rounded-xl border border-border shadow-card space-y-3">
+    <div className="notranslate p-4 bg-card rounded-xl border border-border shadow-card space-y-3" translate="no">
       <div className="flex items-center gap-2">
         <Timer size={16} className="text-accent" />
         <span className="text-sm font-semibold text-foreground">Controllo Tempo</span>
@@ -41,7 +41,7 @@ export function TimeTrackingPanel({
             Clicca sotto per avviare la pulizia e registrare l&apos;orario di inizio.
           </p>
           <Button type="button" variant="accent" icon={<Play size={15} />} onClick={onOpenStart}>
-            Avvia Pulizia
+            <span className="notranslate" translate="no">Avvia Pulizia</span>
           </Button>
         </div>
       )}
@@ -53,7 +53,7 @@ export function TimeTrackingPanel({
             {startedAt ? <LiveTimer startedAt={startedAt} /> : <span className="text-sm font-medium">—</span>}
           </div>
           <Button type="button" variant="accent" icon={<Flag size={15} />} onClick={onOpenFinish}>
-            Completa Pulizia
+            <span className="notranslate" translate="no">Completa Pulizia</span>
           </Button>
         </div>
       )}
@@ -82,7 +82,7 @@ export function TimeSummaryPanel({
   completionNotes: string | null | undefined
 }) {
   return (
-    <div className="p-4 bg-card rounded-xl border border-border shadow-card space-y-2">
+    <div className="notranslate p-4 bg-card rounded-xl border border-border shadow-card space-y-2" translate="no">
       <div className="flex items-center gap-2">
         <Timer size={16} className="text-accent" />
         <span className="text-sm font-semibold text-foreground">Riepilogo Tempo</span>
@@ -109,6 +109,7 @@ export function StartCleaningModal({
   onConfirm,
   details,
   cleaningNotes,
+  photoUploader,
 }: {
   propertyName: string | null | undefined
   isLoading: boolean
@@ -116,22 +117,23 @@ export function StartCleaningModal({
   onConfirm: () => void
   details?: ReactNode
   cleaningNotes?: string | null
+  photoUploader?: ReactNode
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <div className="bg-card border border-border rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4 space-y-4">
+    <div className="notranslate fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" translate="no">
+      <div className="bg-card border border-border rounded-2xl shadow-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto mx-4 space-y-4">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-2">
             <Play size={18} className="text-accent" />
             <h2 className="text-base font-semibold text-foreground">Avvia Pulizia</h2>
           </div>
-          <button type="button" onClick={onCancel} className="text-muted-foreground hover:text-foreground transition-colors">
+          <button type="button" disabled={isLoading} onClick={onCancel} className="text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50">
             <X size={18} />
           </button>
         </div>
         <div className="rounded-xl bg-muted/40 border border-border/50 px-4 py-3 space-y-1">
           <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Immobile</p>
-          <p className="text-sm font-semibold text-foreground">{propertyName ?? '—'}</p>
+          <p className="text-sm font-semibold text-foreground"><span>{propertyName ?? '—'}</span></p>
           {details}
         </div>
         {cleaningNotes && (
@@ -145,15 +147,16 @@ export function StartCleaningModal({
             </div>
           </div>
         )}
+        {photoUploader}
         <p className="text-sm text-muted-foreground">
           Alla conferma, l&apos;orario di inizio verrà registrato e lo stato passerà a <strong>In corso</strong>.
         </p>
         <div className="flex gap-2 pt-1">
-          <Button type="button" variant="ghost" onClick={onCancel} className="flex-1">
-            Annulla
+          <Button type="button" variant="ghost" disabled={isLoading} onClick={onCancel} className="flex-1">
+            <span className="notranslate" translate="no">Annulla</span>
           </Button>
           <Button type="button" variant="accent" isLoading={isLoading} onClick={onConfirm} className="flex-1">
-            Conferma
+            <span className="notranslate" translate="no">Conferma</span>
           </Button>
         </div>
       </div>
@@ -171,6 +174,7 @@ export function FinishCleaningModal({
   details,
   placeholder = "Problemi nell'immobile, eventi, note generali…",
   showOptionalLabel = true,
+  photoUploader,
 }: {
   propertyName: string | null | undefined
   notes: string
@@ -181,22 +185,23 @@ export function FinishCleaningModal({
   details?: ReactNode
   placeholder?: string
   showOptionalLabel?: boolean
+  photoUploader?: ReactNode
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <div className="bg-card border border-border rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4 space-y-4">
+    <div className="notranslate fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" translate="no">
+      <div className="bg-card border border-border rounded-2xl shadow-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto mx-4 space-y-4">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-2">
             <Flag size={18} className="text-accent" />
             <h2 className="text-base font-semibold text-foreground">Completa Pulizia</h2>
           </div>
-          <button type="button" onClick={onCancel} className="text-muted-foreground hover:text-foreground transition-colors">
+          <button type="button" disabled={isLoading} onClick={onCancel} className="text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50">
             <X size={18} />
           </button>
         </div>
         <div className="rounded-xl bg-muted/40 border border-border/50 px-4 py-3 space-y-1">
           <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Immobile</p>
-          <p className="text-sm font-semibold text-foreground">{propertyName ?? '—'}</p>
+          <p className="text-sm font-semibold text-foreground"><span>{propertyName ?? '—'}</span></p>
           {details}
         </div>
         <div className="space-y-1.5">
@@ -211,15 +216,16 @@ export function FinishCleaningModal({
             className="w-full px-3 py-2.5 border border-input-border rounded-lg text-sm text-foreground bg-white resize-none transition-all focus:ring-2 focus:ring-input-focus/20 focus:border-input-focus outline-none placeholder:text-muted-foreground/50"
           />
         </div>
+        {photoUploader}
         <p className="text-sm text-muted-foreground">
           L&apos;orario di completamento verrà registrato e il tempo totale verrà calcolato automaticamente.
         </p>
         <div className="flex gap-2 pt-1">
-          <Button type="button" variant="ghost" onClick={onCancel} className="flex-1">
-            Annulla
+          <Button type="button" variant="ghost" disabled={isLoading} onClick={onCancel} className="flex-1">
+            <span className="notranslate" translate="no">Annulla</span>
           </Button>
           <Button type="button" variant="accent" isLoading={isLoading} onClick={onConfirm} className="flex-1">
-            Conferma
+            <span className="notranslate" translate="no">Conferma</span>
           </Button>
         </div>
       </div>

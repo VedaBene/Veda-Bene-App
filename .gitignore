@@ -24,6 +24,7 @@
 .DS_Store
 *.pem
 /supabase/.temp
+/supabase/.branches
 
 # debug
 npm-debug.log*

@@ -17,6 +17,8 @@ import { formatDateTime } from './display'
 import { compareServiceOrderPriority } from './ordering'
 
 import type { StaffOption } from '@/lib/types/view-models'
+import { CleaningPhotoUploader } from './CleaningPhotoUploader'
+import { useCleaningPhotoWorkflow } from './useCleaningPhotoWorkflow'
 
 export function ServiceOrderList({
   active,
@@ -33,6 +35,7 @@ export function ServiceOrderList({
   initialStartDate,
   initialEndDate,
   staff,
+  cleaningPhotosEnabled = false,
 }: {
   active: ServiceOrderListItem[]
   done: ServiceOrderListItem[]
@@ -48,6 +51,7 @@ export function ServiceOrderList({
   initialStartDate: string
   initialEndDate: string
   staff: StaffOption[]
+  cleaningPhotosEnabled?: boolean
 }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -61,6 +65,8 @@ export function ServiceOrderList({
   const [finishModalOrder, setFinishModalOrder] = useState<ServiceOrderListItem | null>(null)
   const [finishNotes, setFinishNotes] = useState('')
   const [isTrackingAction, setIsTrackingAction] = useState(false)
+  const beforePhotos = useCleaningPhotoWorkflow(startModalOrder?.id ?? '', 'before', cleaningPhotosEnabled)
+  const afterPhotos = useCleaningPhotoWorkflow(finishModalOrder?.id ?? '', 'after', cleaningPhotosEnabled)
 
   const [prevInitial, setPrevInitial] = useState({
     q: initialQ,
@@ -159,10 +165,12 @@ export function ServiceOrderList({
     if (!startModalOrder) return
     setIsTrackingAction(true)
     try {
-      const result = await startCleaning(startModalOrder.id)
+      const photoIds = await beforePhotos.uploadAll()
+      const result = await startCleaning(startModalOrder.id, photoIds)
       if (result?.error) {
         alert(result.error)
       } else {
+        beforePhotos.reset()
         setStartModalOrder(null)
         startTransition(() => router.refresh())
       }
@@ -187,10 +195,12 @@ export function ServiceOrderList({
     if (!finishModalOrder) return
     setIsTrackingAction(true)
     try {
-      const result = await finishCleaning(finishModalOrder.id, finishNotes)
+      const photoIds = await afterPhotos.uploadAll()
+      const result = await finishCleaning(finishModalOrder.id, finishNotes, photoIds)
       if (result?.error) {
         alert(result.error)
       } else {
+        afterPhotos.reset()
         setFinishModalOrder(null)
         setFinishNotes('')
         startTransition(() => router.refresh())
@@ -212,13 +222,14 @@ export function ServiceOrderList({
     }
   }
 
-  function closeFinishModal() {
+  async function closeFinishModal() {
+    await afterPhotos.discardAll()
     setFinishModalOrder(null)
     setFinishNotes('')
   }
 
   return (
-    <div className="space-y-5">
+    <div className="notranslate space-y-5" translate="no">
       <ServiceOrderFilters
         search={search}
         cleaningStaffId={cleaningStaffId}
@@ -302,11 +313,21 @@ export function ServiceOrderList({
         <StartCleaningModal
           key={`start-modal-${startModalOrder.id}`}
           propertyName={startModalOrder.property?.name}
-          isLoading={isTrackingAction}
-          onCancel={() => setStartModalOrder(null)}
+          isLoading={isTrackingAction || beforePhotos.isUploading}
+          onCancel={async () => { await beforePhotos.discardAll(); setStartModalOrder(null) }}
           onConfirm={handleStartCleaning}
           details={<StartOrderDetails order={startModalOrder} />}
           cleaningNotes={startModalOrder.cleaning_notes}
+          photoUploader={cleaningPhotosEnabled ? (
+            <CleaningPhotoUploader
+              phase="before"
+              items={beforePhotos.items}
+              error={beforePhotos.selectionError}
+              disabled={isTrackingAction || beforePhotos.isUploading}
+              onFiles={beforePhotos.addFiles}
+              onRemove={beforePhotos.removeItem}
+            />
+          ) : undefined}
         />
       )}
 
@@ -315,13 +336,23 @@ export function ServiceOrderList({
           key={`finish-modal-${finishModalOrder.id}`}
           propertyName={finishModalOrder.property?.name}
           notes={finishNotes}
-          isLoading={isTrackingAction}
+          isLoading={isTrackingAction || afterPhotos.isUploading}
           onNotesChange={setFinishNotes}
           onCancel={closeFinishModal}
           onConfirm={handleFinishCleaning}
           details={<FinishOrderDetails order={finishModalOrder} />}
           placeholder="Tutto OK, problemi riscontrati, note generali…"
           showOptionalLabel={false}
+          photoUploader={cleaningPhotosEnabled ? (
+            <CleaningPhotoUploader
+              phase="after"
+              items={afterPhotos.items}
+              error={afterPhotos.selectionError}
+              disabled={isTrackingAction || afterPhotos.isUploading}
+              onFiles={afterPhotos.addFiles}
+              onRemove={afterPhotos.removeItem}
+            />
+          ) : undefined}
         />
       )}
     </div>

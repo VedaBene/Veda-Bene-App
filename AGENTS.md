@@ -36,3 +36,17 @@ Qualquer rotina, helper, utilitário ou componente do frontend que manipule, com
 - Realize as modificações, implementações e testes necessários no código localmente.
 - Execute comandos de `git commit` ou `git push` **apenas quando o usuário solicitar expressamente**.
 <!-- END:git-rules -->
+
+<!-- BEGIN:production-data-safety-rules -->
+# Regra Absoluta de Integridade dos Dados de Produção
+
+- Durante desenvolvimento, manutenção, correções, refatorações e migrações, a preservação integral dos dados existentes em produção tem prioridade sobre qualquer entrega ou prazo.
+- É proibido usar scripts, migrações ou comandos de manutenção destrutivos em produção, incluindo `DROP TABLE`, `DROP SCHEMA`, `DROP DATABASE`, `TRUNCATE`, exclusão de dados, recriação/reset do banco e `supabase db reset --linked`.
+- Toda evolução do banco deve usar migrações incrementais, aditivas, compatíveis com a versão anterior da aplicação e preservadoras dos dados existentes.
+- Antes de qualquer alteração de banco, é obrigatório documentar análise de impacto, pré-condições, invariantes verificáveis, testes, estratégia de implantação e rollback não destrutivo.
+- O rollback padrão de banco é desativar a funcionalidade, reimplantar uma versão compatível e aplicar uma correção progressiva. Não remover tabelas, colunas, buckets ou registros para reverter uma entrega.
+- Esta regra não altera funcionalidades CRUD nem ações de usuários/administradores previstas nas regras de negócio. Exclusões autorizadas pela aplicação permanecem válidas e devem conservar seus controles de autenticação, autorização e auditoria existentes.
+- Uma operação destrutiva só pode ser considerada como exceção extrema, com justificativa técnica escrita, aprovação prévia e expressa do responsável pelo projeto, backup confirmado, restauração ensaiada em ambiente isolado e validação pós-operação. Sem todos esses requisitos, a operação permanece proibida.
+- Nunca aplique migração, comando SQL mutável ou alteração de Storage no Supabase de produção sem autorização explícita e específica do usuário para essa execução.
+- Consulte `docs/production-data-safety.md` antes de alterar schema, dados, RLS, funções, triggers, grants, buckets ou políticas de Storage.
+<!-- END:production-data-safety-rules -->

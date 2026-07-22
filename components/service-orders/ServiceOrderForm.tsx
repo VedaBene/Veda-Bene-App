@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useTransition, type FormEvent } from 'react'
+import { useEffect, useState, useTransition, type FormEvent, type ReactNode } from 'react'
 import {
   createServiceOrder,
   finishCleaning,
@@ -34,6 +34,8 @@ import {
   TimeTrackingPanel,
 } from './ServiceOrderTimeControls'
 import { hoursUntil } from './display'
+import { CleaningPhotoUploader } from './CleaningPhotoUploader'
+import { useCleaningPhotoWorkflow } from './useCleaningPhotoWorkflow'
 
 export function ServiceOrderForm({
   order,
@@ -43,6 +45,8 @@ export function ServiceOrderForm({
   userId,
   deleteAction,
   readOnly = false,
+  cleaningPhotosEnabled = false,
+  photoGallery,
 }: {
   order?: ServiceOrderFormData
   properties: ServiceOrderPropertyOption[]
@@ -51,6 +55,8 @@ export function ServiceOrderForm({
   userId?: string
   deleteAction?: () => Promise<{ success: false; error: string } | void>
   readOnly?: boolean
+  cleaningPhotosEnabled?: boolean
+  photoGallery?: ReactNode
 }) {
   const [isPending, startTransition] = useTransition()
   const [isDeleting, setIsDeleting] = useState(false)
@@ -63,6 +69,8 @@ export function ServiceOrderForm({
   const [finishNotes, setFinishNotes] = useState('')
   const [isTrackingAction, setIsTrackingAction] = useState(false)
   const [isSavingExtras, setIsSavingExtras] = useState(false)
+  const beforePhotos = useCleaningPhotoWorkflow(order?.id ?? '', 'before', cleaningPhotosEnabled)
+  const afterPhotos = useCleaningPhotoWorkflow(order?.id ?? '', 'after', cleaningPhotosEnabled)
 
   const [open, setOpen] = useState({ imovel: true, visita: true, ocupacao: false, obsLimpeza: false, extras: false })
   const toggle = (s: keyof typeof open) => setOpen(prev => ({ ...prev, [s]: !prev[s] }))
@@ -189,21 +197,41 @@ export function ServiceOrderForm({
     if (!order) return
     setIsTrackingAction(true)
     setError(null)
-    const result = await startCleaning(order.id)
-    if (result && !result.success) setError(result.error)
-    setIsTrackingAction(false)
-    setShowStartModal(false)
+    try {
+      const photoIds = await beforePhotos.uploadAll()
+      const result = await startCleaning(order.id, photoIds)
+      if (result && !result.success) {
+        setError(result.error)
+        return
+      }
+      beforePhotos.reset()
+      setShowStartModal(false)
+    } catch (actionError) {
+      setError(actionError instanceof Error ? actionError.message : 'Errore durante l’avvio della pulizia.')
+    } finally {
+      setIsTrackingAction(false)
+    }
   }
 
   async function handleFinishCleaning() {
     if (!order) return
     setIsTrackingAction(true)
     setError(null)
-    const result = await finishCleaning(order.id, finishNotes)
-    if (result && !result.success) setError(result.error)
-    setIsTrackingAction(false)
-    setShowFinishModal(false)
-    setFinishNotes('')
+    try {
+      const photoIds = await afterPhotos.uploadAll()
+      const result = await finishCleaning(order.id, finishNotes, photoIds)
+      if (result && !result.success) {
+        setError(result.error)
+        return
+      }
+      afterPhotos.reset()
+      setShowFinishModal(false)
+      setFinishNotes('')
+    } catch (actionError) {
+      setError(actionError instanceof Error ? actionError.message : 'Errore durante il completamento della pulizia.')
+    } finally {
+      setIsTrackingAction(false)
+    }
   }
 
   async function handleSaveExtras() {
@@ -244,13 +272,25 @@ export function ServiceOrderForm({
         <TimeSummaryPanel workedMinutes={order.worked_minutes} completionNotes={order.completion_notes} />
       )}
 
+      {photoGallery}
+
       {showStartModal && order && (
         <StartCleaningModal
           propertyName={selectedProperty?.name}
-          isLoading={isTrackingAction}
-          onCancel={() => setShowStartModal(false)}
+          isLoading={isTrackingAction || beforePhotos.isUploading}
+          onCancel={async () => { await beforePhotos.discardAll(); setShowStartModal(false) }}
           onConfirm={handleStartCleaning}
           cleaningNotes={cleaningNotes}
+          photoUploader={cleaningPhotosEnabled ? (
+            <CleaningPhotoUploader
+              phase="before"
+              items={beforePhotos.items}
+              error={beforePhotos.selectionError}
+              disabled={isTrackingAction || beforePhotos.isUploading}
+              onFiles={beforePhotos.addFiles}
+              onRemove={beforePhotos.removeItem}
+            />
+          ) : undefined}
         />
       )}
 
@@ -258,10 +298,20 @@ export function ServiceOrderForm({
         <FinishCleaningModal
           propertyName={selectedProperty?.name}
           notes={finishNotes}
-          isLoading={isTrackingAction}
+          isLoading={isTrackingAction || afterPhotos.isUploading}
           onNotesChange={setFinishNotes}
-          onCancel={() => { setShowFinishModal(false); setFinishNotes('') }}
+          onCancel={async () => { await afterPhotos.discardAll(); setShowFinishModal(false); setFinishNotes('') }}
           onConfirm={handleFinishCleaning}
+          photoUploader={cleaningPhotosEnabled ? (
+            <CleaningPhotoUploader
+              phase="after"
+              items={afterPhotos.items}
+              error={afterPhotos.selectionError}
+              disabled={isTrackingAction || afterPhotos.isUploading}
+              onFiles={afterPhotos.addFiles}
+              onRemove={afterPhotos.removeItem}
+            />
+          ) : undefined}
         />
       )}
 

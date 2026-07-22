@@ -35,3 +35,16 @@ The following security hardening migrations were applied after reconciliation:
 
 After these migrations, the local and remote migration histories are aligned
 through `20260427110000`.
+
+## Reconciliation on 2026-07-21
+
+The SQL recorded in the remote migration history was compared with the local
+files for the two later migrations below. Their contents matched; only the local
+timestamps differed. The files were renamed locally to the canonical versions
+already recorded in production:
+
+- `20260702010536_multi_staff_cleaning.sql`
+- `20260712033748_add_consegna_fee_to_service_orders.sql`
+
+No SQL was executed and no production migration history was edited during this
+reconciliation.

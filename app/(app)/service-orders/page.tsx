@@ -6,6 +6,7 @@ import { Plus } from 'lucide-react'
 import { getCurrentViewer } from '@/lib/server/data-access/viewer'
 import { getServiceOrderList, getServiceOrderFormOptions } from '@/lib/server/data-access/service-orders'
 import { serviceOrderListSearchParamsSchema } from '@/lib/server/validation/contracts'
+import { isCleaningPhotosEnabled } from '@/lib/server/features'
 
 const DONE_PAGE_SIZE = 20
 
@@ -62,6 +63,7 @@ export default async function ServiceOrdersPage(props: PageProps<never>) {
         initialStartDate={filters.startDate ?? ''}
         initialEndDate={filters.endDate ?? ''}
         staff={viewer.role === 'cliente' ? [] : staff}
+        cleaningPhotosEnabled={isCleaningPhotosEnabled()}
       />
     </div>
   )

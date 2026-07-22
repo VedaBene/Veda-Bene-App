@@ -6,6 +6,7 @@ export default defineConfig({
     tsconfigPaths: true,
     alias: {
       'server-only': fileURLToPath(new URL('./test/server-only.ts', import.meta.url)),
+      'client-only': fileURLToPath(new URL('./test/client-only.ts', import.meta.url)),
     },
   },
   test: {

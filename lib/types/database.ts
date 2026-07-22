@@ -100,6 +100,7 @@ export type ServiceOrder = {
   completed_at?: string | null
   completion_notes?: string | null
   worked_minutes?: number | null
+  cleaning_cycle: number
   cleaning_notes?: string | null
   extra_services_description?: string | null
   extra_services_price?: number | null

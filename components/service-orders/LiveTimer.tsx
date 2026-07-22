@@ -29,5 +29,5 @@ export function LiveTimer({ startedAt }: { startedAt: string }) {
     ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
     : `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 
-  return <span className="font-mono text-sm font-semibold tabular-nums">{parts}</span>
+  return <span className="notranslate font-mono text-sm font-semibold tabular-nums" translate="no">{parts}</span>
 }

@@ -65,8 +65,21 @@ apenas por possuir uma janela de limpeza menor.
 - As transições são condicionais no servidor para que operações simultâneas não
   sobrescrevam os horários já registrados.
 - Administrador e secretária podem reabrir uma OS. A reabertura limpa
-  `started_at`, `completed_at` e as notas de conclusão para iniciar um novo ciclo
-  de rastreamento.
+  `started_at`, `completed_at` e as notas de conclusão, incrementa
+  `cleaning_cycle` e preserva as fotos dos ciclos anteriores.
+
+## Fotos antes e depois da limpeza
+
+- Com `CLEANING_PHOTOS_ENABLED=true`, os pop-ups de início e conclusão aceitam
+  até oito fotos opcionais para as fases `before` e `after`.
+- As imagens são comprimidas no navegador, gravadas em bucket privado e só
+  aparecem após verificação server-side.
+- A galeria fica no detalhe de uma O.S. concluída e organiza fotos por ciclo,
+  separando claramente **Prima** e **Dopo**.
+- Clientes veem somente fotos de suas próprias O.S. concluídas; exclusão é
+  exclusiva do administrador.
+- Arquitetura, limites, implantação e rollback estão documentados em
+  [`service-order-photos.md`](service-order-photos.md) e no [ADR 012](decisions/012-fotos-privadas-por-ciclo-da-ordem-de-servico.md).
 
 ## PDFs por status
 

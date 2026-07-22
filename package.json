@@ -2,12 +2,16 @@
   "name": "veda-bene",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "local:seed:photos": "node --env-file=.env.development.local scripts/setup-local-photo-test.mjs"
   },
   "dependencies": {
     "@sentry/nextjs": "^10.50.0",
@@ -16,7 +20,7 @@
     "date-fns": "^4.1.0",
     "jwt-decode": "^4.0.0",
     "lucide-react": "^1.8.0",
-    "next": "16.2.3",
+    "next": "16.2.10",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "recharts": "^3.8.1",
@@ -24,11 +28,11 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
+    "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.2.3",
+    "eslint-config-next": "16.2.10",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.1.6"

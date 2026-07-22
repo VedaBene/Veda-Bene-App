@@ -29,8 +29,10 @@ As decisões com maior peso e nuance estão registradas em [`docs/decisions/`](d
 - [ADR 006](docs/decisions/006-rpcs-privilegiadas-sem-execucao-direta.md) — RPCs `SECURITY DEFINER` em `public` não ficam executáveis diretamente por `anon`/`authenticated`
 - [ADR 007](docs/decisions/007-exposicao-de-notas-de-limpeza-para-todos-os-perfis.md) — Notas de limpeza são visíveis para todos os perfis que já podem ler a OS
 - [ADR 008](docs/decisions/008-controles-seguranca-autenticacao.md) — Timeout de sessão por inatividade e bloqueio temporário após falhas de login
+- [ADR 012](docs/decisions/012-fotos-privadas-por-ciclo-da-ordem-de-servico.md) — Fotos privadas antes/depois por ciclo, com URLs assinadas e publicação em duas fases
 
 Outras convenções importantes:
+- **Integridade dos dados durante desenvolvimento/manutenção (regra absoluta)**: scripts, migrações e operações de manutenção não podem apagar, recriar ou sobrescrever dados e estruturas existentes em produção. Evoluções de banco devem ser incrementais, aditivas e compatíveis; exigem análise de impacto, invariantes verificáveis e rollback não destrutivo. A regra não modifica o CRUD autorizado nem as ações previstas pelas regras de negócio. Leia obrigatoriamente [`docs/production-data-safety.md`](docs/production-data-safety.md) antes de alterar banco, RLS ou Storage.
 - **`is_urgent`** na tabela `service_orders`: coluna `GENERATED ALWAYS AS STORED` — não pode ser inserida manualmente. É `true` quando `(checkin_at - checkout_at) <= 3h` (3 horas ou menos).
 - **Ordenação de OSs em Aberto**: Na listagem do aplicativo (seção "Aperti") e nos PDFs consolidados de ordens ativas, as ordens de serviço são ordenadas primeiro por `cleaning_date` crescente. Dentro da mesma data, a prioridade é o menor intervalo disponível de limpeza (`checkin_at - checkout_at`). Ordens sem data aparecem por último; dentro de uma data, ordens sem horários de check-in/check-out definidos aparecem após as que possuem uma janela calculável. O desempate final usa `order_number` crescente.
 - **Supabase clients**: `utils/supabase/{client,server,middleware}.ts` para uso comum. `utils/supabase/admin.ts` é um adapter admin server-only; não exporta o client service-role bruto e expõe apenas operações administrativas explícitas. O `middleware.ts` aqui é convenção do `@supabase/ssr`, não do Next.js — o arquivo de proxy do Next.js está na raiz como `proxy.ts` (ver ADR 004).
@@ -46,6 +48,7 @@ Outras convenções importantes:
 - **Key Boundaries para Componentes com Hooks**: Em `ServiceOrderListTable.tsx`, elementos renderizados condicionalmente contendo hooks internos (como `LiveTimer.tsx` e `TrackingActions`) possuem delimitadores `key` explícitos por item para prevenir falhas de reconciliação de hooks no React 19 (`JAVASCRIPT-NEXTJS-C`).
 
 ## Documentos de referência
+- [`docs/production-data-safety.md`](docs/production-data-safety.md) — política obrigatória de preservação de dados, migrações e rollback em produção
 - [`docs/service-orders.md`](docs/service-orders.md) — regras atuais da listagem, filtros, prioridade operacional e PDFs de Ordens de Serviço
 - `~/Downloads/prd-veda-bene.md` — PRD completo (schema SQL, RLS, padrões de código)
 - `~/Downloads/Spec_1.md` — Plano tático de implementação arquivo a arquivo (derivado do PRD)

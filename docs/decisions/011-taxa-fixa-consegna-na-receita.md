@@ -21,7 +21,7 @@ históricos já gravados.
    remuneradas, custo de equipe ou a regra futura de remuneração da Consegna.
 4. `A Receber` e seu PDF mostram separadamente limpeza, serviços extras,
    Consegna e total da OS.
-5. A migração `20260712032456_add_consegna_fee_to_service_orders.sql` atribui
+5. A migração `20260712033748_add_consegna_fee_to_service_orders.sql` atribui
    a taxa a todas as OSs existentes e adiciona €10 aos `total_price` já
    calculados, uma única vez.
 

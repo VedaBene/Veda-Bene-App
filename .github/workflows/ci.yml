@@ -8,7 +8,7 @@ on:
 
 jobs:
   verify:
-    name: Lint, Typecheck & Test
+    name: Lint, Typecheck, Test & Build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -29,3 +29,6 @@ jobs:
 
       - name: Test
         run: npm test
+
+      - name: Production build
+        run: npm run build

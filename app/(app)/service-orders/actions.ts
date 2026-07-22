@@ -5,8 +5,14 @@ import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { getAuthorizedClient } from '@/lib/server/authz'
 import { calculateTotalPrice, loadOrderPricingContext, recalculateOrderPricing } from '@/lib/server/pricing'
-import { withLogging } from '@/lib/server/logger'
+import { captureQueryError, withLogging } from '@/lib/server/logger'
 import { validateCleaningTrackingTransition } from '@/lib/service-order-tracking'
+import { isCleaningPhotosEnabled } from '@/lib/server/features'
+import { validateReadyPhotosForTransition } from '@/lib/server/service-order-photos'
+import {
+  deletePhotoObjects,
+  listPhotoRecordsForOrder,
+} from '@/lib/server/storage/service-order-photo-storage'
 import {
   nonNegativeMoneySchema,
   optionalDateOnlySchema,
@@ -216,17 +222,33 @@ async function reopenServiceOrderImpl(id: string) {
 
   const { supabase } = await getAuthorizedClient()
 
-  const { error } = await supabase
+  const { data: order, error: loadError } = await supabase
+    .from('service_orders')
+    .select('status, cleaning_cycle')
+    .eq('id', parsedId.data)
+    .maybeSingle()
+
+  if (loadError) return { success: false as const, error: loadError.message }
+  if (!order) return { success: false as const, error: 'O.L. non trovato o non autorizzato.' }
+  if (order.status !== 'done') return { success: false as const, error: 'Solo una pulizia completata può essere riaperta.' }
+
+  const { data: reopenedOrder, error } = await supabase
     .from('service_orders')
     .update({
       status: 'open',
       started_at: null,
       completed_at: null,
       completion_notes: null,
+      cleaning_cycle: order.cleaning_cycle + 1,
     })
     .eq('id', parsedId.data)
+    .eq('status', 'done')
+    .eq('cleaning_cycle', order.cleaning_cycle)
+    .select('id')
+    .maybeSingle()
 
   if (error) return { success: false as const, error: error.message }
+  if (!reopenedOrder) return { success: false as const, error: 'La O.L. è già stata riaperta da un altro operatore.' }
 
   await recalculateOrderPricing(supabase, parsedId.data)
 
@@ -238,15 +260,15 @@ async function reopenServiceOrderImpl(id: string) {
   return { success: true as const }
 }
 
-async function startCleaningImpl(id: string) {
+async function startCleaningImpl(id: string, photoIds: string[] = []) {
   const parsedId = uuidSchema.safeParse(id)
   if (!parsedId.success) return { success: false as const, error: validationMessage(parsedId.error) }
 
-  const { supabase } = await getAuthorizedClient(['admin', 'secretaria', 'limpeza'])
+  const { supabase, userId } = await getAuthorizedClient(['admin', 'secretaria', 'limpeza'])
 
   const { data: order, error: loadError } = await supabase
     .from('service_orders')
-    .select('status, started_at, completed_at')
+    .select('status, started_at, completed_at, cleaning_cycle')
     .eq('id', parsedId.data)
     .maybeSingle()
 
@@ -255,6 +277,21 @@ async function startCleaningImpl(id: string) {
 
   const transitionError = validateCleaningTrackingTransition('start', order)
   if (transitionError) return { success: false as const, error: transitionError }
+
+  if (photoIds.length > 0 && !isCleaningPhotosEnabled()) {
+    return { success: false as const, error: 'La funzione foto non è attiva.' }
+  }
+  try {
+    await validateReadyPhotosForTransition({
+      serviceOrderId: parsedId.data,
+      cycleNo: order.cleaning_cycle,
+      phase: 'before',
+      photoIds,
+      uploadedBy: userId,
+    })
+  } catch (error) {
+    return { success: false as const, error: error instanceof Error ? error.message : 'Foto non valide.' }
+  }
 
   const { data: updatedOrder, error } = await supabase
     .from('service_orders')
@@ -266,6 +303,7 @@ async function startCleaningImpl(id: string) {
     .in('status', ['open', 'in_progress'])
     .is('started_at', null)
     .is('completed_at', null)
+    .eq('cleaning_cycle', order.cleaning_cycle)
     .select('id')
     .maybeSingle()
 
@@ -277,18 +315,18 @@ async function startCleaningImpl(id: string) {
   return { success: true as const }
 }
 
-async function finishCleaningImpl(id: string, notes: string) {
+async function finishCleaningImpl(id: string, notes: string, photoIds: string[] = []) {
   const parsedId = uuidSchema.safeParse(id)
   if (!parsedId.success) return { success: false as const, error: validationMessage(parsedId.error) }
 
   const parsedNotes = optionalNotesSchema.safeParse(notes)
   if (!parsedNotes.success) return { success: false as const, error: validationMessage(parsedNotes.error) }
 
-  const { supabase } = await getAuthorizedClient(['admin', 'secretaria', 'limpeza'])
+  const { supabase, userId } = await getAuthorizedClient(['admin', 'secretaria', 'limpeza'])
 
   const { data: order, error: loadError } = await supabase
     .from('service_orders')
-    .select('status, started_at, completed_at')
+    .select('status, started_at, completed_at, cleaning_cycle')
     .eq('id', parsedId.data)
     .maybeSingle()
 
@@ -297,6 +335,21 @@ async function finishCleaningImpl(id: string, notes: string) {
 
   const transitionError = validateCleaningTrackingTransition('finish', order)
   if (transitionError) return { success: false as const, error: transitionError }
+
+  if (photoIds.length > 0 && !isCleaningPhotosEnabled()) {
+    return { success: false as const, error: 'La funzione foto non è attiva.' }
+  }
+  try {
+    await validateReadyPhotosForTransition({
+      serviceOrderId: parsedId.data,
+      cycleNo: order.cleaning_cycle,
+      phase: 'after',
+      photoIds,
+      uploadedBy: userId,
+    })
+  } catch (error) {
+    return { success: false as const, error: error instanceof Error ? error.message : 'Foto non valide.' }
+  }
 
   const { data: updatedOrder, error } = await supabase
     .from('service_orders')
@@ -309,6 +362,7 @@ async function finishCleaningImpl(id: string, notes: string) {
     .eq('status', 'in_progress')
     .not('started_at', 'is', null)
     .is('completed_at', null)
+    .eq('cleaning_cycle', order.cleaning_cycle)
     .select('id')
     .maybeSingle()
 
@@ -375,8 +429,21 @@ async function deleteServiceOrderImpl(id: string) {
 
   const { supabase } = await getAuthorizedClient()
 
+  let photoRecords
+  try {
+    photoRecords = await listPhotoRecordsForOrder(parsedId.data)
+  } catch (error) {
+    return { success: false as const, error: error instanceof Error ? error.message : 'Errore durante la verifica delle foto.' }
+  }
+
   const { error } = await supabase.from('service_orders').delete().eq('id', parsedId.data)
   if (error) return { success: false as const, error: error.message }
+
+  try {
+    await deletePhotoObjects(photoRecords)
+  } catch (cleanupError) {
+    captureQueryError('service-orders', 'delete-photo-objects', cleanupError)
+  }
 
   revalidatePath('/service-orders')
   redirect('/service-orders')
@@ -394,12 +461,12 @@ export async function reopenServiceOrder(id: string) {
   return withLogging('reopenServiceOrder', () => reopenServiceOrderImpl(id))
 }
 
-export async function startCleaning(id: string) {
-  return withLogging('startCleaning', () => startCleaningImpl(id))
+export async function startCleaning(id: string, photoIds: string[] = []) {
+  return withLogging('startCleaning', () => startCleaningImpl(id, photoIds))
 }
 
-export async function finishCleaning(id: string, notes: string) {
-  return withLogging('finishCleaning', () => finishCleaningImpl(id, notes))
+export async function finishCleaning(id: string, notes: string, photoIds: string[] = []) {
+  return withLogging('finishCleaning', () => finishCleaningImpl(id, notes, photoIds))
 }
 
 export async function updateExtraServices(

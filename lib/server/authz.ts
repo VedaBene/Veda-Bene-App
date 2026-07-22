@@ -6,6 +6,7 @@ export type { SupabaseServerClient }
 export type AuthorizedClient = {
   supabase: SupabaseServerClient
   role: Role
+  userId: string
 }
 
 export async function getAuthorizedClient(
@@ -17,5 +18,5 @@ export async function getAuthorizedClient(
     throw new Error('Sem permissão')
   }
 
-  return { supabase, role: viewer.role }
+  return { supabase, role: viewer.role, userId: viewer.userId }
 }

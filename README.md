@@ -30,7 +30,7 @@ CRM/ERP operacional para uma empresa de limpeza de imóveis em Roma (Itália), e
 
 ### Pré-requisitos
 
-- Node 20+
+- Node 22 LTS+
 - npm
 - [Supabase CLI](https://supabase.com/docs/guides/cli) (`npm i -g supabase` ou `scoop install supabase`)
 - Acesso a um projeto Supabase (remoto via Dashboard, ou local via `supabase start`)
@@ -61,8 +61,14 @@ CRM/ERP operacional para uma empresa de limpeza de imóveis em Roma (Itália), e
    ```bash
    supabase login
    supabase link --project-ref <project-ref>
+   supabase db push --dry-run
    supabase db push
    ```
+
+   Esses comandos destinam-se ao ambiente local, de desenvolvimento ou staging.
+   Em produção, nunca execute `db push` sem revisão do `--dry-run`, checklist
+   completo e autorização explícita. `supabase db reset --linked` é proibido em
+   produção porque destrói os dados do projeto vinculado.
 
 4. Seed de dados: **não há seed automático**. A migration `20260410233431_seed_mock_data.sql` é um placeholder no-op (ver [supabase/BASELINE_SYNC.md](supabase/BASELINE_SYNC.md)). Para popular o ambiente:
    - Crie usuários via Supabase Dashboard → Authentication → Users
@@ -79,6 +85,7 @@ npm run lint     # ESLint
 
 ## Arquitetura — pontos críticos
 
+- **Integridade dos dados durante desenvolvimento/manutenção**: scripts, migrações e operações de manutenção em produção devem preservar integralmente os registros existentes. Migrações devem ser incrementais, aditivas, compatíveis e acompanhadas de análise de impacto e rollback não destrutivo. A regra não altera o CRUD autorizado nem ações previstas pelas regras de negócio. Operações técnicas como `DROP TABLE`, `DROP SCHEMA`, `TRUNCATE`, exclusão de dados por migration ou reset/recriação do banco são proibidas, salvo exceção extrema previamente aprovada e protegida por backup e restauração ensaiada. Consulte a [política de segurança dos dados de produção](docs/production-data-safety.md).
 - **RLS**: roles injetadas no JWT via `custom_access_token_hook` como `app_role`. A função `get_my_role()` lê o JWT como JSONB — retorna com aspas duplas embutidas (ex: `'"admin"'`), então policies usam `= '"admin"'`, **não** `= 'admin'`.
 - **Column Level Security**: RLS protege linhas no Supabase/Postgres, mas a proteção de colunas sensíveis hoje fica na aplicação. Server Components, Server Actions, filtros explícitos de `select()` e DTOs devem selecionar apenas os campos permitidos por role. As views `properties_public` e `profiles_public` foram removidas e **não** são o mecanismo ativo. Ver [ADR 002](docs/decisions/002-cls-via-filtro-select.md).
 - **`is_urgent`** em `service_orders`: coluna `GENERATED ALWAYS AS STORED` — não pode ser inserida manualmente. É `true` quando `(checkin_at - checkout_at) <= 3h`.
@@ -114,6 +121,7 @@ Este projeto roda no Next.js 16, que tem **breaking changes** em relação a ver
 
 ## Documentação do projeto
 
+- [Segurança dos dados de produção](docs/production-data-safety.md) — regra obrigatória para migrações, validação, implantação e rollback.
 - [Ordens de Serviço — regras de listagem e exportação](docs/service-orders.md) — filtros, prioridade operacional, informações exibidas e PDFs por status.
 - [Architecture Decision Records](docs/decisions/README.md) — decisões arquiteturais duráveis e seus motivos.
 - [Histórico da evolução técnica](docs/evolution/README.md) — etapas concluídas da evolução arquitetural.
