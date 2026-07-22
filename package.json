@@ -10,6 +10,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "local:seed:photos": "node --env-file=.env.development.local scripts/setup-local-photo-test.mjs"
   },
