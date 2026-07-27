@@ -36,6 +36,7 @@ import {
 import { hoursUntil } from './display'
 import { CleaningPhotoUploader } from './CleaningPhotoUploader'
 import { useCleaningPhotoWorkflow } from './useCleaningPhotoWorkflow'
+import { toRomeIsoString, toRomeLocalInputValue } from '@/lib/timezone'
 
 export function ServiceOrderForm({
   order,
@@ -117,8 +118,8 @@ export function ServiceOrderForm({
   }, [propertyId, isAdminOrSec])
 
   const [cleaningDate, setCleaningDate] = useState(order?.cleaning_date ?? '')
-  const [checkoutAt, setCheckoutAt] = useState(order?.checkout_at ? order.checkout_at.slice(0, 16) : '')
-  const [checkinAt, setCheckinAt] = useState(order?.checkin_at ? order.checkin_at.slice(0, 16) : '')
+  const [checkoutAt, setCheckoutAt] = useState(toRomeLocalInputValue(order?.checkout_at))
+  const [checkinAt, setCheckinAt] = useState(toRomeLocalInputValue(order?.checkin_at))
   const urgencyWarning = checkoutAt && checkinAt
     ? (() => {
         const hours = hoursUntil(checkoutAt, checkinAt)
@@ -151,8 +152,8 @@ export function ServiceOrderForm({
       fd.set('consegna_staff_id', consegnaStaffId)
     }
     fd.set('cleaning_date', cleaningDate)
-    fd.set('checkout_at', checkoutAt)
-    fd.set('checkin_at', checkinAt)
+    fd.set('checkout_at', toRomeIsoString(checkoutAt) ?? '')
+    fd.set('checkin_at', toRomeIsoString(checkinAt) ?? '')
     fd.set('real_guests', realGuests)
     fd.set('double_beds', doubleBeds)
     fd.set('single_beds', singleBeds)

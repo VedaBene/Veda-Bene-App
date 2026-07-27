@@ -32,6 +32,7 @@ Isso preserva o histórico de **por que** o sistema chegou no estado atual.
 | [010](010-resolucao-erro-stolen-lock-supabase.md) | Resolução de Erro de Concorrência de Autenticação (Lock Stolen) | Aceita |
 | [011](011-taxa-fixa-consegna-na-receita.md) | Taxa fixa de Consegna na receita da OS | Aceita |
 | [012](012-fotos-privadas-por-ciclo-da-ordem-de-servico.md) | Fotos privadas antes/depois por ciclo da O.S. | Aceita |
+| [013](013-padronizacao-fuso-horario-rome-timestamps.md) | Padronização de fuso horário (Europe/Rome) em inputs e timestamps de OS | Aceita |
 
 
 

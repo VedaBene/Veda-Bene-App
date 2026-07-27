@@ -23,8 +23,13 @@ import {
   validationMessage,
 } from '@/lib/server/validation/contracts'
 import type { PricingMode } from '@/lib/types/database'
+import { toRomeIsoString } from '@/lib/timezone'
 
 const optStr = z.preprocess(v => (v === '' ? undefined : v), z.string().optional())
+const optIsoDateStr = z.preprocess(
+  v => (v === '' || v == null ? undefined : toRomeIsoString(String(v)) ?? v),
+  z.string().optional(),
+)
 const optNum = z.preprocess(
   v => (v === '' || v == null ? undefined : Number(v)),
   z.number().min(0).optional(),
@@ -37,8 +42,8 @@ const serviceOrderSchema = z.object({
   cleaning_staff_ids: z.array(uuidSchema).max(3, 'Massimo 3 responsabili').default([]),
   consegna_staff_id: optionalUuidSchema,
   cleaning_date: optionalDateOnlySchema,
-  checkout_at: optStr,
-  checkin_at: optStr,
+  checkout_at: optIsoDateStr,
+  checkin_at: optIsoDateStr,
   real_guests: optNum,
   double_beds: intDef(0),
   single_beds: intDef(0),
