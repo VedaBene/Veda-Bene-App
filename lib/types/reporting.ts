@@ -20,7 +20,12 @@ export type ClientOption = {
   name: string
 }
 
-export type ReceivableOrderRow = {
+export type ReceivablePendingReason =
+  | 'missing_property_base_price'
+  | 'missing_total_price'
+  | 'invalid_financial_data'
+
+type ReceivableOrderBase = {
   section: PricingMode
   orderId: string
   orderNumber: number
@@ -37,17 +42,34 @@ export type ReceivableOrderRow = {
     cribs: number
   }
   currentBasePrice: number | null
-  consideredAmount: number
   extraDescription: string | null
-  extraAmount: number
-  consegnaFee: number
-  totalPrice: number
 }
+
+export type ReceivableOrderRow = ReceivableOrderBase & (
+  | {
+      financialStatus: 'complete'
+      pendingReason: null
+      consideredAmount: number
+      extraAmount: number
+      consegnaFee: number
+      totalPrice: number
+    }
+  | {
+      financialStatus: 'pending'
+      pendingReason: ReceivablePendingReason
+      consideredAmount: number | null
+      extraAmount: number | null
+      consegnaFee: number | null
+      totalPrice: number | null
+    }
+)
 
 export type ReceivableSection = {
   mode: PricingMode
   rows: ReceivableOrderRow[]
   orderCount: number
+  completeOrderCount: number
+  pendingCount: number
   consideredTotal: number
   extraTotal: number
   consegnaTotal: number
@@ -62,6 +84,9 @@ export type ReceivableReport = {
   standard: ReceivableSection
   ripasso: ReceivableSection
   outLongStay: ReceivableSection
+  orderCount: number
+  completeOrderCount: number
+  pendingCount: number
   grandTotal: number
 }
 

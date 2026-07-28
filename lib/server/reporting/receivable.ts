@@ -55,15 +55,11 @@ function roundMoney(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100
 }
 
-function assertMoney(
-  value: number | null,
-  field: string,
-  orderNumber: number,
-): number {
+function normalizeMoney(value: number | null): number | null {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
-    throw new Error(`Valor financeiro inválido em ${field} na O.S. #${orderNumber}`)
+    return null
   }
-  return value
+  return roundMoney(value)
 }
 
 function clientName(property: NonNullable<ReceivableOrderRecord['property']>): string {
@@ -133,25 +129,20 @@ function toRow(
     throw new Error(`Modalidade de preço inválida na O.S. #${order.order_number}`)
   }
 
-  const totalPrice = assertMoney(order.total_price, 'total_price', order.order_number)
+  const totalPrice = normalizeMoney(order.total_price)
   const extraAmount = order.extra_services_price == null
     ? 0
-    : assertMoney(order.extra_services_price, 'extra_services_price', order.order_number)
+    : normalizeMoney(order.extra_services_price)
   const consegnaFee = order.consegna_fee == null
     ? CONSEGNA_FEE
-    : assertMoney(order.consegna_fee, 'consegna_fee', order.order_number)
-  const consideredAmount = roundMoney(totalPrice - extraAmount - consegnaFee)
-
-  if (consideredAmount < 0) {
-    throw new Error(`Composição financeira inválida na O.S. #${order.order_number}`)
-  }
+    : normalizeMoney(order.consegna_fee)
 
   const currentBasePrice = property.base_price == null
     ? null
-    : roundMoney(assertMoney(property.base_price, 'properties.base_price', order.order_number))
+    : normalizeMoney(property.base_price)
   const extraDescription = order.extra_services_description?.trim() || null
 
-  return {
+  const baseRow = {
     section: order.pricing_mode,
     orderId: order.id,
     orderNumber: order.order_number,
@@ -168,11 +159,56 @@ function toRow(
       cribs: order.cribs,
     },
     currentBasePrice,
-    consideredAmount,
     extraDescription,
-    extraAmount: roundMoney(extraAmount),
-    consegnaFee: roundMoney(consegnaFee),
-    totalPrice: roundMoney(totalPrice),
+  }
+
+  if (order.total_price == null) {
+    return {
+      ...baseRow,
+      financialStatus: 'pending',
+      pendingReason: order.pricing_mode !== 'out_long_stay' && property.base_price == null
+        ? 'missing_property_base_price'
+        : 'missing_total_price',
+      consideredAmount: null,
+      extraAmount,
+      consegnaFee,
+      totalPrice: null,
+    }
+  }
+
+  if (totalPrice == null || extraAmount == null || consegnaFee == null) {
+    return {
+      ...baseRow,
+      financialStatus: 'pending',
+      pendingReason: 'invalid_financial_data',
+      consideredAmount: null,
+      extraAmount,
+      consegnaFee,
+      totalPrice,
+    }
+  }
+
+  const consideredAmount = roundMoney(totalPrice - extraAmount - consegnaFee)
+  if (consideredAmount < 0) {
+    return {
+      ...baseRow,
+      financialStatus: 'pending',
+      pendingReason: 'invalid_financial_data',
+      consideredAmount: null,
+      extraAmount,
+      consegnaFee,
+      totalPrice,
+    }
+  }
+
+  return {
+    ...baseRow,
+    financialStatus: 'complete',
+    pendingReason: null,
+    consideredAmount,
+    extraAmount,
+    consegnaFee,
+    totalPrice,
   }
 }
 
@@ -200,15 +236,22 @@ function buildSection(
   allRows: ReceivableOrderRow[],
 ): ReceivableSection {
   const rows = sortRows(allRows.filter(row => row.section === mode))
+  const completeRows = rows.filter(
+    (row): row is Extract<ReceivableOrderRow, { financialStatus: 'complete' }> => (
+      row.financialStatus === 'complete'
+    ),
+  )
 
   return {
     mode,
     rows,
     orderCount: rows.length,
-    consideredTotal: roundMoney(rows.reduce((sum, row) => sum + row.consideredAmount, 0)),
-    extraTotal: roundMoney(rows.reduce((sum, row) => sum + row.extraAmount, 0)),
-    consegnaTotal: roundMoney(rows.reduce((sum, row) => sum + row.consegnaFee, 0)),
-    sectionTotal: roundMoney(rows.reduce((sum, row) => sum + row.totalPrice, 0)),
+    completeOrderCount: completeRows.length,
+    pendingCount: rows.length - completeRows.length,
+    consideredTotal: roundMoney(completeRows.reduce((sum, row) => sum + row.consideredAmount, 0)),
+    extraTotal: roundMoney(completeRows.reduce((sum, row) => sum + row.extraAmount, 0)),
+    consegnaTotal: roundMoney(completeRows.reduce((sum, row) => sum + row.consegnaFee, 0)),
+    sectionTotal: roundMoney(completeRows.reduce((sum, row) => sum + row.totalPrice, 0)),
   }
 }
 
@@ -225,6 +268,10 @@ export async function getReceivableReport(
   const standard = buildSection('standard', rows)
   const ripasso = buildSection('ripasso', rows)
   const outLongStay = buildSection('out_long_stay', rows)
+  const orderCount = standard.orderCount + ripasso.orderCount + outLongStay.orderCount
+  const completeOrderCount = (
+    standard.completeOrderCount + ripasso.completeOrderCount + outLongStay.completeOrderCount
+  )
 
   return {
     period: {
@@ -234,6 +281,9 @@ export async function getReceivableReport(
     standard,
     ripasso,
     outLongStay,
+    orderCount,
+    completeOrderCount,
+    pendingCount: orderCount - completeOrderCount,
     grandTotal: roundMoney(
       standard.sectionTotal + ripasso.sectionTotal + outLongStay.sectionTotal,
     ),

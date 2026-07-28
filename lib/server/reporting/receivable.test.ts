@@ -72,6 +72,8 @@ describe('receivable report producer', () => {
     expect(report.outLongStay.rows).toHaveLength(1)
     expect(report.standard.rows[0]).toMatchObject({
       section: 'standard',
+      financialStatus: 'complete',
+      pendingReason: null,
       cleaningDate: '2026-05-10',
       currentBasePrice: 110,
       consideredAmount: 123,
@@ -92,6 +94,11 @@ describe('receivable report producer', () => {
       totalPrice: 225,
     })
     expect(report.grandTotal).toBe(443)
+    expect(report).toMatchObject({
+      orderCount: 3,
+      completeOrderCount: 3,
+      pendingCount: 0,
+    })
   })
 
   it('sorts each section by Italian property name, cleaning date, and order number', async () => {
@@ -161,6 +168,8 @@ describe('receivable report producer', () => {
 
     expect(report.standard.rows[0].currentBasePrice).toBeNull()
     expect(report.standard.rows[0].totalPrice).toBe(148)
+    expect(report.standard.rows[0].financialStatus).toBe('complete')
+    expect(report.pendingCount).toBe(0)
   })
 
   it('paginates beyond the local PostgREST limit without truncating rows', async () => {
@@ -176,13 +185,101 @@ describe('receivable report producer', () => {
     expect(report.standard.sectionTotal).toBe(148148)
   })
 
-  it('does not silently convert an invalid persisted total into zero', async () => {
+  it('keeps orders with missing totals visible as pending and excludes them from totals', async () => {
+    const fake = new FakeSupabase({
+      service_orders: [
+        order(),
+        order({
+          id: 'pending-order',
+          order_number: 2,
+          total_price: null,
+          property: {
+            id: 'property-without-price',
+            name: 'Senza prezzo',
+            client_type: 'rental',
+            base_price: null,
+            agency: { id: '11111111-1111-4111-8111-111111111111', name: 'Rental' },
+            owner: null,
+          },
+        }),
+      ],
+    })
+
+    const report = await getReceivableReport(asSupabase(fake), filters)
+    const pendingRow = report.standard.rows.find(row => row.orderId === 'pending-order')
+
+    expect(pendingRow).toMatchObject({
+      financialStatus: 'pending',
+      pendingReason: 'missing_property_base_price',
+      consideredAmount: null,
+      totalPrice: null,
+    })
+    expect(report.standard).toMatchObject({
+      orderCount: 2,
+      completeOrderCount: 1,
+      pendingCount: 1,
+      sectionTotal: 148,
+    })
+    expect(report).toMatchObject({
+      orderCount: 2,
+      completeOrderCount: 1,
+      pendingCount: 1,
+      grandTotal: 148,
+    })
+  })
+
+  it('distinguishes a missing order total from a missing property base price', async () => {
     const fake = new FakeSupabase({
       service_orders: [order({ total_price: null })],
     })
 
-    await expect(getReceivableReport(asSupabase(fake), filters))
-      .rejects.toThrow('Valor financeiro inválido em total_price na O.S. #1')
+    const report = await getReceivableReport(asSupabase(fake), filters)
+
+    expect(report.standard.rows[0]).toMatchObject({
+      financialStatus: 'pending',
+      pendingReason: 'missing_total_price',
+    })
+  })
+
+  it('does not attribute an Out Long Stay pending total to the property base price', async () => {
+    const fake = new FakeSupabase({
+      service_orders: [order({
+        pricing_mode: 'out_long_stay',
+        total_price: null,
+        property: {
+          id: 'property-1',
+          name: 'Campo',
+          client_type: 'rental',
+          base_price: null,
+          agency: { id: '11111111-1111-4111-8111-111111111111', name: 'Rental' },
+          owner: null,
+        },
+      })],
+    })
+
+    const report = await getReceivableReport(asSupabase(fake), filters)
+
+    expect(report.outLongStay.rows[0]).toMatchObject({
+      financialStatus: 'pending',
+      pendingReason: 'missing_total_price',
+    })
+  })
+
+  it('marks invalid financial composition as pending without hiding the order', async () => {
+    const fake = new FakeSupabase({
+      service_orders: [order({ total_price: 10, extra_services_price: 15, consegna_fee: 10 })],
+    })
+
+    const report = await getReceivableReport(asSupabase(fake), filters)
+
+    expect(report.standard.rows[0]).toMatchObject({
+      financialStatus: 'pending',
+      pendingReason: 'invalid_financial_data',
+      consideredAmount: null,
+      totalPrice: 10,
+    })
+    expect(report.standard.sectionTotal).toBe(0)
+    expect(report.pendingCount).toBe(1)
   })
 
   it('propagates a Supabase query failure instead of returning an empty report', async () => {

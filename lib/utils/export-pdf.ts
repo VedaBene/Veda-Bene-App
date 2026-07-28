@@ -204,6 +204,12 @@ export function buildReceivablePrintBody(report: ReceivableReport): string {
 }
 
 export function exportReceivablePDF(report: ReceivableReport) {
+  if (report.pendingCount > 0) {
+    throw new Error(
+      `Exportação bloqueada: existem ${report.pendingCount} O.S. com dados financeiros pendentes neste filtro.`,
+    )
+  }
+
   printHTML(
     'Extrato a Receber - Veda Bene',
     buildReceivablePrintBody(report),

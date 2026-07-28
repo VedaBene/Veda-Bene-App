@@ -5,7 +5,7 @@ import { fetchReceivableReport } from '@/app/(app)/statements/actions'
 import { exportReceivablePDF } from '@/lib/utils/export-pdf'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
-import { Download, FileText, Filter, Receipt } from 'lucide-react'
+import { AlertTriangle, Download, FileText, Filter, Receipt } from 'lucide-react'
 import type { PricingMode } from '@/lib/types/database'
 import type {
   ClientOption,
@@ -59,6 +59,16 @@ const SECTION_STYLE: Record<PricingMode, { title: string; badge: string; header:
   },
 }
 
+const PENDING_REASON_LABEL = {
+  missing_property_base_price: 'Preço base do imóvel ausente',
+  missing_total_price: 'Total da O.S. não calculado',
+  invalid_financial_data: 'Dados financeiros inválidos',
+} as const
+
+function exportBlockedMessage(pendingCount: number): string {
+  return `Exportação bloqueada: existem ${pendingCount} O.S. com dados financeiros pendentes neste filtro.`
+}
+
 function Occupancy({ row }: { row: ReceivableOrderRow }) {
   const fields = [
     ['PX', row.occupancy.guests ?? '—'],
@@ -84,15 +94,16 @@ function Occupancy({ row }: { row: ReceivableOrderRow }) {
 
 function SectionSummary({ section }: { section: ReceivableSection }) {
   const items = [
-    ['Ordens', String(section.orderCount)],
+    ['Incluídas no total', String(section.completeOrderCount)],
+    ['Pendentes', String(section.pendingCount)],
     ['Valor considerado', money(section.consideredTotal)],
     ['Serviços extras', money(section.extraTotal)],
     ['Consegna', money(section.consegnaTotal)],
-    ['Subtotal da seção', money(section.sectionTotal)],
+    [section.pendingCount > 0 ? 'Subtotal parcial' : 'Subtotal da seção', money(section.sectionTotal)],
   ]
 
   return (
-    <div className="grid grid-cols-2 gap-2 border-t border-border bg-muted/20 p-4 sm:grid-cols-3 xl:grid-cols-5">
+    <div className="grid grid-cols-2 gap-2 border-t border-border bg-muted/20 p-4 sm:grid-cols-3 xl:grid-cols-6">
       {items.map(([label, value], index) => (
         <div
           key={label}
@@ -107,12 +118,19 @@ function SectionSummary({ section }: { section: ReceivableSection }) {
 }
 
 function MobileOrderCard({ row }: { row: ReceivableOrderRow }) {
+  const isPending = row.financialStatus === 'pending'
+
   return (
-    <article className="space-y-3 border-b border-border/60 p-4 last:border-b-0">
+    <article className={`space-y-3 border-b border-border/60 p-4 last:border-b-0 ${isPending ? 'bg-amber-50/60' : ''}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <span className="block truncate font-semibold text-foreground">{row.propertyName}</span>
           <span className="block text-xs text-muted-foreground">{row.clientName}</span>
+          {isPending && (
+            <span className="mt-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
+              {PENDING_REASON_LABEL[row.pendingReason]}
+            </span>
+          )}
         </div>
         <div className="shrink-0 text-right">
           <span className="block text-xs font-semibold text-foreground">O.S. #{row.orderNumber}</span>
@@ -145,9 +163,9 @@ function MobileOrderCard({ row }: { row: ReceivableOrderRow }) {
         </div>
       </dl>
 
-      <div className="flex items-center justify-between rounded-lg bg-primary px-3 py-2 text-primary-foreground">
+      <div className={`flex items-center justify-between rounded-lg px-3 py-2 ${isPending ? 'bg-amber-100 text-amber-900' : 'bg-primary text-primary-foreground'}`}>
         <span className="text-xs font-semibold uppercase tracking-wider">Total O.S.</span>
-        <span className="font-bold">{money(row.totalPrice)}</span>
+        <span className="font-bold">{isPending ? 'Pendente' : money(row.totalPrice)}</span>
       </div>
     </article>
   )
@@ -201,10 +219,20 @@ function ReceivableSectionBlock({ section }: { section: ReceivableSection }) {
                 </td>
               </tr>
             ) : section.rows.map(row => (
-              <tr key={row.orderId} className="align-top transition-colors hover:bg-muted/25">
+              <tr
+                key={row.orderId}
+                className={`align-top transition-colors hover:bg-muted/25 ${row.financialStatus === 'pending' ? 'bg-amber-50/70' : ''}`}
+              >
                 <td className="whitespace-nowrap px-3 py-3 text-foreground/70"><span>{dateOnly(row.cleaningDate)}</span></td>
                 <td className="whitespace-nowrap px-3 py-3 text-right font-medium text-foreground"><span>#{row.orderNumber}</span></td>
-                <td className="px-3 py-3 font-medium text-foreground"><span>{row.propertyName}</span></td>
+                <td className="px-3 py-3 font-medium text-foreground">
+                  <span>{row.propertyName}</span>
+                  {row.financialStatus === 'pending' && (
+                    <span className="mt-1 block text-[10px] font-semibold text-amber-800">
+                      {PENDING_REASON_LABEL[row.pendingReason]}
+                    </span>
+                  )}
+                </td>
                 <td className="px-3 py-3 text-foreground/70"><span>{row.clientName}</span></td>
                 <td className="px-2 py-3 text-center"><span>{row.occupancy.guests ?? '—'}</span></td>
                 <td className="px-2 py-3 text-center"><span>{row.occupancy.doubleBeds}</span></td>
@@ -218,7 +246,9 @@ function ReceivableSectionBlock({ section }: { section: ReceivableSection }) {
                 <td className="whitespace-pre-wrap break-words px-3 py-3 text-foreground/80"><span>{row.extraDescription ?? '—'}</span></td>
                 <td className="whitespace-nowrap px-3 py-3 text-right"><span>{money(row.extraAmount)}</span></td>
                 <td className="whitespace-nowrap px-3 py-3 text-right"><span>{money(row.consegnaFee)}</span></td>
-                <td className="whitespace-nowrap px-3 py-3 text-right font-bold text-foreground"><span>{money(row.totalPrice)}</span></td>
+                <td className="whitespace-nowrap px-3 py-3 text-right font-bold text-foreground">
+                  <span>{row.financialStatus === 'pending' ? 'Pendente' : money(row.totalPrice)}</span>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -293,12 +323,24 @@ export function ReceivableStatement({
   }
 
   function handlePDF() {
-    requestReport(nextReport => exportReceivablePDF(nextReport))
+    requestReport(nextReport => {
+      if (nextReport.pendingCount > 0) {
+        setError(exportBlockedMessage(nextReport.pendingCount))
+        return
+      }
+      exportReceivablePDF(nextReport)
+    })
   }
 
   const clientOptions = clientType === 'rental' ? agencies : clientType === 'particular' ? owners : []
   const clientLabel = clientType === 'rental' ? 'Agência' : clientType === 'particular' ? 'Proprietário' : null
-  const totalOrders = report.standard.orderCount + report.ripasso.orderCount + report.outLongStay.orderCount
+  const pendingRows = [report.standard, report.ripasso, report.outLongStay]
+    .flatMap(section => section.rows)
+    .filter(row => row.financialStatus === 'pending')
+  const pendingProperties = [...new Set(pendingRows.map(row => row.propertyName))]
+  const visiblePendingProperties = pendingProperties.slice(0, 5)
+  const hiddenPendingPropertyCount = pendingProperties.length - visiblePendingProperties.length
+  const exportDisabled = isPending || report.pendingCount > 0
 
   return (
     <div className="space-y-5">
@@ -335,10 +377,26 @@ export function ReceivableStatement({
             {isPending ? 'Buscando…' : 'Filtrar'}
           </Button>
           <div className="ml-auto flex gap-2">
-            <Button type="button" onClick={handleCSV} disabled={isPending} variant="ghost" size="sm" icon={<Download size={14} />}>
+            <Button
+              type="button"
+              onClick={handleCSV}
+              disabled={exportDisabled}
+              title={report.pendingCount > 0 ? exportBlockedMessage(report.pendingCount) : undefined}
+              variant="ghost"
+              size="sm"
+              icon={<Download size={14} />}
+            >
               CSV
             </Button>
-            <Button type="button" onClick={handlePDF} disabled={isPending} variant="ghost" size="sm" icon={<FileText size={14} />}>
+            <Button
+              type="button"
+              onClick={handlePDF}
+              disabled={exportDisabled}
+              title={report.pendingCount > 0 ? exportBlockedMessage(report.pendingCount) : undefined}
+              variant="ghost"
+              size="sm"
+              icon={<FileText size={14} />}
+            >
               PDF
             </Button>
           </div>
@@ -347,6 +405,25 @@ export function ReceivableStatement({
 
       {error && (
         <div className="rounded-xl bg-danger-bg px-4 py-3 text-sm text-danger"><span>{error}</span></div>
+      )}
+
+      {report.pendingCount > 0 && (
+        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-950" role="alert">
+          <AlertTriangle className="mt-0.5 shrink-0 text-amber-600" size={20} />
+          <div className="space-y-1 text-sm">
+            <span className="block font-semibold">
+              {report.pendingCount} {report.pendingCount === 1 ? 'O.S. pendente' : 'O.S. pendentes'} de preço
+            </span>
+            <span className="block">
+              O total abaixo é parcial e considera {report.completeOrderCount} de {report.orderCount} O.S. CSV e PDF ficam bloqueados até a correção.
+            </span>
+            {visiblePendingProperties.length > 0 && (
+              <span className="block text-xs text-amber-800">
+                Imóveis envolvidos: {visiblePendingProperties.join(', ')}{hiddenPendingPropertyCount > 0 ? ` e mais ${hiddenPendingPropertyCount}` : ''}.
+              </span>
+            )}
+          </div>
+        </div>
       )}
 
       <Card className="px-5 py-4">
@@ -358,10 +435,10 @@ export function ReceivableStatement({
           <div className="flex items-center gap-6">
             <div className="text-right">
               <span className="block text-xs text-muted-foreground">Total de O.S.</span>
-              <span className="block text-lg font-bold text-foreground">{totalOrders}</span>
+              <span className="block text-lg font-bold text-foreground">{report.orderCount}</span>
             </div>
             <div className="text-right">
-              <span className="block text-xs text-muted-foreground">Total geral</span>
+              <span className="block text-xs text-muted-foreground">{report.pendingCount > 0 ? 'Total parcial' : 'Total geral'}</span>
               <span className="block text-xl font-bold text-accent">{money(report.grandTotal)}</span>
             </div>
           </div>
@@ -373,7 +450,7 @@ export function ReceivableStatement({
       <ReceivableSectionBlock section={report.outLongStay} />
 
       <div className="flex items-center justify-between rounded-xl bg-primary px-5 py-4 text-primary-foreground shadow-card">
-        <span className="font-semibold">Total geral do período</span>
+        <span className="font-semibold">{report.pendingCount > 0 ? 'Total parcial do período' : 'Total geral do período'}</span>
         <span className="text-xl font-bold">{money(report.grandTotal)}</span>
       </div>
     </div>
