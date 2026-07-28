@@ -1,4 +1,4 @@
-import type { PayableRow, ReceivableRow } from '@/lib/types/reporting'
+import type { PayableRow, ReceivableReport } from '@/lib/types/reporting'
 
 function escapeCSV(value: string | number | null | undefined): string {
   if (value == null) return ''
@@ -40,16 +40,55 @@ export function formatPayableCSV(data: PayableRow[]): string {
   return [header, ...rows].join('\n')
 }
 
-export function formatReceivableCSV(data: ReceivableRow[]): string {
-  const header = row(['Cliente', 'Tipo', 'Imóvel', 'Total OS', 'Total (€)'])
-  const rows = data.map(item =>
-    row([
-      item.client_name,
-      item.client_type === 'rental' ? 'Agência' : 'Particular',
-      item.property_name,
-      item.os_count,
-      item.total_value,
-    ]),
+export function formatReceivableCSV(report: ReceivableReport): string {
+  const header = row([
+    'Sezione',
+    'Data',
+    'Numero OS',
+    'Cliente',
+    'Immobile',
+    'PX',
+    'M',
+    'S',
+    'DL',
+    'WC',
+    'BI',
+    'CUL',
+    'Prezzo base attuale',
+    'Valore considerato',
+    'Descrizione servizio extra',
+    'Valore servizio extra',
+    'Consegna',
+    'Totale OS',
+  ])
+
+  const sections = [
+    ['Standard', report.standard],
+    ['Ripasso', report.ripasso],
+    ['Out Long Stay', report.outLongStay],
+  ] as const
+
+  const rows = sections.flatMap(([sectionLabel, section]) =>
+    section.rows.map(item => row([
+      sectionLabel,
+      item.cleaningDate,
+      item.orderNumber,
+      item.clientName,
+      item.propertyName,
+      item.occupancy.guests,
+      item.occupancy.doubleBeds,
+      item.occupancy.singleBeds,
+      item.occupancy.sofaBeds,
+      item.occupancy.bathrooms,
+      item.occupancy.bidets,
+      item.occupancy.cribs,
+      item.currentBasePrice,
+      item.consideredAmount,
+      item.extraDescription,
+      item.extraAmount,
+      item.consegnaFee,
+      item.totalPrice,
+    ])),
   )
 
   return [header, ...rows].join('\n')

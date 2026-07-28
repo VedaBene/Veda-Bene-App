@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
-import { getReceivableStatementRows } from '@/lib/server/reporting/financial'
+import { getReceivableReport } from '@/lib/server/reporting/receivable'
 import { formatReceivableCSV } from '@/lib/utils/export-csv'
 import {
   receivableExportSearchParamsSchema,
@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     .eq('id', user.id)
     .single()
 
-  if (!['admin', 'secretaria'].includes(profile?.role ?? '')) {
+  if (profile?.role !== 'admin') {
     return NextResponse.json({ error: 'Sem permissão' }, { status: 403 })
   }
 
@@ -32,14 +32,23 @@ export async function GET(request: NextRequest) {
   }
 
   const { startDate, endDate, clientType, clientId } = parsedFilters.data
-  const data = await getReceivableStatementRows(supabase, { startDate, endDate, clientType, clientId })
-  const csv = formatReceivableCSV(data)
-  const filename = `extrato-a-receber_${startDate}_${endDate}.csv`
+  try {
+    const report = await getReceivableReport(supabase, { startDate, endDate, clientType, clientId })
+    const csv = formatReceivableCSV(report)
+    const filename = `extrato-a-receber_${startDate}_${endDate}.csv`
 
-  return new NextResponse(csv, {
-    headers: {
-      'Content-Type': 'text/csv; charset=utf-8',
-      'Content-Disposition': `attachment; filename="${filename}"`,
-    },
-  })
+    return new NextResponse(csv, {
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Cache-Control': 'private, no-store',
+        'X-Content-Type-Options': 'nosniff',
+      },
+    })
+  } catch {
+    return NextResponse.json(
+      { error: 'Não foi possível gerar o relatório.' },
+      { status: 500 },
+    )
+  }
 }

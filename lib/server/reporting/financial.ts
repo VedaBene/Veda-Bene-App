@@ -2,17 +2,14 @@ import 'server-only'
 
 import { captureQueryError } from '@/lib/server/logger'
 import { resolveOrderHours, resolveOrderPayableHours } from '@/lib/server/hours'
-import { CONSEGNA_FEE } from '@/lib/server/pricing'
 import type { DashboardData, MonthStat, TopProperty } from '@/lib/types/dashboard'
 import type {
   ClientOption,
   EmployeeOption,
   PayableDetailRow,
   PayableRow,
-  ReceivableDetailRow,
-  ReceivableRow,
 } from '@/lib/types/reporting'
-import type { PayableStatementFilters, ReceivableStatementFilters } from '@/lib/server/validation/contracts'
+import type { PayableStatementFilters } from '@/lib/server/validation/contracts'
 import type { SupabaseServerClient } from '@/lib/server/data-access/viewer'
 
 type PayableOrder = {
@@ -21,23 +18,6 @@ type PayableOrder = {
   completed_at: string | null
   cleaning_staff: { id: string }[] | null
   property: { name?: string | null; avg_cleaning_hours: number | null } | null
-}
-
-type ReceivableOrder = {
-  id: string
-  order_number: number
-  completed_at: string | null
-  real_guests: number | null
-  extra_services_price: number | null
-  consegna_fee: number | null
-  total_price: number | null
-  property: {
-    id: string
-    name: string
-    client_type: 'rental' | 'particular'
-    agency: { id: string; name: string } | null
-    owner: { id: string; name: string } | null
-  } | null
 }
 
 type StaffProfile = {
@@ -78,52 +58,6 @@ function unwrap<T>(
     return []
   }
   return value.data ?? []
-}
-
-function clientName(property: NonNullable<ReceivableOrder['property']>): string {
-  return property.client_type === 'rental'
-    ? (property.agency?.name ?? '—')
-    : (property.owner?.name ?? '—')
-}
-
-function matchesReceivableFilters(
-  property: NonNullable<ReceivableOrder['property']>,
-  filters: ReceivableStatementFilters,
-): boolean {
-  if (filters.clientType && filters.clientType !== 'all' && property.client_type !== filters.clientType) {
-    return false
-  }
-
-  if (!filters.clientId) return true
-
-  return property.agency?.id === filters.clientId || property.owner?.id === filters.clientId
-}
-
-async function fetchReceivableOrders(
-  supabase: SupabaseServerClient,
-  filters: ReceivableStatementFilters,
-  includeDetail: boolean,
-): Promise<ReceivableOrder[]> {
-  let query = supabase
-    .from('service_orders')
-    .select(`
-      id, order_number, completed_at, real_guests, extra_services_price, consegna_fee, total_price,
-      property:properties(
-        id, name, client_type,
-        agency:agencies(id, name),
-        owner:owners(id, name)
-      )
-    `)
-    .eq('status', 'done')
-    .gte('completed_at', filters.startDate)
-    .lte('completed_at', filters.endDate)
-
-  if (includeDetail) {
-    query = query.order('completed_at', { ascending: true })
-  }
-
-  const { data } = await query
-  return (data ?? []) as unknown as ReceivableOrder[]
 }
 
 async function fetchPayableOrders(
@@ -312,71 +246,6 @@ export async function getPayableDetailRows(
     if (a.employee_name !== b.employee_name) return a.employee_name.localeCompare(b.employee_name)
     return (a.completed_at ?? '').localeCompare(b.completed_at ?? '')
   })
-
-  return rows
-}
-
-export async function getReceivableStatementRows(
-  supabase: SupabaseServerClient,
-  filters: ReceivableStatementFilters,
-): Promise<ReceivableRow[]> {
-  const detailRows = await getReceivableDetailRows(supabase, filters)
-  const map = new Map<string, ReceivableRow>()
-
-  for (const detail of detailRows) {
-    let row = map.get(detail.property_id)
-    if (!row) {
-      row = {
-        property_id: detail.property_id,
-        property_name: detail.property_name,
-        client_type: detail.client_type,
-        client_name: detail.client_name,
-        os_count: 0,
-        total_value: 0,
-      }
-      map.set(detail.property_id, row)
-    }
-
-    row.os_count += 1
-    row.total_value += detail.total_price
-  }
-
-  return [...map.values()].map(row => ({
-    ...row,
-    total_value: roundMoney(row.total_value),
-  }))
-}
-
-export async function getReceivableDetailRows(
-  supabase: SupabaseServerClient,
-  filters: ReceivableStatementFilters,
-): Promise<(ReceivableDetailRow & { property_id: string })[]> {
-  const orders = await fetchReceivableOrders(supabase, filters, true)
-  const rows: (ReceivableDetailRow & { property_id: string })[] = []
-
-  for (const order of orders) {
-    const property = order.property
-    if (!property || !matchesReceivableFilters(property, filters)) continue
-
-    const totalPrice = order.total_price ?? 0
-    const extraServicesPrice = order.extra_services_price ?? 0
-    const consegnaFee = order.total_price == null ? 0 : order.consegna_fee ?? CONSEGNA_FEE
-
-    rows.push({
-      order_id: order.id,
-      order_number: order.order_number,
-      completed_at: order.completed_at,
-      property_id: property.id,
-      property_name: property.name,
-      client_type: property.client_type,
-      client_name: clientName(property),
-      real_guests: order.real_guests,
-      extra_services_price: order.extra_services_price,
-      cleaning_price: roundMoney(Math.max(0, totalPrice - extraServicesPrice - consegnaFee)),
-      consegna_fee: roundMoney(consegnaFee),
-      total_price: roundMoney(totalPrice),
-    })
-  }
 
   return rows
 }

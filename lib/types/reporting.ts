@@ -1,4 +1,4 @@
-import type { ClientType } from '@/lib/types/database'
+import type { PricingMode } from '@/lib/types/database'
 
 export type PayableRow = {
   employee_id: string
@@ -8,15 +8,6 @@ export type PayableRow = {
   hourly_rate: number | null
   monthly_salary: number | null
   total_amount: number | null
-}
-
-export type ReceivableRow = {
-  property_id: string
-  property_name: string
-  client_type: ClientType
-  client_name: string
-  os_count: number
-  total_value: number
 }
 
 export type EmployeeOption = {
@@ -29,18 +20,49 @@ export type ClientOption = {
   name: string
 }
 
-export type ReceivableDetailRow = {
-  order_id: string
-  order_number: number
-  completed_at: string | null
-  property_name: string
-  client_type: ClientType
-  client_name: string
-  real_guests: number | null
-  cleaning_price: number
-  extra_services_price: number | null
-  consegna_fee: number
-  total_price: number
+export type ReceivableOrderRow = {
+  section: PricingMode
+  orderId: string
+  orderNumber: number
+  cleaningDate: string
+  propertyName: string
+  clientName: string
+  occupancy: {
+    guests: number | null
+    doubleBeds: number
+    singleBeds: number
+    sofaBeds: number
+    bathrooms: number
+    bidets: number
+    cribs: number
+  }
+  currentBasePrice: number | null
+  consideredAmount: number
+  extraDescription: string | null
+  extraAmount: number
+  consegnaFee: number
+  totalPrice: number
+}
+
+export type ReceivableSection = {
+  mode: PricingMode
+  rows: ReceivableOrderRow[]
+  orderCount: number
+  consideredTotal: number
+  extraTotal: number
+  consegnaTotal: number
+  sectionTotal: number
+}
+
+export type ReceivableReport = {
+  period: {
+    startDate: string
+    endDate: string
+  }
+  standard: ReceivableSection
+  ripasso: ReceivableSection
+  outLongStay: ReceivableSection
+  grandTotal: number
 }
 
 export type PayableDetailRow = {

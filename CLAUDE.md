@@ -11,8 +11,8 @@
 ## Cinco perfis de acesso (roles)
 | Role | Permissões |
 |------|-----------|
-| `admin` | Acesso total, incluindo remuneração e extratos a pagar |
-| `secretaria` | Imóveis + OS + extratos a receber (sem ver preços de imóveis nem remuneração) |
+| `admin` | Acesso total, incluindo os módulos A Receber e A Pagar |
+| `secretaria` | Imóveis + OS, sem acesso aos módulos financeiros nem aos preços dos imóveis |
 | `limpeza` | Apenas suas próprias OSs + dados básicos do imóvel (sem preços) |
 | `consegna` | Idêntico ao de limpeza |
 | `cliente` | Seus imóveis + OSs abertas/finalizadas (sem nomes de responsáveis) |

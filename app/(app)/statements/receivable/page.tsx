@@ -2,8 +2,9 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import { ReceivableStatement } from '@/components/statements/ReceivableStatement'
 import { PageHeader } from '@/components/ui/PageHeader'
-import { fetchReceivableData, fetchAgencies, fetchOwners } from '../actions'
+import { fetchReceivableReport, fetchAgencies, fetchOwners } from '../actions'
 import type { Role } from '@/lib/types/database'
+import { getRomeDateOnly, getRomeMonthStartDateOnly } from '@/lib/utils/date-rome'
 
 export default async function ReceivablePage() {
   const supabase = await createClient()
@@ -22,19 +23,25 @@ export default async function ReceivablePage() {
   if (role !== 'admin') redirect('/service-orders')
 
   const now = new Date()
-  const startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10)
-  const endDate = now.toISOString().slice(0, 10)
+  const startDate = getRomeMonthStartDateOnly(now)
+  const endDate = getRomeDateOnly(now)
 
   const [initial, agencies, owners] = await Promise.all([
-    fetchReceivableData(startDate, endDate),
+    fetchReceivableReport(startDate, endDate),
     fetchAgencies(),
     fetchOwners(),
   ])
 
   return (
     <div className="animate-fade-in-up">
-      <PageHeader title="Extrato a Receber" description="Resumo de valores a receber por imóvel no período selecionado" />
-      <ReceivableStatement initial={initial} agencies={agencies} owners={owners} />
+      <PageHeader title="Extrato a Receber" description="Ordens de serviço e composição dos valores no período selecionado" />
+      <ReceivableStatement
+        initial={initial}
+        initialStartDate={startDate}
+        initialEndDate={endDate}
+        agencies={agencies}
+        owners={owners}
+      />
     </div>
   )
 }

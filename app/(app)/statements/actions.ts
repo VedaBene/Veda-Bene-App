@@ -4,12 +4,11 @@ import { getAuthorizedClient } from '@/lib/server/authz'
 import {
   getPayableDetailRows,
   getPayableStatementRows,
-  getReceivableDetailRows,
-  getReceivableStatementRows,
   getReportingAgencies,
   getReportingEmployees,
   getReportingOwners,
 } from '@/lib/server/reporting/financial'
+import { getReceivableReport } from '@/lib/server/reporting/receivable'
 import {
   payableStatementFiltersSchema,
   receivableStatementFiltersSchema,
@@ -20,8 +19,7 @@ import type {
   EmployeeOption,
   PayableDetailRow,
   PayableRow,
-  ReceivableDetailRow,
-  ReceivableRow,
+  ReceivableReport,
 } from '@/lib/types/reporting'
 
 export async function fetchEmployees(): Promise<EmployeeOption[]> {
@@ -42,39 +40,26 @@ export async function fetchPayableData(
 }
 
 export async function fetchAgencies(): Promise<ClientOption[]> {
-  const { supabase } = await getAuthorizedClient()
+  const { supabase } = await getAuthorizedClient(['admin'])
   return getReportingAgencies(supabase)
 }
 
 export async function fetchOwners(): Promise<ClientOption[]> {
-  const { supabase } = await getAuthorizedClient()
+  const { supabase } = await getAuthorizedClient(['admin'])
   return getReportingOwners(supabase)
 }
 
-export async function fetchReceivableData(
+export async function fetchReceivableReport(
   startDate: string,
   endDate: string,
   clientType?: 'rental' | 'particular' | 'all',
   clientId?: string,
-): Promise<ReceivableRow[]> {
+): Promise<ReceivableReport> {
   const parsedFilters = receivableStatementFiltersSchema.safeParse({ startDate, endDate, clientType, clientId })
   if (!parsedFilters.success) throw new Error(validationMessage(parsedFilters.error))
 
-  const { supabase } = await getAuthorizedClient()
-  return getReceivableStatementRows(supabase, parsedFilters.data)
-}
-
-export async function fetchReceivableDetail(
-  startDate: string,
-  endDate: string,
-  clientType?: 'rental' | 'particular' | 'all',
-  clientId?: string,
-): Promise<ReceivableDetailRow[]> {
-  const parsedFilters = receivableStatementFiltersSchema.safeParse({ startDate, endDate, clientType, clientId })
-  if (!parsedFilters.success) throw new Error(validationMessage(parsedFilters.error))
-
-  const { supabase } = await getAuthorizedClient()
-  return getReceivableDetailRows(supabase, parsedFilters.data)
+  const { supabase } = await getAuthorizedClient(['admin'])
+  return getReceivableReport(supabase, parsedFilters.data)
 }
 
 export async function fetchPayableDetail(
