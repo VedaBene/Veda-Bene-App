@@ -138,10 +138,12 @@ Sem qualquer um desses itens, a operação permanece proibida.
 
 ## Aplicação à funcionalidade de fotos
 
-A migration de fotos deve apenas adicionar `service_orders.cleaning_cycle`, a
-tabela `service_order_photos`, índices, RLS e o bucket privado. Ela não altera nem
-remove Ordens de Serviço existentes. A versão anterior da aplicação ignora esses
-objetos e continua compatível.
+As migrations de fotos adicionam `service_orders.cleaning_cycle`, a tabela
+`service_order_photos`, índices, RLS e o bucket privado. A evolução de formatos
+adiciona somente `service_order_photos.content_type`, com default WebP para os
+registros existentes, e permite JPEG no mesmo bucket privado. Nenhuma delas
+remove Ordens de Serviço, metadados ou objetos. A versão anterior da aplicação
+continua gravando WebP e permanece compatível.
 
 O rollback é feito com `CLEANING_PHOTOS_ENABLED=false` e reimplantação de uma
 versão compatível. A tabela, a coluna, o bucket e todas as imagens permanecem

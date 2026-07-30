@@ -10,7 +10,7 @@ import {
   finalizeCleaningPhotoUpload,
   reserveCleaningPhotoUpload,
 } from '@/lib/server/service-order-photos'
-import type { CleaningPhotoPhase } from '@/lib/types/service-order-photos'
+import type { CleaningPhotoContentType, CleaningPhotoPhase } from '@/lib/types/service-order-photos'
 
 function assertEnabled() {
   if (!isCleaningPhotosEnabled()) throw new Error('La funzione foto non è attiva.')
@@ -20,6 +20,7 @@ async function reserveImpl(
   serviceOrderId: string,
   phase: CleaningPhotoPhase,
   clientUploadId: string,
+  contentType: CleaningPhotoContentType,
 ) {
   assertEnabled()
   const { supabase, viewer } = await getCurrentViewer()
@@ -27,6 +28,7 @@ async function reserveImpl(
     serviceOrderId,
     phase,
     clientUploadId,
+    contentType,
   })
   return { success: true as const, upload }
 }
@@ -57,8 +59,11 @@ export async function reserveCleaningPhoto(
   serviceOrderId: string,
   phase: CleaningPhotoPhase,
   clientUploadId: string,
+  contentType: CleaningPhotoContentType,
 ) {
-  return withLogging('reserveCleaningPhoto', () => reserveImpl(serviceOrderId, phase, clientUploadId))
+  return withLogging('reserveCleaningPhoto', () =>
+    reserveImpl(serviceOrderId, phase, clientUploadId, contentType),
+  )
 }
 
 export async function finalizeCleaningPhoto(photoId: string) {

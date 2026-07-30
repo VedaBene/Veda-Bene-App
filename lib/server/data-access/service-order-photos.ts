@@ -15,7 +15,7 @@ export async function getCleaningPhotoGallery(
 ): Promise<CleaningPhotoGalleryCycle[]> {
   const { data, error } = await supabase
     .from('service_order_photos')
-    .select('id, service_order_id, cycle_no, phase, status, display_path, thumbnail_path, uploaded_by, sort_order, width, height, display_size_bytes, thumbnail_size_bytes, created_at, ready_at')
+    .select('id, service_order_id, cycle_no, phase, status, content_type, display_path, thumbnail_path, uploaded_by, sort_order, width, height, display_size_bytes, thumbnail_size_bytes, created_at, ready_at')
     .eq('service_order_id', serviceOrderId)
     .eq('status', 'ready')
     .order('cycle_no', { ascending: false })

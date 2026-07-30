@@ -1,7 +1,9 @@
 import 'server-only'
 
 import { createClient } from '@supabase/supabase-js'
+import sharp from 'sharp'
 import type {
+  CleaningPhotoContentType,
   CleaningPhotoPhase,
   ServiceOrderPhotoRecord,
 } from '@/lib/types/service-order-photos'
@@ -9,17 +11,24 @@ import type {
 export const CLEANING_PHOTO_BUCKET = 'service-order-photos'
 export const MAX_DISPLAY_BYTES = 2 * 1024 * 1024
 export const MAX_THUMBNAIL_BYTES = 512 * 1024
+const MAX_DECODE_PIXELS = 1920 * 1920
+
+const CONTENT_TYPE_CONFIG: Record<CleaningPhotoContentType, { extension: string; sharpFormat: string }> = {
+  'image/webp': { extension: 'webp', sharpFormat: 'webp' },
+  'image/jpeg': { extension: 'jpg', sharpFormat: 'jpeg' },
+}
 
 type ReservePhotoInput = {
   id: string
   serviceOrderId: string
   cycleNo: number
   phase: CleaningPhotoPhase
+  contentType: CleaningPhotoContentType
   uploadedBy: string
   sortOrder: number
 }
 
-type InspectedWebp = {
+type InspectedImage = {
   size: number
   width: number
   height: number
@@ -39,9 +48,10 @@ function createStorageAdminClient() {
 
 function buildPaths(input: ReservePhotoInput) {
   const base = `${input.serviceOrderId}/cycle-${input.cycleNo}/${input.phase}/${input.id}`
+  const extension = CONTENT_TYPE_CONFIG[input.contentType].extension
   return {
-    displayPath: `${base}/display.webp`,
-    thumbnailPath: `${base}/thumb.webp`,
+    displayPath: `${base}/display.${extension}`,
+    thumbnailPath: `${base}/thumb.${extension}`,
   }
 }
 
@@ -109,6 +119,7 @@ export async function reservePhotoRecord(input: ReservePhotoInput): Promise<Serv
       cycle_no: input.cycleNo,
       phase: input.phase,
       status: 'pending',
+      content_type: input.contentType,
       display_path: displayPath,
       thumbnail_path: thumbnailPath,
       uploaded_by: input.uploadedBy,
@@ -135,41 +146,41 @@ export async function createPhotoUploadTokens(record: ServiceOrderPhotoRecord) {
 
   return {
     photoId: record.id,
+    contentType: record.content_type,
     display: { path: record.display_path, token: display.data.token },
     thumbnail: { path: record.thumbnail_path, token: thumbnail.data.token },
   }
 }
 
-export function parseWebpDimensions(bytes: Uint8Array): { width: number; height: number } | null {
-  if (bytes.length < 30) return null
-  const ascii = (offset: number, length: number) =>
-    String.fromCharCode(...bytes.subarray(offset, offset + length))
-  if (ascii(0, 4) !== 'RIFF' || ascii(8, 4) !== 'WEBP') return null
+export async function inspectImageBytes(
+  bytes: Uint8Array,
+  expectedContentType: CleaningPhotoContentType,
+): Promise<{ width: number; height: number }> {
+  try {
+    const image = sharp(bytes, {
+      failOn: 'warning',
+      limitInputPixels: MAX_DECODE_PIXELS,
+      sequentialRead: true,
+    })
+    const metadata = await image.metadata()
+    if (metadata.format !== CONTENT_TYPE_CONFIG[expectedContentType].sharpFormat) {
+      throw new Error('Unexpected decoded format')
+    }
+    if ((metadata.pages ?? 1) !== 1) throw new Error('Animated images are not allowed')
 
-  const chunk = ascii(12, 4)
-  if (chunk === 'VP8X') {
-    const width = 1 + bytes[24] + (bytes[25] << 8) + (bytes[26] << 16)
-    const height = 1 + bytes[27] + (bytes[28] << 8) + (bytes[29] << 16)
-    return { width, height }
+    const { info } = await image.clone().raw().toBuffer({ resolveWithObject: true })
+    if (!info.width || !info.height) throw new Error('Missing decoded dimensions')
+    return { width: info.width, height: info.height }
+  } catch {
+    throw new Error('O conteúdo da imagem é inválido.')
   }
-
-  if (chunk === 'VP8 ' && bytes.length >= 30) {
-    if (bytes[23] !== 0x9d || bytes[24] !== 0x01 || bytes[25] !== 0x2a) return null
-    const width = (bytes[26] | (bytes[27] << 8)) & 0x3fff
-    const height = (bytes[28] | (bytes[29] << 8)) & 0x3fff
-    return width > 0 && height > 0 ? { width, height } : null
-  }
-
-  if (chunk === 'VP8L' && bytes[20] === 0x2f) {
-    const width = 1 + bytes[21] + ((bytes[22] & 0x3f) << 8)
-    const height = 1 + ((bytes[22] & 0xc0) >> 6) + (bytes[23] << 2) + ((bytes[24] & 0x0f) << 10)
-    return { width, height }
-  }
-
-  return null
 }
 
-export async function inspectWebpObject(path: string): Promise<InspectedWebp> {
+export async function inspectImageObject(
+  path: string,
+  expectedContentType: CleaningPhotoContentType,
+  limits: { maxBytes: number; maxDimension: number },
+): Promise<InspectedImage> {
   const admin = createStorageAdminClient()
   const bucket = admin.storage.from(CLEANING_PHOTO_BUCKET)
   const [{ data: info, error: infoError }, { data: blob, error: downloadError }] = await Promise.all([
@@ -181,16 +192,27 @@ export async function inspectWebpObject(path: string): Promise<InspectedWebp> {
     throw new Error('O arquivo enviado não foi encontrado.')
   }
 
-  if (info.contentType !== 'image/webp' || blob.type !== 'image/webp') {
+  const expectedExtension = `.${CONTENT_TYPE_CONFIG[expectedContentType].extension}`
+  if (
+    !path.endsWith(expectedExtension) ||
+    info.contentType !== expectedContentType ||
+    blob.type !== expectedContentType
+  ) {
     throw new Error('Formato de imagem inválido.')
   }
 
+  const size = info.size ?? blob.size
+  if (size <= 0 || size > limits.maxBytes) {
+    throw new Error('La foto supera il limite di dimensione consentito.')
+  }
   const bytes = new Uint8Array(await blob.arrayBuffer())
-  const dimensions = parseWebpDimensions(bytes)
-  if (!dimensions) throw new Error('O conteúdo da imagem é inválido.')
+  const dimensions = await inspectImageBytes(bytes, expectedContentType)
+  if (dimensions.width > limits.maxDimension || dimensions.height > limits.maxDimension) {
+    throw new Error('La risoluzione della foto supera il limite consentito.')
+  }
 
   return {
-    size: info.size ?? blob.size,
+    size,
     ...dimensions,
   }
 }

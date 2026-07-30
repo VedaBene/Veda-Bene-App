@@ -3,13 +3,16 @@
 ## Fluxo funcional
 
 1. O funcionário seleciona até oito fotos no pop-up de início ou conclusão.
-2. O navegador valida, corrige a orientação durante a decodificação, redimensiona
-   e regrava cada imagem como WebP. A regravação remove EXIF e GPS.
+2. O navegador valida, corrige a orientação durante a decodificação, limita a
+   fonte a 50 megapixels, redimensiona e regrava cada imagem. Usa WebP quando um
+   probe real de canvas confirma a codificação e JPEG como fallback. A
+   regravação remove EXIF e GPS.
 3. Uma Server Action confirma identidade, perfil, atribuição, estado e ciclo da
    O.S. antes de reservar dois caminhos imutáveis.
-4. O navegador envia `display.webp` e `thumb.webp` por URLs assinadas, sem receber
-   credenciais privilegiadas.
-5. O servidor confere os objetos e muda o metadado de `pending` para `ready`.
+4. O navegador envia `display` e `thumb`, ambos no MIME contratado, por URLs
+   assinadas, sem receber credenciais privilegiadas.
+5. O servidor confere caminho, MIME, tamanho, dimensões, formato e decodificação
+   integral dos objetos antes de mudar o metadado de `pending` para `ready`.
 6. A transição de início/conclusão valida que os IDs prontos pertencem à mesma
    O.S., ciclo, fase e usuário.
 7. A galeria consulta somente linhas liberadas pelo RLS e recebe URLs de leitura
@@ -25,12 +28,13 @@ anterior.
 | Fotos por fase e ciclo | 8 |
 | Arquivo selecionado | 20 MB |
 | Lado maior da visualização | 1920 px |
-| Visualização WebP | 2 MB |
+| Visualização WebP/JPEG | 2 MB |
 | Lado maior da miniatura | 480 px |
-| Miniatura WebP | 512 KB no servidor; alvo menor no navegador |
+| Miniatura WebP/JPEG | 512 KB no servidor; alvo menor no navegador |
 
-Formatos aceitos: JPEG, PNG e WebP. HEIC/HEIF gera uma orientação clara ao
-usuário em vez de enviar um original não otimizado.
+Formatos de origem aceitos: JPEG, PNG e WebP. As variantes armazenadas usam WebP
+ou JPEG. HEIC/HEIF gera uma orientação clara ao usuário em vez de enviar um
+original não otimizado.
 
 ## Autorização
 
@@ -55,10 +59,12 @@ anteriores não são alteradas. A galeria mostra o ciclo mais recente primeiro.
 1. Manter `CLEANING_PHOTOS_ENABLED=false` durante a preparação do schema.
 2. Cumprir integralmente a política em `docs/production-data-safety.md`, incluindo
    backup/restauração verificados, dry-run, invariantes e autorização explícita.
-3. Aplicar a migration versionada
-   `20260722041920_add_service_order_cleaning_photos.sql`.
+3. Aplicar, na ordem, as migrations versionadas
+   `20260722041920_add_service_order_cleaning_photos.sql` e
+   `20260730231155_allow_jpeg_cleaning_photos.sql`.
 4. Confirmar que as invariantes das O.S. não mudaram e validar tabela,
-   constraints, índices, grants, RLS e bucket privado.
+   constraints, índices, grants, RLS e bucket privado, incluindo as asserções
+   read-only de `supabase/tests/service_order_photo_formats_invariants.sql`.
 5. Publicar a aplicação.
 6. Fazer smoke test autenticado com a flag ainda desligada.
 7. Publicar a aplicação, que habilita a funcionalidade por padrão. Para uma

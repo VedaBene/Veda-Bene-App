@@ -1,12 +1,15 @@
 import { z } from 'zod'
+import { CLEANING_PHOTO_CONTENT_TYPES } from '@/lib/types/service-order-photos'
 import { uuidSchema } from './contracts'
 
 export const cleaningPhotoPhaseSchema = z.enum(['before', 'after'])
+export const cleaningPhotoContentTypeSchema = z.enum(CLEANING_PHOTO_CONTENT_TYPES)
 
 export const reserveCleaningPhotoSchema = z.object({
   serviceOrderId: uuidSchema,
   phase: cleaningPhotoPhaseSchema,
   clientUploadId: uuidSchema,
+  contentType: cleaningPhotoContentTypeSchema,
 })
 
 export const finalizeCleaningPhotoSchema = z.object({

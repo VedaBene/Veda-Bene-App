@@ -12,7 +12,7 @@ import {
   deletePhotoRecordAndObjects,
   findPhotoById,
   findPhotosByIds,
-  inspectWebpObject,
+  inspectImageObject,
   listPhotoRecords,
   markPhotoReady,
   MAX_DISPLAY_BYTES,
@@ -89,7 +89,7 @@ export async function reserveCleaningPhotoUpload(
   const parsed = reserveCleaningPhotoSchema.safeParse(input)
   if (!parsed.success) throw new Error(validationMessage(parsed.error))
 
-  const { serviceOrderId, phase, clientUploadId } = parsed.data
+  const { serviceOrderId, phase, clientUploadId, contentType } = parsed.data
   const order = await loadAuthorizedOrderForPhase(supabase, viewer, serviceOrderId, phase)
 
   const existing = await findPhotoById(clientUploadId)
@@ -98,6 +98,7 @@ export async function reserveCleaningPhotoUpload(
       existing.service_order_id === serviceOrderId &&
       existing.cycle_no === order.cleaning_cycle &&
       existing.phase === phase &&
+      existing.content_type === contentType &&
       existing.uploaded_by === viewer.userId
     if (!belongsToRequest || existing.status !== 'pending') {
       throw new Error('Questa foto è già stata utilizzata.')
@@ -119,6 +120,7 @@ export async function reserveCleaningPhotoUpload(
     serviceOrderId,
     cycleNo: order.cleaning_cycle,
     phase,
+    contentType,
     uploadedBy: viewer.userId,
     sortOrder,
   })
@@ -156,20 +158,14 @@ export async function finalizeCleaningPhotoUpload(
   }
 
   try {
-    const [display, thumbnail] = await Promise.all([
-      inspectWebpObject(record.display_path),
-      inspectWebpObject(record.thumbnail_path),
-    ])
-
-    if (display.size > MAX_DISPLAY_BYTES || thumbnail.size > MAX_THUMBNAIL_BYTES) {
-      throw new Error('La foto supera il limite di dimensione consentito.')
-    }
-    if (display.width > 1920 || display.height > 1920) {
-      throw new Error('La risoluzione della foto supera il limite consentito.')
-    }
-    if (thumbnail.width > 480 || thumbnail.height > 480) {
-      throw new Error('La miniatura supera la risoluzione consentita.')
-    }
+    const display = await inspectImageObject(record.display_path, record.content_type, {
+      maxBytes: MAX_DISPLAY_BYTES,
+      maxDimension: 1920,
+    })
+    const thumbnail = await inspectImageObject(record.thumbnail_path, record.content_type, {
+      maxBytes: MAX_THUMBNAIL_BYTES,
+      maxDimension: 480,
+    })
 
     await markPhotoReady(record.id, {
       width: display.width,

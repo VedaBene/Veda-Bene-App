@@ -1,5 +1,7 @@
 export type CleaningPhotoPhase = 'before' | 'after'
 export type CleaningPhotoStatus = 'pending' | 'ready'
+export const CLEANING_PHOTO_CONTENT_TYPES = ['image/webp', 'image/jpeg'] as const
+export type CleaningPhotoContentType = (typeof CLEANING_PHOTO_CONTENT_TYPES)[number]
 
 export type ServiceOrderPhotoRecord = {
   id: string
@@ -7,6 +9,7 @@ export type ServiceOrderPhotoRecord = {
   cycle_no: number
   phase: CleaningPhotoPhase
   status: CleaningPhotoStatus
+  content_type: CleaningPhotoContentType
   display_path: string
   thumbnail_path: string
   uploaded_by: string | null
@@ -21,6 +24,7 @@ export type ServiceOrderPhotoRecord = {
 
 export type ReservedCleaningPhotoUpload = {
   photoId: string
+  contentType: CleaningPhotoContentType
   display: { path: string; token: string }
   thumbnail: { path: string; token: string }
 }

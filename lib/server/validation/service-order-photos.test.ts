@@ -10,6 +10,7 @@ describe('cleaning photo validation', () => {
       serviceOrderId: ORDER_ID,
       phase: 'before',
       clientUploadId: PHOTO_ID,
+      contentType: 'image/jpeg',
     }).success).toBe(true)
   })
 
@@ -18,6 +19,13 @@ describe('cleaning photo validation', () => {
       serviceOrderId: ORDER_ID,
       phase: 'during',
       clientUploadId: PHOTO_ID,
+      contentType: 'image/webp',
+    }).success).toBe(false)
+    expect(reserveCleaningPhotoSchema.safeParse({
+      serviceOrderId: ORDER_ID,
+      phase: 'before',
+      clientUploadId: PHOTO_ID,
+      contentType: 'image/png',
     }).success).toBe(false)
     expect(cleaningPhotoIdsSchema.safeParse([PHOTO_ID, PHOTO_ID]).success).toBe(false)
   })
