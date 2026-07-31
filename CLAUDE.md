@@ -30,6 +30,7 @@ As decisões com maior peso e nuance estão registradas em [`docs/decisions/`](d
 - [ADR 007](docs/decisions/007-exposicao-de-notas-de-limpeza-para-todos-os-perfis.md) — Notas de limpeza são visíveis para todos os perfis que já podem ler a OS
 - [ADR 008](docs/decisions/008-controles-seguranca-autenticacao.md) — Timeout de sessão por inatividade e bloqueio temporário após falhas de login
 - [ADR 012](docs/decisions/012-fotos-privadas-por-ciclo-da-ordem-de-servico.md) — Fotos privadas antes/depois por ciclo, com URLs assinadas e publicação em duas fases
+- [ADR 014](docs/decisions/014-fallback-jpeg-e-validacao-integral-de-fotos.md) — Fallback JPEG quando o canvas não codifica WebP e validação integral das variantes no servidor
 
 Outras convenções importantes:
 - **Integridade dos dados durante desenvolvimento/manutenção (regra absoluta)**: scripts, migrações e operações de manutenção não podem apagar, recriar ou sobrescrever dados e estruturas existentes em produção. Evoluções de banco devem ser incrementais, aditivas e compatíveis; exigem análise de impacto, invariantes verificáveis e rollback não destrutivo. A regra não modifica o CRUD autorizado nem as ações previstas pelas regras de negócio. Leia obrigatoriamente [`docs/production-data-safety.md`](docs/production-data-safety.md) antes de alterar banco, RLS ou Storage.
@@ -50,6 +51,7 @@ Outras convenções importantes:
 ## Documentos de referência
 - [`docs/production-data-safety.md`](docs/production-data-safety.md) — política obrigatória de preservação de dados, migrações e rollback em produção
 - [`docs/service-orders.md`](docs/service-orders.md) — regras atuais da listagem, filtros, prioridade operacional e PDFs de Ordens de Serviço
+- [`docs/maintenance/README.md`](docs/maintenance/README.md) — índice de correções relevantes, atualizações de dependências, validações e implantações
 - `~/Downloads/prd-veda-bene.md` — PRD completo (schema SQL, RLS, padrões de código)
 - `~/Downloads/Spec_1.md` — Plano tático de implementação arquivo a arquivo (derivado do PRD)
 

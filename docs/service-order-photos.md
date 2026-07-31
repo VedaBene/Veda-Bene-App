@@ -87,3 +87,9 @@ anteriores não são alteradas. A galeria mostra o ciclo mais recente primeiro.
 Ao iniciar um novo envio, reservas `pending` abandonadas pelo mesmo usuário são
 removidas. Pendências de outros operadores com mais de 24 horas também são
 limpas oportunisticamente para evitar bloqueio dos oito espaços da fase.
+
+## Histórico da correção de compatibilidade
+
+O diagnóstico, os arquivos alterados, a verificação de preservação dos dados,
+os commits, os deploys e os riscos residuais da correção WebP/JPEG estão no
+[registro de manutenção de 2026-07-30](maintenance/2026-07-30-photo-upload-and-next-security-hardening.md).
