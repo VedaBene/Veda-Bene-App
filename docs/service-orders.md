@@ -94,9 +94,11 @@ apenas por possuir uma janela de limpeza menor.
   - `OSPITI` → `PX`
   - `LETTI MATRIMONIALI` → `M`
   - `LETTI SINGOLI` → `S`
-  - `DIVANI LETTO` → `DC`
+  - `DIVANI LETTO` → `DL`
   - `BAGNI` → `WC`
   - `BIDET` → `BID`
+- A coluna **Note Pulizia** aparece depois de todas as colunas de ocupação
+  efetiva.
 
 ## Pontos de manutenção
 

@@ -10,7 +10,7 @@ const OCCUPANCY_FIELDS: { key: keyof ServiceOrderListItem; label: string }[] = [
   { key: 'real_guests', label: 'PX' },
   { key: 'double_beds', label: 'M' },
   { key: 'single_beds', label: 'S' },
-  { key: 'sofa_beds', label: 'DC' },
+  { key: 'sofa_beds', label: 'DL' },
   { key: 'bathrooms', label: 'WC' },
   { key: 'bidets', label: 'BID' },
   { key: 'cribs', label: 'Culle' },
@@ -78,7 +78,6 @@ function generatePDF(orders: ServiceOrderListItem[], date: string, status: 'open
       <td>${escapeHtml(o.property?.name ?? '—')}</td>
       <td>${formatDateTime(o.checkin_at)}</td>
       <td>${formatDateTime(o.checkout_at)}</td>
-      <td class="notes-cell">${o.cleaning_notes ? escapeHtml(o.cleaning_notes) : '—'}</td>
       ${status === 'done' ? `<td class="completion-cell">
         <span><strong>Conclusa:</strong> ${formatDateTime(o.completed_at)}</span>
         <span><strong>Tempo:</strong> ${o.worked_minutes != null ? formatWorkedTime(o.worked_minutes) : '—'}</span>
@@ -87,6 +86,7 @@ function generatePDF(orders: ServiceOrderListItem[], date: string, status: 'open
         const val = (o[key] as number) ?? 0
         return `<td class="${val > 0 ? 'highlight' : 'dim'}">${val > 0 ? val : '—'}</td>`
       }).join('')}
+      <td class="notes-cell">${o.cleaning_notes ? escapeHtml(o.cleaning_notes) : '—'}</td>
     </tr>
   `).join('')
 
@@ -111,7 +111,7 @@ function generatePDF(orders: ServiceOrderListItem[], date: string, status: 'open
     table { width: 100%; border-collapse: collapse; margin-bottom: 28px; }
     th { background: #f0f0f0; text-align: center; padding: 5px 4px; font-size: 9px; text-transform: uppercase; letter-spacing: 0.03em; border-bottom: 2px solid #ccc; }
     td { padding: 4px; border-bottom: 1px solid #e5e5e5; vertical-align: middle; text-align: center; }
-    th:nth-child(2), td:nth-child(2), th:nth-child(5), td:nth-child(5) { text-align: left; }
+    th:nth-child(2), td:nth-child(2), .notes-header, .notes-cell { text-align: left; }
     tr:last-child td { border-bottom: none; }
     .highlight { font-weight: 700; color: #111; }
     .dim { color: #aaa; }
@@ -136,9 +136,9 @@ function generatePDF(orders: ServiceOrderListItem[], date: string, status: 'open
         <th>Immobile</th>
         <th>Check-in</th>
         <th>Check-out</th>
-        <th>Note Pulizia</th>
         ${status === 'done' ? '<th>Conclusione / Tempo</th>' : ''}
         ${OCCUPANCY_FIELDS.map(({ label }) => `<th>${label}</th>`).join('')}
+        <th class="notes-header">Note Pulizia</th>
       </tr>
     </thead>
     <tbody>
