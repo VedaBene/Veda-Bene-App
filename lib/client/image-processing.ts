@@ -2,9 +2,10 @@ import 'client-only'
 
 import type { CleaningPhotoContentType } from '@/lib/types/service-order-photos'
 
+export { MAX_CLEANING_PHOTOS } from '@/lib/types/service-order-photos'
+
 export const MAX_SOURCE_IMAGE_BYTES = 20 * 1024 * 1024
 export const MAX_SOURCE_IMAGE_PIXELS = 50_000_000
-export const MAX_CLEANING_PHOTOS = 8
 export const MAX_DISPLAY_IMAGE_BYTES = 2 * 1024 * 1024
 export const MAX_THUMBNAIL_IMAGE_BYTES = 512 * 1024
 

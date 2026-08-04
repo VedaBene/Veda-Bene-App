@@ -10,7 +10,12 @@ import {
   finalizeCleaningPhotoUpload,
   reserveCleaningPhotoUpload,
 } from '@/lib/server/service-order-photos'
-import type { CleaningPhotoContentType, CleaningPhotoPhase } from '@/lib/types/service-order-photos'
+import {
+  CLEANING_PHOTO_LIMIT_CODE,
+  CLEANING_PHOTO_LIMIT_MESSAGE,
+  type CleaningPhotoContentType,
+  type CleaningPhotoPhase,
+} from '@/lib/types/service-order-photos'
 
 function assertEnabled() {
   if (!isCleaningPhotosEnabled()) throw new Error('La funzione foto non è attiva.')
@@ -24,13 +29,24 @@ async function reserveImpl(
 ) {
   assertEnabled()
   const { supabase, viewer } = await getCurrentViewer()
-  const upload = await reserveCleaningPhotoUpload(supabase, viewer, {
-    serviceOrderId,
-    phase,
-    clientUploadId,
-    contentType,
-  })
-  return { success: true as const, upload }
+  try {
+    const upload = await reserveCleaningPhotoUpload(supabase, viewer, {
+      serviceOrderId,
+      phase,
+      clientUploadId,
+      contentType,
+    })
+    return { success: true as const, upload }
+  } catch (error) {
+    if (error instanceof Error && error.message === CLEANING_PHOTO_LIMIT_MESSAGE) {
+      return {
+        success: false as const,
+        code: CLEANING_PHOTO_LIMIT_CODE,
+        error: CLEANING_PHOTO_LIMIT_MESSAGE,
+      }
+    }
+    throw error
+  }
 }
 
 async function finalizeImpl(photoId: string) {

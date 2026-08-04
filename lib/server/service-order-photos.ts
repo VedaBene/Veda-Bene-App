@@ -24,6 +24,10 @@ import type {
   ReservedCleaningPhotoUpload,
   ServiceOrderPhotoRecord,
 } from '@/lib/types/service-order-photos'
+import {
+  CLEANING_PHOTO_LIMIT_MESSAGE,
+  MAX_CLEANING_PHOTOS,
+} from '@/lib/types/service-order-photos'
 import { validationMessage } from '@/lib/server/validation/contracts'
 
 const PHOTO_OPERATOR_ROLES = new Set(['admin', 'secretaria', 'limpeza'])
@@ -112,8 +116,9 @@ export async function reserveCleaningPhotoUpload(
   records = await listPhotoRecords(serviceOrderId, order.cleaning_cycle, phase)
 
   const usedSlots = new Set(records.map(record => record.sort_order))
-  const sortOrder = Array.from({ length: 8 }, (_, index) => index).find(index => !usedSlots.has(index))
-  if (sortOrder === undefined) throw new Error('Massimo 8 foto per fase.')
+  const sortOrder = Array.from({ length: MAX_CLEANING_PHOTOS }, (_, index) => index)
+    .find(index => !usedSlots.has(index))
+  if (sortOrder === undefined) throw new Error(CLEANING_PHOTO_LIMIT_MESSAGE)
 
   const record = await reservePhotoRecord({
     id: clientUploadId,

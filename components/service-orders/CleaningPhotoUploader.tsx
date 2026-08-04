@@ -1,6 +1,7 @@
 'use client'
 
 import { Camera, Check, ImagePlus, Loader2, RotateCcw, Trash2 } from 'lucide-react'
+import { MAX_CLEANING_PHOTOS } from '@/lib/types/service-order-photos'
 import type { CleaningPhotoQueueItem } from './useCleaningPhotoWorkflow'
 
 export function CleaningPhotoUploader({
@@ -25,9 +26,9 @@ export function CleaningPhotoUploader({
       <div className="flex items-center justify-between gap-2">
         <div>
           <p className="text-xs font-semibold text-foreground">{label}</p>
-          <p className="text-[11px] text-muted-foreground">Opzionale · massimo 8 foto</p>
+          <p className="text-[11px] text-muted-foreground">Opzionale · massimo {MAX_CLEANING_PHOTOS} foto</p>
         </div>
-        <span className="text-[11px] text-muted-foreground">{items.length}/8</span>
+        <span className="text-[11px] text-muted-foreground">{items.length}/{MAX_CLEANING_PHOTOS}</span>
       </div>
 
       <div className="grid grid-cols-2 gap-2">
@@ -39,7 +40,7 @@ export function CleaningPhotoUploader({
             accept="image/jpeg,image/png,image/webp"
             capture="environment"
             multiple
-            disabled={disabled || items.length >= 8}
+            disabled={disabled || items.length >= MAX_CLEANING_PHOTOS}
             className="sr-only"
             onChange={event => { onFiles(event.target.files); event.target.value = '' }}
           />
@@ -51,7 +52,7 @@ export function CleaningPhotoUploader({
             type="file"
             accept="image/jpeg,image/png,image/webp,.heic,.heif"
             multiple
-            disabled={disabled || items.length >= 8}
+            disabled={disabled || items.length >= MAX_CLEANING_PHOTOS}
             className="sr-only"
             onChange={event => { onFiles(event.target.files); event.target.value = '' }}
           />

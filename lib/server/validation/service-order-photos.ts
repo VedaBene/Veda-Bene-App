@@ -1,5 +1,9 @@
 import { z } from 'zod'
-import { CLEANING_PHOTO_CONTENT_TYPES } from '@/lib/types/service-order-photos'
+import {
+  CLEANING_PHOTO_CONTENT_TYPES,
+  CLEANING_PHOTO_LIMIT_MESSAGE,
+  MAX_CLEANING_PHOTOS,
+} from '@/lib/types/service-order-photos'
 import { uuidSchema } from './contracts'
 
 export const cleaningPhotoPhaseSchema = z.enum(['before', 'after'])
@@ -18,5 +22,5 @@ export const finalizeCleaningPhotoSchema = z.object({
 
 export const cleaningPhotoIdsSchema = z
   .array(uuidSchema)
-  .max(8, 'Massimo 8 foto per fase')
+  .max(MAX_CLEANING_PHOTOS, CLEANING_PHOTO_LIMIT_MESSAGE)
   .refine(ids => new Set(ids).size === ids.length, 'Le foto non possono essere duplicate')

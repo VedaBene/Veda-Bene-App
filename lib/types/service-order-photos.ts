@@ -1,6 +1,10 @@
 export type CleaningPhotoPhase = 'before' | 'after'
 export type CleaningPhotoStatus = 'pending' | 'ready'
 export const CLEANING_PHOTO_CONTENT_TYPES = ['image/webp', 'image/jpeg'] as const
+export const MAX_CLEANING_PHOTOS = 8
+export const CLEANING_PHOTO_LIMIT_CODE = 'photo_limit_reached' as const
+export const CLEANING_PHOTO_LIMIT_MESSAGE =
+  `Sono già presenti ${MAX_CLEANING_PHOTOS} foto per questa fase. Rimuovi la foto in eccesso e riprova.`
 export type CleaningPhotoContentType = (typeof CLEANING_PHOTO_CONTENT_TYPES)[number]
 
 export type ServiceOrderPhotoRecord = {

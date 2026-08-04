@@ -14,6 +14,7 @@ import {
   processCleaningPhoto,
   validateSourceImage,
 } from '@/lib/client/image-processing'
+import { appendWithinLimit } from '@/lib/client/cleaning-photo-queue'
 import type { CleaningPhotoContentType, CleaningPhotoPhase } from '@/lib/types/service-order-photos'
 
 export type CleaningPhotoQueueItem = {
@@ -27,6 +28,16 @@ export type CleaningPhotoQueueItem = {
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : 'Errore durante il caricamento della foto.'
+}
+
+class CleaningPhotoWorkflowError extends Error {
+  constructor(
+    message: string,
+    readonly code: string,
+  ) {
+    super(message)
+    this.name = 'CleaningPhotoWorkflowError'
+  }
 }
 
 function sourceSizeBucket(bytes: number) {
@@ -50,13 +61,14 @@ function capturePhotoFailure(
 ) {
   const exception = error instanceof Error ? error : new Error(String(error))
   const processingError = error instanceof PhotoProcessingError ? error : null
+  const workflowError = error instanceof CleaningPhotoWorkflowError ? error : null
   Sentry.captureException(exception, {
-    level: processingError ? 'warning' : 'error',
+    level: processingError || workflowError ? 'warning' : 'error',
     tags: {
       area: 'cleaning-photo',
       phase,
       stage,
-      failure_code: processingError?.code ?? 'workflow_error',
+      failure_code: processingError?.code ?? workflowError?.code ?? 'workflow_error',
       source_content_type: sourceContentTypeTag(file.type),
       source_size_bucket: sourceSizeBucket(file.size),
     },
@@ -107,26 +119,32 @@ export function useCleaningPhotoWorkflow(
     if (!enabled || !files) return
     setSelectionError(null)
     const selected = Array.from(files)
-    const available = MAX_CLEANING_PHOTOS - items.length
-    if (selected.length > available) {
-      setSelectionError(`Puoi aggiungere al massimo ${MAX_CLEANING_PHOTOS} foto.`)
-    }
-
-    const accepted: CleaningPhotoQueueItem[] = []
-    for (const file of selected.slice(0, Math.max(0, available))) {
+    const valid: File[] = []
+    for (const file of selected) {
       const validationError = validateSourceImage(file)
       if (validationError) {
         setSelectionError(validationError)
         continue
       }
-      accepted.push({
+      valid.push(file)
+    }
+
+    const result = appendWithinLimit(
+      itemsRef.current,
+      valid,
+      MAX_CLEANING_PHOTOS,
+      file => ({
         localId: crypto.randomUUID(),
         file,
         previewUrl: URL.createObjectURL(file),
-        status: 'idle',
-      })
+        status: 'idle' as const,
+      }),
+    )
+    itemsRef.current = result.items
+    setItems(result.items)
+    if (result.rejectedCount > 0) {
+      setSelectionError(`Puoi aggiungere al massimo ${MAX_CLEANING_PHOTOS} foto.`)
     }
-    setItems(current => [...current, ...accepted])
   }
 
   async function removeItem(localId: string) {
@@ -147,12 +165,13 @@ export function useCleaningPhotoWorkflow(
   }
 
   async function uploadAll(): Promise<string[]> {
-    if (!enabled || items.length === 0) return []
+    const queuedItems = itemsRef.current
+    if (!enabled || queuedItems.length === 0) return []
     setIsUploading(true)
     const uploadedIds: string[] = []
 
     try {
-      for (const item of items) {
+      for (const item of queuedItems) {
         if (item.status === 'ready' && item.photoId) {
           uploadedIds.push(item.photoId)
           continue
@@ -170,6 +189,9 @@ export function useCleaningPhotoWorkflow(
             photoId,
             processed.contentType,
           )
+          if (!reserved.success) {
+            throw new CleaningPhotoWorkflowError(reserved.error, reserved.code)
+          }
           photoId = reserved.upload.photoId
           if (reserved.upload.contentType !== processed.contentType) {
             throw new Error('Il formato prenotato non corrisponde alla foto elaborata.')
