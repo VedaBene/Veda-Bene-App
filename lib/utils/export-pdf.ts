@@ -23,7 +23,7 @@ function printHTML(
   const safeTitle = escapeHtml(title)
 
   win.document.write(`<!DOCTYPE html>
-<html lang="pt">
+<html lang="it">
 <head>
   <meta charset="UTF-8" />
   <title>${safeTitle}</title>
@@ -71,7 +71,7 @@ function printHTML(
   <h1>${safeTitle}</h1>
   ${bodyHTML}
   <br/>
-  <button onclick="window.print()">Imprimir / Salvar PDF</button>
+  <button onclick="window.print()">Stampa / Salva PDF</button>
   <script>setTimeout(() => window.print(), 300)</script>
 </body>
 </html>`)
@@ -266,6 +266,19 @@ export function exportPayablePDF(
   endDate: string,
   employeeName?: string,
 ) {
+  const title = employeeName
+    ? `Estratto da pagare - ${employeeName} - Veda Bene`
+    : 'Estratto da pagare - Veda Bene'
+
+  printHTML(title, buildPayablePrintBody(data, startDate, endDate, employeeName))
+}
+
+export function buildPayablePrintBody(
+  data: PayableDetailRow[],
+  startDate: string,
+  endDate: string,
+  employeeName?: string,
+): string {
   const groups = groupPayable(data)
 
   const sections = groups.map(g => {
@@ -280,27 +293,27 @@ export function exportPayablePDF(
       </tr>`).join('')
 
     const fixedNote = g.monthly_salary != null
-      ? `<p class="muted" style="margin:2px 0 6px">Salário fixo: ${money(g.monthly_salary)} - totais por OS não se aplicam.</p>`
+      ? `<p class="muted" style="margin:2px 0 6px">Stipendio fisso: ${money(g.monthly_salary)} - i totali per O.L. non si applicano.</p>`
       : ''
 
     return `
-      <h2>Funcionário: ${escapeHtml(g.employee_name)}</h2>
+      <h2>Dipendente: ${escapeHtml(g.employee_name)}</h2>
       ${fixedNote}
       <table>
         <thead>
           <tr>
-            <th>Data</th>
-            <th>OS</th>
-            <th>Imóvel</th>
-            <th class="num">Tempo para Pagamento</th>
-            <th class="num">Valor/Hora</th>
-            <th class="num">Total por OS</th>
+            <th>Data O.L.</th>
+            <th>Numero O.L.</th>
+            <th>Immobile/i</th>
+            <th class="num">Ore da pagare</th>
+            <th class="num">Tariffa oraria</th>
+            <th class="num">Totale per O.L.</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
         <tfoot>
           <tr>
-            <td colspan="3">Total de Horas para Pagamento</td>
+            <td colspan="3">Totale ore da pagare</td>
             <td class="num">${g.totalHours.toFixed(2)} h</td>
             <td></td>
             <td class="num">${money(g.totalPayable)}</td>
@@ -314,29 +327,18 @@ export function exportPayablePDF(
   const grandPayable = groups.reduce((s, g) => s + g.totalPayable, 0)
   const grandBlock = showGrand
     ? `<div class="grand">
-         Total Geral de Horas para Pagamento: ${grandHours.toFixed(2)} h &nbsp;·&nbsp;
-         Total Geral a Pagar: ${money(grandPayable)}
+         Totale generale delle ore da pagare: ${grandHours.toFixed(2)} h &nbsp;·&nbsp;
+         Totale generale da pagare: ${money(grandPayable)}
        </div>`
     : ''
 
   const empty = groups.length === 0
-    ? `<p class="muted" style="text-align:center;padding:20px">Nenhum dado encontrado para o período.</p>`
+    ? `<p class="muted" style="text-align:center;padding:20px">Nessun dato trovato per il periodo.</p>`
     : ''
 
-  const subtitle = employeeName
-    ? `<p class="muted" style="margin-bottom:4px">Funcionário: <strong>${escapeHtml(employeeName)}</strong></p>`
-    : ''
-
-  const body = `
-    ${subtitle}
-    <p class="muted" style="margin-bottom:12px">Período: ${startDate} → ${endDate}</p>
+  return `
+    <p class="muted" style="margin-bottom:12px">Periodo: ${formatDateOnly(startDate)} → ${formatDateOnly(endDate)}</p>
     ${empty}
     ${sections}
     ${grandBlock}`
-
-  const title = employeeName
-    ? `Extrato a Pagar - ${employeeName} - Veda Bene`
-    : 'Extrato a Pagar - Veda Bene'
-
-  printHTML(title, body)
 }

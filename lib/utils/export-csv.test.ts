@@ -1,6 +1,21 @@
 import { describe, expect, it } from 'vitest'
-import { formatReceivableCSV } from './export-csv'
-import type { ReceivableReport } from '@/lib/types/reporting'
+import { formatPayableCSV, formatReceivableCSV } from './export-csv'
+import type { PayableDetailRow, ReceivableReport } from '@/lib/types/reporting'
+
+const payableRows: PayableDetailRow[] = [
+  {
+    employee_id: 'employee-1',
+    employee_name: '=HYPERLINK("evil")',
+    order_id: 'order-834',
+    order_number: 834,
+    completed_at: '2026-08-01T22:30:00.000Z',
+    property_name: 'Aurelia Sunset, Penthouse',
+    hours: 3,
+    hourly_rate: 12.5,
+    monthly_salary: null,
+    os_total: 37.5,
+  },
+]
 
 const report: ReceivableReport = {
   period: { startDate: '2026-05-01', endDate: '2026-05-31' },
@@ -44,6 +59,25 @@ const report: ReceivableReport = {
   pendingCount: 0,
   grandTotal: 148,
 }
+
+describe('payable CSV formatter', () => {
+  it('exports the same per-order columns used by the payable PDF, in Italian', () => {
+    const csv = formatPayableCSV(payableRows)
+    const [header] = csv.split('\n', 1)
+
+    expect(header).toBe(
+      'Dipendente,Data O.L.,Numero O.L.,Immobile/i,Ore da pagare (h),Tariffa oraria (€),Totale per O.L. (€)',
+    )
+    expect(csv).toContain('02/08/2026,834,"Aurelia Sunset, Penthouse",3.00,12.50,37.50')
+  })
+
+  it('uses the Rome timezone and neutralizes spreadsheet formulas', () => {
+    const csv = formatPayableCSV(payableRows)
+
+    expect(csv).toContain("'=HYPERLINK")
+    expect(csv).toContain('02/08/2026')
+  })
+})
 
 describe('receivable CSV formatter', () => {
   it('exports the transactional columns and preserves numeric money values', () => {

@@ -1,4 +1,4 @@
-import type { PayableRow, ReceivableReport } from '@/lib/types/reporting'
+import type { PayableDetailRow, ReceivableReport } from '@/lib/types/reporting'
 
 function escapeCSV(value: string | number | null | undefined): string {
   if (value == null) return ''
@@ -16,24 +16,40 @@ function row(cells: (string | number | null | undefined)[]): string {
   return cells.map(escapeCSV).join(',')
 }
 
-export function formatPayableCSV(data: PayableRow[]): string {
+function formatPayableDate(value: string | null): string {
+  if (!value) return '-'
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '-'
+
+  return new Intl.DateTimeFormat('it-IT', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    timeZone: 'Europe/Rome',
+  }).format(date)
+}
+
+export function formatPayableCSV(data: PayableDetailRow[]): string {
   const header = row([
-    'Funcionário',
-    'Total OS',
-    'Horas para Pagamento',
-    'Valor/Hora (€)',
-    'Salário Fixo (€)',
-    'Total a Pagar (€)',
+    'Dipendente',
+    'Data O.L.',
+    'Numero O.L.',
+    'Immobile/i',
+    'Ore da pagare (h)',
+    'Tariffa oraria (€)',
+    'Totale per O.L. (€)',
   ])
 
   const rows = data.map(item =>
     row([
-      item.full_name,
-      item.os_count,
-      item.total_hours,
-      item.hourly_rate,
-      item.monthly_salary,
-      item.total_amount,
+      item.employee_name,
+      formatPayableDate(item.completed_at),
+      item.order_number,
+      item.property_name,
+      item.hours.toFixed(2),
+      item.hourly_rate?.toFixed(2) ?? '-',
+      item.os_total?.toFixed(2) ?? '-',
     ]),
   )
 

@@ -1,6 +1,25 @@
 import { describe, expect, it } from 'vitest'
-import { buildReceivablePrintBody, exportReceivablePDF } from './export-pdf'
-import type { ReceivableReport } from '@/lib/types/reporting'
+import {
+  buildPayablePrintBody,
+  buildReceivablePrintBody,
+  exportReceivablePDF,
+} from './export-pdf'
+import type { PayableDetailRow, ReceivableReport } from '@/lib/types/reporting'
+
+const payableRows: PayableDetailRow[] = [
+  {
+    employee_id: 'employee-1',
+    employee_name: 'Allen & Figli',
+    order_id: 'order-834',
+    order_number: 834,
+    completed_at: '2026-08-01T10:00:00.000Z',
+    property_name: 'Aurelia <Sunset>',
+    hours: 3,
+    hourly_rate: 12.5,
+    monthly_salary: null,
+    os_total: 37.5,
+  },
+]
 
 const report: ReceivableReport = {
   period: { startDate: '2026-05-01', endDate: '2026-05-31' },
@@ -38,6 +57,24 @@ const report: ReceivableReport = {
   pendingCount: 0,
   grandTotal: 148,
 }
+
+describe('payable PDF formatter', () => {
+  it('renders the per-order report structure and all payable labels in Italian', () => {
+    const html = buildPayablePrintBody(payableRows, '2026-08-01', '2026-08-05')
+
+    expect(html).toContain('Periodo: 01/08/2026 → 05/08/2026')
+    expect(html).toContain('Dipendente: Allen &amp; Figli')
+    expect(html).toContain('Data O.L.')
+    expect(html).toContain('Numero O.L.')
+    expect(html).toContain('Immobile/i')
+    expect(html).toContain('Ore da pagare')
+    expect(html).toContain('Tariffa oraria')
+    expect(html).toContain('Totale per O.L.')
+    expect(html).toContain('Aurelia &lt;Sunset&gt;')
+    expect(html).not.toContain('Funcionário')
+    expect(html).not.toContain('Tempo para Pagamento')
+  })
+})
 
 describe('receivable PDF formatter', () => {
   it('renders exactly the three pricing sections and the approved columns', () => {

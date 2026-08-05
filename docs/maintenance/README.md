@@ -15,4 +15,5 @@ acompanhamento. Quando ambos existirem, mantenha links entre eles.
 
 | Data | Registro | Estado |
 |---|---|---|
+| 2026-08-04 | [Consistência entre CSV e PDF do extrato A Pagar](2026-08-04-payable-csv-pdf-consistency.md) | Implementado localmente; não implantado |
 | 2026-07-30 | [Compatibilidade de fotos móveis e atualização de segurança do Next.js](2026-07-30-photo-upload-and-next-security-hardening.md) | Implantado em produção |
