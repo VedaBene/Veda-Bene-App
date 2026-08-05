@@ -99,6 +99,13 @@ apenas por possuir uma janela de limpeza menor.
   - `BIDET` → `BID`
 - A coluna **Note Pulizia** aparece depois de todas as colunas de ocupação
   efetiva.
+- Quando ao menos uma ordem do relatório possui responsável visível, o PDF
+  inclui **Consegna** imediatamente antes das colunas de ocupação e **Pulizia**
+  imediatamente depois delas. Ordens sem atribuição exibem `—`; quando nenhum
+  nome está disponível, a respectiva coluna é omitida para preservar o espaço.
+- Os nomes usados no PDF são os mesmos do `ServiceOrderListItem`. O perfil
+  `cliente` continua sem recebê-los no DTO e, consequentemente, não exibe essas
+  colunas.
 
 ## Pontos de manutenção
 

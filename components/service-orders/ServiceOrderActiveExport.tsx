@@ -31,8 +31,27 @@ const STATUS_TITLES: Record<'open' | 'in_progress' | 'done', string> = {
   done: 'Completati',
 }
 
-function generatePDF(orders: ServiceOrderListItem[], date: string, status: 'open' | 'in_progress' | 'done') {
+type PdfStatus = keyof typeof STATUS_TITLES
+
+function getCleaningStaffNames(order: Pick<ServiceOrderListItem, 'cleaning_staff'>): string {
+  return order.cleaning_staff
+    .map(({ full_name }) => full_name.trim())
+    .filter(Boolean)
+    .join(', ')
+}
+
+function getConsegnaStaffName(order: Pick<ServiceOrderListItem, 'consegna_staff'>): string {
+  return order.consegna_staff?.full_name.trim() ?? ''
+}
+
+export function buildServiceOrdersPdfHtml(
+  orders: ServiceOrderListItem[],
+  date: string,
+  status: PdfStatus,
+): string {
   const sortedOrders = status !== 'done' ? [...orders].sort(compareServiceOrderPriority) : orders
+  const showConsegnaStaff = sortedOrders.some((order) => getConsegnaStaffName(order) !== '')
+  const showCleaningStaff = sortedOrders.some((order) => getCleaningStaffNames(order) !== '')
   
   let dateLabel = 'Tutte le date'
   if (date) {
@@ -82,10 +101,12 @@ function generatePDF(orders: ServiceOrderListItem[], date: string, status: 'open
         <span><strong>Conclusa:</strong> ${formatDateTime(o.completed_at)}</span>
         <span><strong>Tempo:</strong> ${o.worked_minutes != null ? formatWorkedTime(o.worked_minutes) : '—'}</span>
       </td>` : ''}
+      ${showConsegnaStaff ? `<td class="staff-cell">${escapeHtml(getConsegnaStaffName(o)) || '—'}</td>` : ''}
       ${OCCUPANCY_FIELDS.map(({ key }) => {
         const val = (o[key] as number) ?? 0
         return `<td class="${val > 0 ? 'highlight' : 'dim'}">${val > 0 ? val : '—'}</td>`
       }).join('')}
+      ${showCleaningStaff ? `<td class="staff-cell">${escapeHtml(getCleaningStaffNames(o)) || '—'}</td>` : ''}
       <td class="notes-cell">${o.cleaning_notes ? escapeHtml(o.cleaning_notes) : '—'}</td>
     </tr>
   `).join('')
@@ -96,6 +117,11 @@ function generatePDF(orders: ServiceOrderListItem[], date: string, status: 'open
       <td class="highlight">${totals[key as string]}</td>
     </tr>
   `).join('')
+
+  const columnCount = 12
+    + (status === 'done' ? 1 : 0)
+    + (showConsegnaStaff ? 1 : 0)
+    + (showCleaningStaff ? 1 : 0)
 
   const html = `<!DOCTYPE html>
 <html lang="it">
@@ -119,6 +145,7 @@ function generatePDF(orders: ServiceOrderListItem[], date: string, status: 'open
     .totals-table { max-width: 300px; }
     .totals-table td:first-child { color: #555; }
     .totals-table td:last-child { font-weight: 700; text-align: right; }
+    .staff-cell { width: 9%; max-width: 110px; white-space: normal; overflow-wrap: anywhere; font-size: 9px; line-height: 1.25; color: #333; text-align: left; }
     .notes-cell { width: 22%; max-width: 220px; white-space: normal; word-break: break-word; font-size: 9px; color: #333; }
     .completion-cell { min-width: 105px; font-size: 9px; line-height: 1.35; }
     .completion-cell span { display: block; white-space: nowrap; }
@@ -137,12 +164,14 @@ function generatePDF(orders: ServiceOrderListItem[], date: string, status: 'open
         <th>Check-in</th>
         <th>Check-out</th>
         ${status === 'done' ? '<th>Conclusione / Tempo</th>' : ''}
+        ${showConsegnaStaff ? '<th class="staff-header">Consegna</th>' : ''}
         ${OCCUPANCY_FIELDS.map(({ label }) => `<th>${label}</th>`).join('')}
+        ${showCleaningStaff ? '<th class="staff-header">Pulizia</th>' : ''}
         <th class="notes-header">Note Pulizia</th>
       </tr>
     </thead>
     <tbody>
-      ${rows || `<tr><td colspan="${12 + (status === 'done' ? 1 : 0)}" style="text-align:center;color:#999;padding:16px">Nessun O.L. trovato</td></tr>`}
+      ${rows || `<tr><td colspan="${columnCount}" style="text-align:center;color:#999;padding:16px">Nessun O.L. trovato</td></tr>`}
     </tbody>
   </table>
   ${activeTotalFields.length > 0 ? `
@@ -154,6 +183,11 @@ function generatePDF(orders: ServiceOrderListItem[], date: string, status: 'open
 </body>
 </html>`
 
+  return html
+}
+
+function generatePDF(orders: ServiceOrderListItem[], date: string, status: PdfStatus) {
+  const html = buildServiceOrdersPdfHtml(orders, date, status)
   const win = window.open('', '_blank')
   if (!win) return
   win.document.write(html)
