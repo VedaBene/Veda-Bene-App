@@ -53,30 +53,33 @@ export function calculateTotalPrice(
   return cleaningPrice == null ? null : cleaningPrice + CONSEGNA_FEE
 }
 
-// Recalcula `total_price` da OS quando worked_minutes acabou de ficar disponível
-// (caso `out_long_stay`). Para os demais modos é no-op — eles já tiveram o preço
-// calculado em create/update e não dependem de worked_minutes.
+// Recalcula `total_price` da OS quando dados do imóvel ou minutos trabalhados ficam disponíveis.
 export async function recalculateOrderPricing(
   supabase: SupabaseServerClient,
   orderId: string,
 ): Promise<number | null> {
+  const ctx = await loadOrderPricingContext(supabase, orderId)
+  if (!ctx) return null
+
   const { data: order } = await supabase
     .from('service_orders')
-    .select('pricing_mode, worked_minutes, extra_services_price')
+    .select('pricing_mode, extra_services_price')
     .eq('id', orderId)
     .single()
 
-  if (order?.pricing_mode !== 'out_long_stay') return null
+  if (!order) return null
 
-  const total_price = calculateTotalPrice(
-    'out_long_stay',
-    null,
-    null,
-    null,
-    null,
-    order.extra_services_price ?? null,
-    order.worked_minutes ?? null,
-  )
+  const total_price = ctx.property
+    ? calculateTotalPrice(
+        order.pricing_mode,
+        ctx.property.base_price,
+        ctx.property.extra_per_person,
+        ctx.realGuests,
+        ctx.property.min_guests,
+        order.extra_services_price ?? null,
+        ctx.workedMinutes,
+      )
+    : null
 
   await supabase.from('service_orders').update({ total_price }).eq('id', orderId)
   return total_price
