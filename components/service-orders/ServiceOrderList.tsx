@@ -8,12 +8,14 @@ import { Card } from '@/components/ui/Card'
 import { Pagination } from '@/components/ui/Pagination'
 import type { Role } from '@/lib/types/database'
 import type { ServiceOrderListItem } from '@/lib/types/view-models'
+import type { OperationalServiceOrderWindow } from '@/lib/service-order-visibility'
+import { getRomeDateOnly } from '@/lib/utils/date-rome'
 import { OrdersPdfButton } from './ServiceOrderActiveExport'
 import { ServiceOrderFilters } from './ServiceOrderFilters'
 import { ServiceOrderListTable } from './ServiceOrderListTable'
 import { FinishCleaningModal, StartCleaningModal } from './ServiceOrderTimeControls'
 import { LiveTimer } from './LiveTimer'
-import { formatDateTime } from './display'
+import { formatDate, formatDateTime } from './display'
 import { compareServiceOrderPriority } from './ordering'
 
 import type { StaffOption } from '@/lib/types/view-models'
@@ -35,6 +37,7 @@ export function ServiceOrderList({
   initialStartDate,
   initialEndDate,
   staff,
+  operationalWindow,
   cleaningPhotosEnabled = false,
 }: {
   active: ServiceOrderListItem[]
@@ -51,6 +54,7 @@ export function ServiceOrderList({
   initialStartDate: string
   initialEndDate: string
   staff: StaffOption[]
+  operationalWindow: OperationalServiceOrderWindow | null
   cleaningPhotosEnabled?: boolean
 }) {
   const router = useRouter()
@@ -129,6 +133,26 @@ export function ServiceOrderList({
     return () => clearTimeout(t)
   }, [search, cleaningStaffId, consegnaStaffId, startDate, endDate, initialQ, initialCleaningStaffId, initialConsegnaStaffId, initialStartDate, initialEndDate, pushFilters])
 
+  useEffect(() => {
+    if (!operationalWindow) return
+
+    const refreshOnRomeDateChange = () => {
+      if (getRomeDateOnly() !== operationalWindow.today) {
+        startTransition(() => router.refresh())
+      }
+    }
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') refreshOnRomeDateChange()
+    }
+
+    window.addEventListener('focus', refreshOnRomeDateChange)
+    document.addEventListener('visibilitychange', refreshWhenVisible)
+    return () => {
+      window.removeEventListener('focus', refreshOnRomeDateChange)
+      document.removeEventListener('visibilitychange', refreshWhenVisible)
+    }
+  }, [operationalWindow, router])
+
   const filterOrder = (o: ServiceOrderListItem) => {
     const matchName = !search || (o.property?.name ?? '').toLowerCase().includes(search.toLowerCase())
     const matchCleaning = !cleaningStaffId || o.cleaning_staff_ids?.includes(cleaningStaffId)
@@ -153,6 +177,14 @@ export function ServiceOrderList({
     endDate !== initialEndDate
 
   const isSyncing = isFiltersDirty || isPending
+  const selectedRangeLabel = startDate && endDate && startDate !== endDate
+    ? `Dal ${formatDate(startDate)} al ${formatDate(endDate)}`
+    : undefined
+  const activePdfDateLabel = selectedRangeLabel ?? (
+    operationalWindow && !startDate && !endDate
+      ? `Fino al ${formatDate(operationalWindow.tomorrow)} (Domani)`
+      : undefined
+  )
   
   const doneSearchParams: Record<string, string> = {}
   if (search) doneSearchParams.q = search
@@ -230,6 +262,15 @@ export function ServiceOrderList({
 
   return (
     <div className="notranslate space-y-5" translate="no">
+      {operationalWindow && (
+        <div role="status" className="rounded-lg border border-info/25 bg-info/5 px-4 py-3 text-sm text-foreground">
+          <span>
+            Sono visibili solo gli O.L. assegnati con data di pulizia fino a domani
+            (ora di Roma). Gli O.L. successivi saranno mostrati automaticamente al momento opportuno.
+          </span>
+        </div>
+      )}
+
       <ServiceOrderFilters
         search={search}
         cleaningStaffId={cleaningStaffId}
@@ -237,6 +278,7 @@ export function ServiceOrderList({
         startDate={startDate}
         endDate={endDate}
         staff={staff}
+        maxDate={operationalWindow?.tomorrow}
         hasFilter={hasFilter}
         onSearchChange={setSearch}
         onCleaningStaffChange={setCleaningStaffId}
@@ -258,7 +300,7 @@ export function ServiceOrderList({
             title="In corso"
             count={inProgress.length}
             countClassName="bg-info/10 text-info"
-            action={<OrdersPdfButton orders={inProgress} date={startDate || endDate || ''} status="in_progress" disabled={isSyncing} />}
+            action={<OrdersPdfButton orders={inProgress} date={startDate || endDate || ''} dateLabel={activePdfDateLabel} status="in_progress" disabled={isSyncing} />}
           />
           <ServiceOrderListTable
             orders={inProgress}
@@ -275,12 +317,12 @@ export function ServiceOrderList({
           title="Aperti"
           count={open.length}
           countClassName="bg-warning-bg text-warning"
-          action={<OrdersPdfButton orders={sortedOpen} date={startDate || endDate || ''} status="open" disabled={isSyncing} />}
+          action={<OrdersPdfButton orders={sortedOpen} date={startDate || endDate || ''} dateLabel={activePdfDateLabel} status="open" disabled={isSyncing} />}
         />
         <ServiceOrderListTable
           orders={sortedOpen}
           role={role}
-          emptyText="Nessun O.L. aperto."
+          emptyText={operationalWindow ? 'Nessun O.L. assegnato fino a domani.' : 'Nessun O.L. aperto.'}
           userId={userId}
           onStart={setStartModalOrder}
         />
@@ -291,7 +333,7 @@ export function ServiceOrderList({
           title="Completati"
           count={doneTotalCount}
           countClassName="bg-success-bg text-success"
-          action={<OrdersPdfButton orders={doneForExport} date={startDate || endDate || ''} status="done" disabled={isSyncing} />}
+          action={<OrdersPdfButton orders={doneForExport} date={startDate || endDate || ''} dateLabel={selectedRangeLabel} status="done" disabled={isSyncing} />}
         />
         <ServiceOrderListTable
           orders={done}

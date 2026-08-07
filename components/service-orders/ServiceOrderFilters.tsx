@@ -12,6 +12,7 @@ export function ServiceOrderFilters({
   startDate,
   endDate,
   staff,
+  maxDate,
   hasFilter,
   onSearchChange,
   onCleaningStaffChange,
@@ -26,6 +27,7 @@ export function ServiceOrderFilters({
   startDate: string
   endDate: string
   staff: StaffOption[]
+  maxDate?: string
   hasFilter: boolean
   onSearchChange: (value: string) => void
   onCleaningStaffChange: (value: string) => void
@@ -79,6 +81,7 @@ export function ServiceOrderFilters({
         <Input
           type="date"
           value={startDate}
+          max={maxDate}
           onChange={(e) => onStartDateChange(e.target.value)}
           className="max-w-[150px] w-full"
         />
@@ -86,6 +89,7 @@ export function ServiceOrderFilters({
         <Input
           type="date"
           value={endDate}
+          max={maxDate}
           onChange={(e) => onEndDateChange(e.target.value)}
           className="max-w-[150px] w-full"
           min={startDate || undefined}

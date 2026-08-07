@@ -12,6 +12,15 @@ tela e os PDFs.
   imóvel foi removido da interface por ser redundante com essa busca.
 - Existem filtros independentes por responsável de **Pulizia** e de
   **Consegna**, além do período por `cleaning_date`.
+- Para os perfis operacionais `limpeza` (Pulizia) e `consegna`, a listagem mostra
+  somente ordens atribuídas ao próprio funcionário com `cleaning_date` menor ou
+  igual a amanhã em `Europe/Rome`. O limite é superior: ordens atrasadas e o
+  histórico continuam visíveis; ordens sem data e ordens posteriores a amanhã
+  são ocultadas. A regra também protege acesso direto por ID e API por meio do
+  RLS, conforme o [ADR 015](decisions/015-janela-visibilidade-equipe-operacional.md).
+- Os filtros por funcionário são ocultados para Pulizia e Consegna. Seus filtros
+  de período continuam disponíveis para consultar o histórico, mas não podem
+  ampliar a janela autorizada além de amanhã.
 - Os filtros são validados no servidor e aplicados igualmente às ordens ativas,
   às concluídas e aos dados enviados aos respectivos PDFs.
 - O filtro de Pulizia considera a relação de múltiplos responsáveis em
@@ -88,6 +97,8 @@ apenas por possuir uma janela de limpeza menor.
 - A exportação de ordens em aberto ("Aperti") contém apenas ordens com status `open`.
 - A exportação de ordens em andamento ("In corso") contém apenas ordens com status `in_progress`.
 - Cada botão exporta os dados já submetidos aos filtros correntes.
+- Para Pulizia e Consegna, o cabeçalho dos PDFs ativos sem período manual informa
+  explicitamente o limite até amanhã, em vez de indicar “Tutte le date”.
 - Os PDFs de ordens ativas ("Aperti" e "In corso") usam a prioridade operacional descrita acima; o de concluídas preserva a ordem retornada pela consulta de concluídas.
 - Os botões de exportação de PDF de todas as seções são desabilitados visualmente e funcionalmente (via flag `isSyncing`) caso o estado de filtros local do cliente esteja desalinhado com o servidor (durante o debounce de digitação ou o tempo de carregamento da transição assíncrona com `useTransition`), blindando o sistema contra geração de relatórios com dados inconsistentes.
 - Para manter o documento compacto, os campos de ocupação usam:
@@ -135,4 +146,7 @@ Todo o sistema utiliza o fuso horário oficial da Itália, `Europe/Rome`, como r
 - A exibição e formatação de datas e horas na tela e nos relatórios PDF (inclusive de extratos a pagar/receber) utilizam `Europe/Rome` na conversão de timestamps TIMESTAMPTZ, garantindo que o fuso horário do usuário (ex: no Brasil) não desloque as datas das limpezas.
 - Os campos de formulário de check-out e check-in (`checkout_at` e `checkin_at`) capturam valores no formato de parede (`<input type="datetime-local">`) e utilizam exclusivamente os utilitários de `lib/timezone.ts` (`toRomeIsoString` na submissão e `toRomeLocalInputValue` na hidratação), convertendo valores de parede para UTC ISO no instante de Roma e vice-versa, conforme o [ADR 013](decisions/013-padronizacao-fuso-horario-rome-timestamps.md). É estritamente proibido utilizar manipulação ingênua de strings como `.slice(0, 16)`.
 - O cálculo do Modo Diário no servidor (todayStr) utiliza o fuso `Europe/Rome`.
+- O teto de visibilidade da equipe operacional também é calculado pelo dia de
+  Roma, no DAL e no PostgreSQL. A página é atualizada ao voltar ao foco após uma
+  virada de data em Roma.
 - O relógio em tempo real exibido no cabeçalho do painel (`DateTimeDisplay.tsx`) também é sincronizado com o fuso da Itália (`Europe/Rome`). Ele usa `useSyncExternalStore`: o snapshot do servidor retorna `null`, mantendo o mesmo placeholder durante SSR e hidratação; no cliente, um snapshot por segundo passa a alimentar a formatação. Não use uma flag `mounted` atualizada sincronicamente em `useEffect`, pois esse padrão viola o lint e introduz uma renderização em cascata evitável.

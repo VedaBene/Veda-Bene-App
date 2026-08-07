@@ -134,9 +134,9 @@ function matchesFilter(row: Row, filter: QueryFilter): boolean {
     case 'eq':
       return row[filter.column] === filter.value
     case 'gte':
-      return String(row[filter.column] ?? '') >= String(filter.value)
+      return row[filter.column] != null && String(row[filter.column]) >= String(filter.value)
     case 'lte':
-      return String(row[filter.column] ?? '') <= String(filter.value)
+      return row[filter.column] != null && String(row[filter.column]) <= String(filter.value)
     case 'in':
       return filter.values.includes(row[filter.column])
     case 'or':

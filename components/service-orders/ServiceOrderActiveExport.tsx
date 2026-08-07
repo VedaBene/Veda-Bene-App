@@ -53,13 +53,16 @@ export function buildServiceOrdersPdfHtml(
   orders: ServiceOrderListItem[],
   date: string,
   status: PdfStatus,
+  dateLabelOverride?: string,
 ): string {
   const sortedOrders = status !== 'done' ? [...orders].sort(compareServiceOrderPriority) : orders
   const showConsegnaStaff = sortedOrders.some((order) => getConsegnaStaffName(order) !== '')
   const showCleaningStaff = sortedOrders.some((order) => getCleaningStaffNames(order) !== '')
   
   let dateLabel = 'Tutte le date'
-  if (date) {
+  if (dateLabelOverride) {
+    dateLabel = dateLabelOverride
+  } else if (date) {
     dateLabel = formatDate(date)
   } else if (status === 'done') {
     const todayStr = new Intl.DateTimeFormat('fr-CA', { timeZone: 'Europe/Rome' }).format(new Date())
@@ -198,8 +201,8 @@ export function buildServiceOrdersPdfHtml(
   return html
 }
 
-function generatePDF(orders: ServiceOrderListItem[], date: string, status: PdfStatus) {
-  const html = buildServiceOrdersPdfHtml(orders, date, status)
+function generatePDF(orders: ServiceOrderListItem[], date: string, status: PdfStatus, dateLabel?: string) {
+  const html = buildServiceOrdersPdfHtml(orders, date, status, dateLabel)
   const win = window.open('', '_blank')
   if (!win) return
   win.document.write(html)
@@ -209,18 +212,20 @@ function generatePDF(orders: ServiceOrderListItem[], date: string, status: PdfSt
 export function OrdersPdfButton({
   orders,
   date,
+  dateLabel,
   status,
   disabled = false,
 }: {
   orders: ServiceOrderListItem[]
   date: string
+  dateLabel?: string
   status: 'open' | 'in_progress' | 'done'
   disabled?: boolean
 }) {
   return (
     <button
       disabled={disabled}
-      onClick={() => generatePDF(orders, date, status)}
+      onClick={() => generatePDF(orders, date, status, dateLabel)}
       className={`flex items-center gap-1.5 text-xs font-medium transition-colors px-3 py-1.5 rounded-md border ${
         disabled
           ? 'opacity-40 cursor-not-allowed text-muted-foreground border-border/40 bg-muted/20'

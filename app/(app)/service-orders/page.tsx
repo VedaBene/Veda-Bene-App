@@ -7,6 +7,10 @@ import { getCurrentViewer } from '@/lib/server/data-access/viewer'
 import { getServiceOrderList, getServiceOrderFormOptions } from '@/lib/server/data-access/service-orders'
 import { serviceOrderListSearchParamsSchema } from '@/lib/server/validation/contracts'
 import { isCleaningPhotosEnabled } from '@/lib/server/features'
+import {
+  getOperationalServiceOrderWindow,
+  isOperationalStaffRole,
+} from '@/lib/service-order-visibility'
 
 const DONE_PAGE_SIZE = 20
 
@@ -17,6 +21,15 @@ export default async function ServiceOrdersPage(props: PageProps<never>) {
     : { donePage: 1, q: undefined, propertyId: undefined, cleaningStaffId: undefined, consegnaStaffId: undefined, startDate: undefined, endDate: undefined }
 
   const { supabase, viewer } = await getCurrentViewer()
+  const operationalWindow = isOperationalStaffRole(viewer.role)
+    ? getOperationalServiceOrderWindow()
+    : null
+  const effectiveStartDate = operationalWindow && filters.startDate && filters.startDate > operationalWindow.tomorrow
+    ? undefined
+    : filters.startDate
+  const effectiveEndDate = operationalWindow && filters.endDate && filters.endDate > operationalWindow.tomorrow
+    ? operationalWindow.tomorrow
+    : filters.endDate
 
   const [
     { active, done, doneForExport, doneTotalPages, doneTotalCount },
@@ -27,12 +40,14 @@ export default async function ServiceOrdersPage(props: PageProps<never>) {
       donePageSize: DONE_PAGE_SIZE,
       q: filters.q,
       propertyId: filters.propertyId,
-      cleaningStaffId: filters.cleaningStaffId,
-      consegnaStaffId: filters.consegnaStaffId,
-      startDate: filters.startDate,
-      endDate: filters.endDate,
-    }),
-    getServiceOrderFormOptions(supabase, viewer),
+      cleaningStaffId: operationalWindow ? undefined : filters.cleaningStaffId,
+      consegnaStaffId: operationalWindow ? undefined : filters.consegnaStaffId,
+      startDate: effectiveStartDate,
+      endDate: effectiveEndDate,
+    }, operationalWindow ?? undefined),
+    operationalWindow
+      ? Promise.resolve({ properties: [], staff: [] })
+      : getServiceOrderFormOptions(supabase, viewer),
   ])
 
   return (
@@ -58,11 +73,12 @@ export default async function ServiceOrdersPage(props: PageProps<never>) {
         doneTotalPages={doneTotalPages}
         doneTotalCount={doneTotalCount}
         initialQ={filters.q ?? ''}
-        initialCleaningStaffId={filters.cleaningStaffId ?? ''}
-        initialConsegnaStaffId={filters.consegnaStaffId ?? ''}
-        initialStartDate={filters.startDate ?? ''}
-        initialEndDate={filters.endDate ?? ''}
-        staff={viewer.role === 'cliente' ? [] : staff}
+        initialCleaningStaffId={operationalWindow ? '' : (filters.cleaningStaffId ?? '')}
+        initialConsegnaStaffId={operationalWindow ? '' : (filters.consegnaStaffId ?? '')}
+        initialStartDate={effectiveStartDate ?? ''}
+        initialEndDate={effectiveEndDate ?? ''}
+        staff={viewer.role === 'cliente' || operationalWindow ? [] : staff}
+        operationalWindow={operationalWindow}
         cleaningPhotosEnabled={isCleaningPhotosEnabled()}
       />
     </div>
