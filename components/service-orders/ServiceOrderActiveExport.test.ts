@@ -38,19 +38,22 @@ function order(overrides: Partial<ServiceOrderListItem> = {}): ServiceOrderListI
 }
 
 describe('service-order PDF staff columns', () => {
-  it('places Consegna before occupancy and Pulizia after occupancy', () => {
+  it('uses the canonical Utente, Consegna and occupancy column order', () => {
     const html = buildServiceOrdersPdfHtml([order()], '2026-08-05', 'open')
 
+    const checkoutHeader = html.indexOf('<th>Check-out</th>')
+    const cleaningHeader = html.indexOf('<th class="staff-header">Utente</th>')
     const consegnaHeader = html.indexOf('<th class="staff-header">Consegna</th>')
     const firstOccupancyHeader = html.indexOf('<th>PX</th>')
     const lastOccupancyHeader = html.indexOf('<th>Culle</th>')
-    const cleaningHeader = html.indexOf('<th class="staff-header">Pulizia</th>')
     const notesHeader = html.indexOf('<th class="notes-header">Note Pulizia</th>')
 
+    expect(cleaningHeader).toBeGreaterThan(checkoutHeader)
+    expect(consegnaHeader).toBeGreaterThan(cleaningHeader)
     expect(consegnaHeader).toBeGreaterThan(-1)
     expect(consegnaHeader).toBeLessThan(firstOccupancyHeader)
-    expect(cleaningHeader).toBeGreaterThan(lastOccupancyHeader)
-    expect(cleaningHeader).toBeLessThan(notesHeader)
+    expect(notesHeader).toBeGreaterThan(lastOccupancyHeader)
+    expect(html).not.toContain('<th class="staff-header">Pulizia</th>')
   })
 
   it('renders multiple names safely and keeps missing assignments explicit', () => {
@@ -75,6 +78,23 @@ describe('service-order PDF staff columns', () => {
     ], '2026-08-05', 'open')
 
     expect(html).not.toContain('<th class="staff-header">Consegna</th>')
-    expect(html).not.toContain('<th class="staff-header">Pulizia</th>')
+    expect(html).not.toContain('<th class="staff-header">Utente</th>')
+  })
+
+  it('formats Check-in as date/time and Check-out as time/date in Rome', () => {
+    const html = buildServiceOrdersPdfHtml([order()], '2026-08-05', 'open')
+
+    expect(html).toContain('<td>05/08/2026, 16:00</td>')
+    expect(html).toContain('<td>10:00 - 05/08/2026</td>')
+  })
+
+  it('centers and uppercases the document and renders totals horizontally', () => {
+    const html = buildServiceOrdersPdfHtml([order()], '2026-08-05', 'open')
+
+    expect(html).toContain('text-align: center; text-transform: uppercase;')
+    expect(html).toContain('tbody > tr { break-inside: avoid; page-break-inside: avoid; }')
+    expect(html).toContain('<h2>Totali occupazione</h2>')
+    expect(html).toContain('<thead><tr><th scope="col">PX</th><th scope="col">M</th>')
+    expect(html).toContain('<tbody><tr><td class="highlight">4</td><td class="highlight">2</td>')
   })
 })

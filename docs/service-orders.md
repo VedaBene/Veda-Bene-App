@@ -97,12 +97,21 @@ apenas por possuir uma janela de limpeza menor.
   - `DIVANI LETTO` → `DL`
   - `BAGNI` → `WC`
   - `BIDET` → `BID`
-- A coluna **Note Pulizia** aparece depois de todas as colunas de ocupação
-  efetiva.
-- Quando ao menos uma ordem do relatório possui responsável visível, o PDF
-  inclui **Consegna** imediatamente antes das colunas de ocupação e **Pulizia**
-  imediatamente depois delas. Ordens sem atribuição exibem `—`; quando nenhum
-  nome está disponível, a respectiva coluna é omitida para preservar o espaço.
+- O PDF de ordens ativas segue a ordem canônica **O.L. | Immobile | Check-in |
+  Check-out | Utente | Consegna | PX | M | S | DL | WC | BID | Culle | Note
+  Pulizia**. O PDF de concluídas conserva **Conclusione / Tempo** depois de
+  Check-out e aplica a mesma sequência às demais colunas.
+- O responsável pela limpeza é apresentado sob o título **Utente**. Quando ao
+  menos uma ordem possui responsável visível, o PDF inclui **Utente** e/ou
+  **Consegna** antes das colunas de ocupação. Ordens sem atribuição exibem `—`;
+  quando nenhum nome está disponível, a respectiva coluna é omitida para
+  preservar o espaço.
+- Todo o conteúdo do documento é exibido em caixa alta e centralizado, inclusive
+  imóvel, responsáveis e notas.
+- Check-in é exibido como `DD/MM/YYYY, HH:mm`; Check-out usa
+  `HH:mm - DD/MM/YYYY`. Ambos são formatados explicitamente em `Europe/Rome`.
+- Os totais de ocupação com valor maior que zero são exibidos em uma tabela
+  horizontal centralizada, com cabeçalhos e valores alinhados.
 - Os nomes usados no PDF são os mesmos do `ServiceOrderListItem`. O perfil
   `cliente` continua sem recebê-los no DTO e, consequentemente, não exibe essas
   colunas.

@@ -2,7 +2,7 @@
 
 import { FileDown } from 'lucide-react'
 import type { ServiceOrderListItem } from '@/lib/types/view-models'
-import { formatDate, formatDateTime } from './display'
+import { formatDate, formatDateTime, formatTimeDate } from './display'
 import { formatWorkedTime } from './LiveTimer'
 import { compareServiceOrderPriority } from './ordering'
 
@@ -77,10 +77,10 @@ export function buildServiceOrdersPdfHtml(
       badges.push(`<span style="display: inline-block; padding: 4px 8px; border-radius: 4px; background: #fef3c7; color: #b45309; font-weight: bold; margin-right: 8px; font-size: 11px;">Aperti: ${openCount}</span>`)
     }
     if (badges.length > 0) {
-      statusSummaryHtml = `<div style="margin-bottom: 16px;">${badges.join('')}</div>`
+      statusSummaryHtml = `<div class="status-summary">${badges.join('')}</div>`
     }
   } else if (status === 'done') {
-    statusSummaryHtml = `<div style="margin-bottom: 16px;">
+    statusSummaryHtml = `<div class="status-summary">
       <span style="display: inline-block; padding: 4px 8px; border-radius: 4px; background: #dcfce7; color: #15803d; font-weight: bold; font-size: 11px;">Completati: ${doneCount}</span>
     </div>`
   }
@@ -96,27 +96,27 @@ export function buildServiceOrdersPdfHtml(
       <td>#${o.order_number}</td>
       <td>${escapeHtml(o.property?.name ?? '—')}</td>
       <td>${formatDateTime(o.checkin_at)}</td>
-      <td>${formatDateTime(o.checkout_at)}</td>
+      <td>${formatTimeDate(o.checkout_at)}</td>
       ${status === 'done' ? `<td class="completion-cell">
         <span><strong>Conclusa:</strong> ${formatDateTime(o.completed_at)}</span>
         <span><strong>Tempo:</strong> ${o.worked_minutes != null ? formatWorkedTime(o.worked_minutes) : '—'}</span>
       </td>` : ''}
+      ${showCleaningStaff ? `<td class="staff-cell">${escapeHtml(getCleaningStaffNames(o)) || '—'}</td>` : ''}
       ${showConsegnaStaff ? `<td class="staff-cell">${escapeHtml(getConsegnaStaffName(o)) || '—'}</td>` : ''}
       ${OCCUPANCY_FIELDS.map(({ key }) => {
         const val = (o[key] as number) ?? 0
         return `<td class="${val > 0 ? 'highlight' : 'dim'}">${val > 0 ? val : '—'}</td>`
       }).join('')}
-      ${showCleaningStaff ? `<td class="staff-cell">${escapeHtml(getCleaningStaffNames(o)) || '—'}</td>` : ''}
       <td class="notes-cell">${o.cleaning_notes ? escapeHtml(o.cleaning_notes) : '—'}</td>
     </tr>
   `).join('')
 
-  const totalRows = activeTotalFields.map(({ key, label }) => `
-    <tr>
-      <td>${label}</td>
-      <td class="highlight">${totals[key as string]}</td>
-    </tr>
-  `).join('')
+  const totalHeaders = activeTotalFields
+    .map(({ label }) => `<th scope="col">${label}</th>`)
+    .join('')
+  const totalValues = activeTotalFields
+    .map(({ key }) => `<td class="highlight">${totals[key as string]}</td>`)
+    .join('')
 
   const columnCount = 12
     + (status === 'done' ? 1 : 0)
@@ -131,22 +131,25 @@ export function buildServiceOrdersPdfHtml(
   <style>
     @page { size: landscape; margin: 15mm; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; font-size: 11px; color: #111; padding: 24px; }
+    body { font-family: Arial, sans-serif; font-size: 11px; color: #111; padding: 24px; text-align: center; text-transform: uppercase; }
     h1 { font-size: 18px; margin-bottom: 2px; }
     .meta { font-size: 10px; color: #555; margin-bottom: 20px; }
     table { width: 100%; border-collapse: collapse; margin-bottom: 28px; }
     th { background: #f0f0f0; text-align: center; padding: 5px 4px; font-size: 9px; text-transform: uppercase; letter-spacing: 0.03em; border-bottom: 2px solid #ccc; }
     td { padding: 4px; border-bottom: 1px solid #e5e5e5; vertical-align: middle; text-align: center; }
-    th:nth-child(2), td:nth-child(2), .notes-header, .notes-cell { text-align: left; }
+    tbody > tr { break-inside: avoid; page-break-inside: avoid; }
     tr:last-child td { border-bottom: none; }
     .highlight { font-weight: 700; color: #111; }
     .dim { color: #aaa; }
-    h2 { font-size: 13px; margin-bottom: 8px; }
-    .totals-table { max-width: 300px; }
-    .totals-table td:first-child { color: #555; }
-    .totals-table td:last-child { font-weight: 700; text-align: right; }
-    .staff-cell { width: 9%; max-width: 110px; white-space: normal; overflow-wrap: anywhere; font-size: 9px; line-height: 1.25; color: #333; text-align: left; }
-    .notes-cell { width: 22%; max-width: 220px; white-space: normal; word-break: break-word; font-size: 9px; color: #333; }
+    .status-summary { margin-bottom: 16px; text-align: center; }
+    h2 { font-size: 13px; margin-bottom: 10px; }
+    .totals-section { break-inside: avoid; page-break-inside: avoid; text-align: center; }
+    .totals-table { width: auto; min-width: 480px; margin: 0 auto; border: 1px solid #d5d5d5; }
+    .totals-table th, .totals-table td { min-width: 68px; padding: 8px 14px; border: 1px solid #dedede; text-align: center; }
+    .totals-table th { color: #555; border-bottom-width: 1px; }
+    .totals-table td { font-size: 12px; }
+    .staff-cell { width: 9%; max-width: 110px; white-space: normal; overflow-wrap: anywhere; font-size: 9px; line-height: 1.25; color: #333; text-align: center; }
+    .notes-cell { width: 22%; max-width: 220px; white-space: normal; word-break: break-word; font-size: 9px; color: #333; text-align: center; }
     .completion-cell { min-width: 105px; font-size: 9px; line-height: 1.35; }
     .completion-cell span { display: block; white-space: nowrap; }
     @media print { body { padding: 0; } }
@@ -164,9 +167,9 @@ export function buildServiceOrdersPdfHtml(
         <th>Check-in</th>
         <th>Check-out</th>
         ${status === 'done' ? '<th>Conclusione / Tempo</th>' : ''}
+        ${showCleaningStaff ? '<th class="staff-header">Utente</th>' : ''}
         ${showConsegnaStaff ? '<th class="staff-header">Consegna</th>' : ''}
         ${OCCUPANCY_FIELDS.map(({ label }) => `<th>${label}</th>`).join('')}
-        ${showCleaningStaff ? '<th class="staff-header">Pulizia</th>' : ''}
         <th class="notes-header">Note Pulizia</th>
       </tr>
     </thead>
@@ -175,10 +178,13 @@ export function buildServiceOrdersPdfHtml(
     </tbody>
   </table>
   ${activeTotalFields.length > 0 ? `
-  <h2>Totali</h2>
-  <table class="totals-table">
-    <tbody>${totalRows}</tbody>
-  </table>` : ''}
+  <section class="totals-section">
+    <h2>Totali occupazione</h2>
+    <table class="totals-table">
+      <thead><tr>${totalHeaders}</tr></thead>
+      <tbody><tr>${totalValues}</tr></tbody>
+    </table>
+  </section>` : ''}
   <script>window.onload = function() { window.print() }<\/script>
 </body>
 </html>`

@@ -26,6 +26,27 @@ export function formatDateTime(value: string | null | undefined) {
   })
 }
 
+export function formatTimeDate(value: string | null | undefined) {
+  if (!value) return '—'
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+
+  const time = new Intl.DateTimeFormat('it-IT', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Europe/Rome',
+  }).format(date)
+  const calendarDate = new Intl.DateTimeFormat('it-IT', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    timeZone: 'Europe/Rome',
+  }).format(date)
+
+  return `${time} - ${calendarDate}`
+}
+
 export function formatDate(value: string | null | undefined) {
   if (!value) return '—'
   const [y, m, d] = value.split('-')
