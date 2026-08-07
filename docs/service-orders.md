@@ -120,6 +120,8 @@ apenas por possuir uma janela de limpeza menor.
 - Todo o conteúdo do documento é exibido em caixa alta e centralizado, exceto o
   nome do imóvel, que fica alinhado à esquerda e em negrito para facilitar a
   leitura.
+- Os conteúdos das colunas **Utente**, **Consegna** e **Note Pulizia** são
+  exibidos em negrito para reforçar sua hierarquia visual.
 - Check-in é exibido como `DD/MM HH:mm`; Check-out usa `HH:mm DD/MM`. As duas
   informações permanecem em uma única linha, sem o ano, e são formatadas
   explicitamente em `Europe/Rome`.

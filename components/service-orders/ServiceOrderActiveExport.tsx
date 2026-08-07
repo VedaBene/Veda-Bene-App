@@ -186,8 +186,8 @@ export function buildServiceOrdersPdfHtml(
     .totals-table th, .totals-table td { min-width: 68px; padding: 8px 14px; border: 1px solid #dedede; text-align: center; }
     .totals-table th { color: #555; border-bottom-width: 1px; }
     .totals-table td { font-size: 12px; }
-    .staff-cell { width: 9%; max-width: 110px; white-space: normal; overflow-wrap: anywhere; font-size: 9px; line-height: 1.25; color: #333; text-align: center; }
-    .notes-cell { width: 22%; max-width: 220px; white-space: normal; word-break: break-word; font-size: 9px; color: #333; text-align: center; }
+    .staff-cell { width: 9%; max-width: 110px; white-space: normal; overflow-wrap: anywhere; font-size: 9px; line-height: 1.25; color: #333; text-align: center; font-weight: 700; }
+    .notes-cell { width: 22%; max-width: 220px; white-space: normal; word-break: break-word; font-size: 9px; color: #333; text-align: center; font-weight: 700; }
     .completion-cell { min-width: 105px; font-size: 9px; line-height: 1.35; }
     .completion-cell span { display: block; white-space: nowrap; }
     @media print { body { padding: 0; } }

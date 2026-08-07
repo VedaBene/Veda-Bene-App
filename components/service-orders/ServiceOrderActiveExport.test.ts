@@ -70,6 +70,8 @@ describe('service-order PDF staff columns', () => {
     expect(html).toContain('Marco &amp; Figlio')
     expect(html).toContain('Ana Rossi, Lia &lt;Bianchi&gt;')
     expect(html.match(/<td class="staff-cell">—<\/td>/g)).toHaveLength(2)
+    expect(html).toContain('.staff-cell { width: 9%; max-width: 110px; white-space: normal; overflow-wrap: anywhere; font-size: 9px; line-height: 1.25; color: #333; text-align: center; font-weight: 700; }')
+    expect(html).toContain('.notes-cell { width: 22%; max-width: 220px; white-space: normal; word-break: break-word; font-size: 9px; color: #333; text-align: center; font-weight: 700; }')
   })
 
   it('omits both staff columns when names are unavailable or redacted', () => {
