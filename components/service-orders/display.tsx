@@ -1,6 +1,7 @@
 import { Badge } from '@/components/ui/Badge'
 import type { OSStatus } from '@/lib/types/database'
 import type { ServiceOrderListItem } from '@/lib/types/view-models'
+import { toRomeIsoString } from '@/lib/timezone'
 
 export const STATUS_LABEL: Record<OSStatus, string> = {
   open: 'Aperto',
@@ -26,11 +27,19 @@ export function formatDateTime(value: string | null | undefined) {
   })
 }
 
-function getCompactRomeDateTimeParts(value: string | null | undefined) {
-  if (!value) return '—'
+export type CompactRomeDateTimeParts = {
+  calendarDate: string
+  calendarDayKey: string
+  time: string
+}
+
+export function getCompactRomeDateTimeParts(
+  value: string | null | undefined,
+): CompactRomeDateTimeParts | null {
+  if (!value) return null
 
   const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
+  if (Number.isNaN(date.getTime())) return null
 
   const time = new Intl.DateTimeFormat('it-IT', {
     hour: '2-digit',
@@ -42,18 +51,14 @@ function getCompactRomeDateTimeParts(value: string | null | undefined) {
     month: '2-digit',
     timeZone: 'Europe/Rome',
   }).format(date)
+  const calendarDayKey = new Intl.DateTimeFormat('fr-CA', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    timeZone: 'Europe/Rome',
+  }).format(date)
 
-  return { calendarDate, time }
-}
-
-export function formatCompactDateTime(value: string | null | undefined) {
-  const parts = getCompactRomeDateTimeParts(value)
-  return parts === '—' ? parts : `${parts.calendarDate} ${parts.time}`
-}
-
-export function formatCompactTimeDate(value: string | null | undefined) {
-  const parts = getCompactRomeDateTimeParts(value)
-  return parts === '—' ? parts : `${parts.time} ${parts.calendarDate}`
+  return { calendarDate, calendarDayKey, time }
 }
 
 export function formatDate(value: string | null | undefined) {
@@ -63,10 +68,19 @@ export function formatDate(value: string | null | undefined) {
 }
 
 export function hoursUntil(checkout: string, checkin: string): number | null {
-  const co = new Date(checkout)
-  const ci = new Date(checkin)
+  const checkoutIso = toRomeIsoString(checkout)
+  const checkinIso = toRomeIsoString(checkin)
+  if (!checkoutIso || !checkinIso) return null
+
+  const co = new Date(checkoutIso)
+  const ci = new Date(checkinIso)
   if (isNaN(co.getTime()) || isNaN(ci.getTime())) return null
   return (ci.getTime() - co.getTime()) / 3600000
+}
+
+export function isUrgentCleaningWindow(checkout: string, checkin: string): boolean {
+  const hours = hoursUntil(checkout, checkin)
+  return hours !== null && hours > 0 && hours <= 3
 }
 
 export function ServiceOrderStatusBadge({ status }: { status: OSStatus }) {

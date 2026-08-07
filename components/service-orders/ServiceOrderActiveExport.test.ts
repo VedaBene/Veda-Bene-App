@@ -84,11 +84,75 @@ describe('service-order PDF staff columns', () => {
   it('formats compact Check-in and Check-out on one line in Rome', () => {
     const html = buildServiceOrdersPdfHtml([order()], '2026-08-05', 'open')
 
-    expect(html).toContain('<td class="datetime-cell">05/08 16:00</td>')
-    expect(html).toContain('<td class="datetime-cell">10:00 05/08</td>')
+    expect(html).toContain('<td class="datetime-cell"><span class="date-part">05/08</span> <span class="time-part same-day-time">16:00</span></td>')
+    expect(html).toContain('<td class="datetime-cell"><span class="time-part same-day-time">10:00</span> <span class="date-part">05/08</span></td>')
     expect(html).toContain('.datetime-cell { white-space: nowrap; }')
     expect(html).not.toContain('05/08/2026, 16:00')
     expect(html).not.toContain('10:00 - 05/08/2026')
+  })
+
+  it('left-aligns and bolds property names while preserving HTML escaping', () => {
+    const html = buildServiceOrdersPdfHtml([
+      order({ property: { id: 'property-1', name: 'Casa <Roma>', avg_cleaning_hours: 3 } }),
+    ], '2026-08-05', 'open')
+
+    expect(html).toContain('<td class="property-cell">Casa &lt;Roma&gt;</td>')
+    expect(html).toContain('.property-cell { text-align: left; font-weight: 700; }')
+  })
+
+  it('renders urgent same-day times in red and bold for active orders', () => {
+    const html = buildServiceOrdersPdfHtml([
+      order({
+        checkout_at: '2026-08-05T08:00:00Z',
+        checkin_at: '2026-08-05T11:00:00Z',
+        is_urgent: true,
+      }),
+    ], '2026-08-05', 'open')
+
+    expect(html.match(/class="time-part same-day-time urgent-time"/g)).toHaveLength(2)
+    expect(html).not.toContain('class="date-part different-day-checkin-date"')
+  })
+
+  it('highlights only the Check-in date when the Rome calendar day changes', () => {
+    const html = buildServiceOrdersPdfHtml([
+      order({
+        checkout_at: '2026-08-05T20:00:00Z',
+        checkin_at: '2026-08-06T01:00:00Z',
+      }),
+    ], '2026-08-05', 'open')
+
+    expect(html).toContain('<span class="date-part different-day-checkin-date">06/08</span> <span class="time-part">03:00</span>')
+    expect(html).toContain('<span class="time-part">22:00</span> <span class="date-part">05/08</span>')
+    expect(html).not.toContain('class="time-part same-day-time')
+    expect(html).not.toContain('class="time-part urgent-time"')
+  })
+
+  it('keeps cross-midnight urgent times red without making them bold', () => {
+    const html = buildServiceOrdersPdfHtml([
+      order({
+        checkout_at: '2026-08-05T21:30:00Z',
+        checkin_at: '2026-08-05T23:30:00Z',
+        is_urgent: true,
+      }),
+    ], '2026-08-05', 'open')
+
+    expect(html).toContain('<span class="date-part different-day-checkin-date">06/08</span> <span class="time-part urgent-time">01:30</span>')
+    expect(html).toContain('<span class="time-part urgent-time">23:30</span> <span class="date-part">05/08</span>')
+    expect(html).not.toContain('class="time-part same-day-time')
+  })
+
+  it('does not show historical urgency in completed PDFs', () => {
+    const html = buildServiceOrdersPdfHtml([
+      order({
+        status: 'done',
+        checkout_at: '2026-08-05T21:30:00Z',
+        checkin_at: '2026-08-05T23:30:00Z',
+        is_urgent: true,
+      }),
+    ], '2026-08-05', 'done')
+
+    expect(html).toContain('class="date-part different-day-checkin-date"')
+    expect(html).not.toContain('class="time-part urgent-time"')
   })
 
   it('centers and uppercases the document and renders totals horizontally', () => {

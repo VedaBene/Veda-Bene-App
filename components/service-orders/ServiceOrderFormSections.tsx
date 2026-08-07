@@ -176,7 +176,7 @@ export function VisitDetailsSection({
       {urgencyWarning && (
         <div className="sm:col-span-2 flex items-center gap-2 px-4 py-3 bg-urgent-bg border border-urgent/20 rounded-xl text-sm text-urgent font-medium">
           <Zap size={16} className="shrink-0" />
-          Intervallo inferiore a 3 ore — questo O.L. sarà contrassegnato come <strong className="ml-1">Urgente</strong>.
+          Intervallo pari o inferiore a 3 ore — questo O.L. sarà contrassegnato come <strong className="ml-1">Urgente</strong>.
         </div>
       )}
     </Section>

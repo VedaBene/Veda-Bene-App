@@ -3,10 +3,9 @@
 import { FileDown } from 'lucide-react'
 import type { ServiceOrderListItem } from '@/lib/types/view-models'
 import {
-  formatCompactDateTime,
-  formatCompactTimeDate,
   formatDate,
   formatDateTime,
+  getCompactRomeDateTimeParts,
 } from './display'
 import { formatWorkedTime } from './LiveTimer'
 import { compareServiceOrderPriority } from './ordering'
@@ -47,6 +46,33 @@ function getCleaningStaffNames(order: Pick<ServiceOrderListItem, 'cleaning_staff
 
 function getConsegnaStaffName(order: Pick<ServiceOrderListItem, 'consegna_staff'>): string {
   return order.consegna_staff?.full_name.trim() ?? ''
+}
+
+function renderScheduleCells(
+  order: Pick<ServiceOrderListItem, 'checkin_at' | 'checkout_at' | 'is_urgent' | 'status'>,
+): string {
+  const checkin = getCompactRomeDateTimeParts(order.checkin_at)
+  const checkout = getCompactRomeDateTimeParts(order.checkout_at)
+  const hasBothDates = checkin !== null && checkout !== null
+  const sameDay = hasBothDates && checkin.calendarDayKey === checkout.calendarDayKey
+  const differentDay = hasBothDates && !sameDay
+  const showUrgency = order.is_urgent && order.status !== 'done'
+
+  const timeClasses = ['time-part']
+  if (sameDay) timeClasses.push('same-day-time')
+  if (showUrgency) timeClasses.push('urgent-time')
+  const timeClassName = timeClasses.join(' ')
+
+  const checkinHtml = checkin
+    ? `<span class="date-part${differentDay ? ' different-day-checkin-date' : ''}">${checkin.calendarDate}</span> <span class="${timeClassName}">${checkin.time}</span>`
+    : '—'
+  const checkoutHtml = checkout
+    ? `<span class="${timeClassName}">${checkout.time}</span> <span class="date-part">${checkout.calendarDate}</span>`
+    : '—'
+
+  return `
+      <td class="datetime-cell">${checkinHtml}</td>
+      <td class="datetime-cell">${checkoutHtml}</td>`
 }
 
 export function buildServiceOrdersPdfHtml(
@@ -102,9 +128,8 @@ export function buildServiceOrdersPdfHtml(
   const rows = sortedOrders.map((o) => `
     <tr>
       <td>#${o.order_number}</td>
-      <td>${escapeHtml(o.property?.name ?? '—')}</td>
-      <td class="datetime-cell">${formatCompactDateTime(o.checkin_at)}</td>
-      <td class="datetime-cell">${formatCompactTimeDate(o.checkout_at)}</td>
+      <td class="property-cell">${escapeHtml(o.property?.name ?? '—')}</td>
+      ${renderScheduleCells(o)}
       ${status === 'done' ? `<td class="completion-cell">
         <span><strong>Conclusa:</strong> ${formatDateTime(o.completed_at)}</span>
         <span><strong>Tempo:</strong> ${o.worked_minutes != null ? formatWorkedTime(o.worked_minutes) : '—'}</span>
@@ -149,7 +174,11 @@ export function buildServiceOrdersPdfHtml(
     tr:last-child td { border-bottom: none; }
     .highlight { font-weight: 700; color: #111; }
     .dim { color: #aaa; }
+    .property-cell { text-align: left; font-weight: 700; }
     .datetime-cell { white-space: nowrap; }
+    .same-day-time { font-weight: 700; }
+    .urgent-time, .different-day-checkin-date { color: #b91c1c; }
+    .different-day-checkin-date { font-weight: 700; }
     .status-summary { margin-bottom: 16px; text-align: center; }
     h2 { font-size: 13px; margin-bottom: 10px; }
     .totals-section { break-inside: avoid; page-break-inside: avoid; text-align: center; }

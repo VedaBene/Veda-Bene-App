@@ -33,7 +33,7 @@ import {
   TimeSummaryPanel,
   TimeTrackingPanel,
 } from './ServiceOrderTimeControls'
-import { hoursUntil } from './display'
+import { isUrgentCleaningWindow } from './display'
 import { CleaningPhotoUploader } from './CleaningPhotoUploader'
 import { useCleaningPhotoWorkflow } from './useCleaningPhotoWorkflow'
 import { toRomeIsoString, toRomeLocalInputValue } from '@/lib/timezone'
@@ -121,10 +121,7 @@ export function ServiceOrderForm({
   const [checkoutAt, setCheckoutAt] = useState(toRomeLocalInputValue(order?.checkout_at))
   const [checkinAt, setCheckinAt] = useState(toRomeLocalInputValue(order?.checkin_at))
   const urgencyWarning = checkoutAt && checkinAt
-    ? (() => {
-        const hours = hoursUntil(checkoutAt, checkinAt)
-        return hours !== null && hours > 0 && hours < 3
-      })()
+    ? isUrgentCleaningWindow(checkoutAt, checkinAt)
     : false
 
   const [realGuests, setRealGuests] = useState(order?.real_guests?.toString() ?? '')

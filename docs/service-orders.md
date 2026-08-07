@@ -117,11 +117,20 @@ apenas por possuir uma janela de limpeza menor.
   **Consegna** antes das colunas de ocupação. Ordens sem atribuição exibem `—`;
   quando nenhum nome está disponível, a respectiva coluna é omitida para
   preservar o espaço.
-- Todo o conteúdo do documento é exibido em caixa alta e centralizado, inclusive
-  imóvel, responsáveis e notas.
+- Todo o conteúdo do documento é exibido em caixa alta e centralizado, exceto o
+  nome do imóvel, que fica alinhado à esquerda e em negrito para facilitar a
+  leitura.
 - Check-in é exibido como `DD/MM HH:mm`; Check-out usa `HH:mm DD/MM`. As duas
   informações permanecem em uma única linha, sem o ano, e são formatadas
   explicitamente em `Europe/Rome`.
+- Quando Check-in e Check-out pertencem ao mesmo dia em Roma, somente os
+  horários aparecem em negrito. Quando pertencem a dias diferentes, a data do
+  Check-in aparece em vermelho e negrito, inclusive no PDF de concluídas.
+- Em PDFs de ordens abertas ou em andamento, os horários de Check-in e Check-out
+  ficam vermelhos quando `is_urgent` é verdadeiro. A regra persistida considera
+  urgente a janela de até três horas, inclusive exatamente três horas; o PDF
+  consome o indicador calculado, sem duplicar o cálculo. Ordens concluídas não
+  recebem o destaque histórico de urgência, em conformidade com a listagem.
 - Os totais de ocupação com valor maior que zero são exibidos em uma tabela
   horizontal centralizada, com cabeçalhos e valores alinhados.
 - Os nomes usados no PDF são os mesmos do `ServiceOrderListItem`. O perfil
