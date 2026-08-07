@@ -108,8 +108,9 @@ apenas por possuir uma janela de limpeza menor.
   preservar o espaço.
 - Todo o conteúdo do documento é exibido em caixa alta e centralizado, inclusive
   imóvel, responsáveis e notas.
-- Check-in é exibido como `DD/MM/YYYY, HH:mm`; Check-out usa
-  `HH:mm - DD/MM/YYYY`. Ambos são formatados explicitamente em `Europe/Rome`.
+- Check-in é exibido como `DD/MM HH:mm`; Check-out usa `HH:mm DD/MM`. As duas
+  informações permanecem em uma única linha, sem o ano, e são formatadas
+  explicitamente em `Europe/Rome`.
 - Os totais de ocupação com valor maior que zero são exibidos em uma tabela
   horizontal centralizada, com cabeçalhos e valores alinhados.
 - Os nomes usados no PDF são os mesmos do `ServiceOrderListItem`. O perfil

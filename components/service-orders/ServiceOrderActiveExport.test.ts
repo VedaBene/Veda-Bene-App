@@ -81,17 +81,21 @@ describe('service-order PDF staff columns', () => {
     expect(html).not.toContain('<th class="staff-header">Utente</th>')
   })
 
-  it('formats Check-in as date/time and Check-out as time/date in Rome', () => {
+  it('formats compact Check-in and Check-out on one line in Rome', () => {
     const html = buildServiceOrdersPdfHtml([order()], '2026-08-05', 'open')
 
-    expect(html).toContain('<td>05/08/2026, 16:00</td>')
-    expect(html).toContain('<td>10:00 - 05/08/2026</td>')
+    expect(html).toContain('<td class="datetime-cell">05/08 16:00</td>')
+    expect(html).toContain('<td class="datetime-cell">10:00 05/08</td>')
+    expect(html).toContain('.datetime-cell { white-space: nowrap; }')
+    expect(html).not.toContain('05/08/2026, 16:00')
+    expect(html).not.toContain('10:00 - 05/08/2026')
   })
 
   it('centers and uppercases the document and renders totals horizontally', () => {
     const html = buildServiceOrdersPdfHtml([order()], '2026-08-05', 'open')
 
     expect(html).toContain('text-align: center; text-transform: uppercase;')
+    expect(html).toContain('font-size: 11px; text-transform: uppercase;')
     expect(html).toContain('tbody > tr { break-inside: avoid; page-break-inside: avoid; }')
     expect(html).toContain('<h2>Totali occupazione</h2>')
     expect(html).toContain('<thead><tr><th scope="col">PX</th><th scope="col">M</th>')

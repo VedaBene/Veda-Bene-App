@@ -2,7 +2,12 @@
 
 import { FileDown } from 'lucide-react'
 import type { ServiceOrderListItem } from '@/lib/types/view-models'
-import { formatDate, formatDateTime, formatTimeDate } from './display'
+import {
+  formatCompactDateTime,
+  formatCompactTimeDate,
+  formatDate,
+  formatDateTime,
+} from './display'
 import { formatWorkedTime } from './LiveTimer'
 import { compareServiceOrderPriority } from './ordering'
 
@@ -95,8 +100,8 @@ export function buildServiceOrdersPdfHtml(
     <tr>
       <td>#${o.order_number}</td>
       <td>${escapeHtml(o.property?.name ?? '—')}</td>
-      <td>${formatDateTime(o.checkin_at)}</td>
-      <td>${formatTimeDate(o.checkout_at)}</td>
+      <td class="datetime-cell">${formatCompactDateTime(o.checkin_at)}</td>
+      <td class="datetime-cell">${formatCompactTimeDate(o.checkout_at)}</td>
       ${status === 'done' ? `<td class="completion-cell">
         <span><strong>Conclusa:</strong> ${formatDateTime(o.completed_at)}</span>
         <span><strong>Tempo:</strong> ${o.worked_minutes != null ? formatWorkedTime(o.worked_minutes) : '—'}</span>
@@ -135,12 +140,13 @@ export function buildServiceOrdersPdfHtml(
     h1 { font-size: 18px; margin-bottom: 2px; }
     .meta { font-size: 10px; color: #555; margin-bottom: 20px; }
     table { width: 100%; border-collapse: collapse; margin-bottom: 28px; }
-    th { background: #f0f0f0; text-align: center; padding: 5px 4px; font-size: 9px; text-transform: uppercase; letter-spacing: 0.03em; border-bottom: 2px solid #ccc; }
+    th { background: #f0f0f0; text-align: center; padding: 5px 4px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; border-bottom: 2px solid #ccc; }
     td { padding: 4px; border-bottom: 1px solid #e5e5e5; vertical-align: middle; text-align: center; }
     tbody > tr { break-inside: avoid; page-break-inside: avoid; }
     tr:last-child td { border-bottom: none; }
     .highlight { font-weight: 700; color: #111; }
     .dim { color: #aaa; }
+    .datetime-cell { white-space: nowrap; }
     .status-summary { margin-bottom: 16px; text-align: center; }
     h2 { font-size: 13px; margin-bottom: 10px; }
     .totals-section { break-inside: avoid; page-break-inside: avoid; text-align: center; }

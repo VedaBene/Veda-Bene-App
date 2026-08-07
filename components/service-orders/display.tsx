@@ -26,7 +26,7 @@ export function formatDateTime(value: string | null | undefined) {
   })
 }
 
-export function formatTimeDate(value: string | null | undefined) {
+function getCompactRomeDateTimeParts(value: string | null | undefined) {
   if (!value) return '—'
 
   const date = new Date(value)
@@ -40,11 +40,20 @@ export function formatTimeDate(value: string | null | undefined) {
   const calendarDate = new Intl.DateTimeFormat('it-IT', {
     day: '2-digit',
     month: '2-digit',
-    year: 'numeric',
     timeZone: 'Europe/Rome',
   }).format(date)
 
-  return `${time} - ${calendarDate}`
+  return { calendarDate, time }
+}
+
+export function formatCompactDateTime(value: string | null | undefined) {
+  const parts = getCompactRomeDateTimeParts(value)
+  return parts === '—' ? parts : `${parts.calendarDate} ${parts.time}`
+}
+
+export function formatCompactTimeDate(value: string | null | undefined) {
+  const parts = getCompactRomeDateTimeParts(value)
+  return parts === '—' ? parts : `${parts.time} ${parts.calendarDate}`
 }
 
 export function formatDate(value: string | null | undefined) {
