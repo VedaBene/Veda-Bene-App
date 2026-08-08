@@ -50,3 +50,39 @@ Qualquer rotina, helper, utilitário ou componente do frontend que manipule, com
 - Nunca aplique migração, comando SQL mutável ou alteração de Storage no Supabase de produção sem autorização explícita e específica do usuário para essa execução.
 - Consulte `docs/production-data-safety.md` antes de alterar schema, dados, RLS, funções, triggers, grants, buckets ou políticas de Storage.
 <!-- END:production-data-safety-rules -->
+
+<!-- BEGIN:secret-management-rules -->
+# Regra Absoluta de Gestão de Segredos e Credenciais
+
+- Nunca escreva, copie ou mantenha chaves secretas, tokens, senhas, credenciais
+  administrativas ou outros segredos em código-fonte, scripts, migrations,
+  seeds, documentação, exemplos, logs, screenshots, prompts, chats ou commits.
+- Chaves privadas e administrativas devem existir somente em variáveis de
+  ambiente server-side ou em um gerenciador de segredos. Arquivos de exemplo
+  devem conter apenas placeholders sem valor real.
+- Variáveis com prefixo público, como `NEXT_PUBLIC_`, jamais podem receber
+  `service_role`, `sb_secret_...`, senhas ou qualquer credencial privilegiada.
+  No frontend, use apenas credenciais deliberadamente públicas, como a chave
+  Supabase `sb_publishable_...`, sempre protegidas por RLS e políticas corretas.
+- Scripts de manutenção devem ler segredos por `process.env`, validar a
+  presença das variáveis antes de iniciar, falhar de forma segura quando
+  ausentes e nunca registrar seus valores. Não inclua credenciais reais como
+  fallback para facilitar execução local.
+- Agentes e mantenedores não devem solicitar que o usuário cole segredos em
+  chats. Oriente o usuário a configurá-los diretamente no ambiente autorizado
+  e confirme somente nome, presença ou prefixo não sensível quando necessário.
+- Ao detectar exposição, interrompa o fluxo sensível, avise imediatamente,
+  revogue ou rotacione a credencial, substitua todos os consumidores, remova o
+  valor do estado atual do repositório e verifique também o histórico Git. A
+  simples remoção do arquivo não neutraliza uma credencial ainda válida.
+- Uma chave legada comprometida e desabilitada nunca deve ser reativada. Se uma
+  integração exigir o legado novamente, trate isso como novo incidente de
+  segurança e planeje previamente a rotação/revogação do segredo subjacente.
+- Antes de qualquer commit ou push, revise o diff staged procurando segredos,
+  confirme que arquivos `.env*` permanecem ignorados e bloqueie a publicação se
+  houver qualquer credencial privada ou padrão suspeito no conteúdo versionado.
+- Scripts, SQL ou ferramentas que possam alterar produção continuam sujeitos à
+  autorização explícita e específica, às validações e às salvaguardas descritas
+  em `docs/production-data-safety.md`, mesmo quando as credenciais estiverem
+  armazenadas corretamente.
+<!-- END:secret-management-rules -->

@@ -1,9 +1,20 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = 'https://iwrbeiqqsvzhiuhkqnqg.supabase.co'
-const serviceRoleKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml3cmJlaXFxc3Z6aGl1aGtxbnFnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTY3MTgyOCwiZXhwIjoyMDkxMjQ3ODI4fQ.hGLE6EJbwMYXp72qBX11sjREjgQQrotuk7XIPK1KmIk'
+const supabaseUrl =
+  process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseSecretKey =
+  process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY
 
-const supabase = createClient(supabaseUrl, serviceRoleKey)
+if (!supabaseUrl || !supabaseSecretKey) {
+  console.error(
+    'Defina SUPABASE_URL (ou NEXT_PUBLIC_SUPABASE_URL) e SUPABASE_SECRET_KEY (ou SUPABASE_SERVICE_ROLE_KEY) antes de executar o script.',
+  )
+  process.exit(1)
+}
+
+const supabase = createClient(supabaseUrl, supabaseSecretKey, {
+  auth: { autoRefreshToken: false, persistSession: false },
+})
 
 const RIPASSO_RATE = 0.6
 const OUT_LONG_STAY_HOURLY_RATE = 25
