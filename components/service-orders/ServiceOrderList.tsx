@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/Card'
 import { Pagination } from '@/components/ui/Pagination'
 import type { Role } from '@/lib/types/database'
 import type { ServiceOrderListItem } from '@/lib/types/view-models'
-import type { OperationalServiceOrderWindow } from '@/lib/service-order-visibility'
+import type { OperationalServiceOrderVisibility } from '@/lib/service-order-visibility'
 import { getRomeDateOnly } from '@/lib/utils/date-rome'
 import { OrdersPdfButton } from './ServiceOrderActiveExport'
 import { ServiceOrderFilters } from './ServiceOrderFilters'
@@ -37,7 +37,7 @@ export function ServiceOrderList({
   initialStartDate,
   initialEndDate,
   staff,
-  operationalWindow,
+  operationalVisibility,
   cleaningPhotosEnabled = false,
 }: {
   active: ServiceOrderListItem[]
@@ -54,7 +54,7 @@ export function ServiceOrderList({
   initialStartDate: string
   initialEndDate: string
   staff: StaffOption[]
-  operationalWindow: OperationalServiceOrderWindow | null
+  operationalVisibility: OperationalServiceOrderVisibility | null
   cleaningPhotosEnabled?: boolean
 }) {
   const router = useRouter()
@@ -134,10 +134,10 @@ export function ServiceOrderList({
   }, [search, cleaningStaffId, consegnaStaffId, startDate, endDate, initialQ, initialCleaningStaffId, initialConsegnaStaffId, initialStartDate, initialEndDate, pushFilters])
 
   useEffect(() => {
-    if (!operationalWindow) return
+    if (!operationalVisibility) return
 
     const refreshOnRomeDateChange = () => {
-      if (getRomeDateOnly() !== operationalWindow.today) {
+      if (getRomeDateOnly() !== operationalVisibility.today) {
         startTransition(() => router.refresh())
       }
     }
@@ -151,7 +151,7 @@ export function ServiceOrderList({
       window.removeEventListener('focus', refreshOnRomeDateChange)
       document.removeEventListener('visibilitychange', refreshWhenVisible)
     }
-  }, [operationalWindow, router])
+  }, [operationalVisibility, router])
 
   const filterOrder = (o: ServiceOrderListItem) => {
     const matchName = !search || (o.property?.name ?? '').toLowerCase().includes(search.toLowerCase())
@@ -181,8 +181,8 @@ export function ServiceOrderList({
     ? `Dal ${formatDate(startDate)} al ${formatDate(endDate)}`
     : undefined
   const activePdfDateLabel = selectedRangeLabel ?? (
-    operationalWindow && !startDate && !endDate
-      ? `Fino al ${formatDate(operationalWindow.tomorrow)} (Domani)`
+    operationalVisibility && !startDate && !endDate
+      ? `Fino al ${formatDate(operationalVisibility.maxVisibleDate)} (Oggi)`
       : undefined
   )
   
@@ -262,11 +262,11 @@ export function ServiceOrderList({
 
   return (
     <div className="notranslate space-y-5" translate="no">
-      {operationalWindow && (
+      {operationalVisibility && (
         <div role="status" className="rounded-lg border border-info/25 bg-info/5 px-4 py-3 text-sm text-foreground">
           <span>
-            Sono visibili solo gli O.L. assegnati con data di pulizia fino a domani
-            (ora di Roma). Gli O.L. successivi saranno mostrati automaticamente al momento opportuno.
+            Sono visibili solo gli O.L. assegnati con data di pulizia fino a oggi
+            (ora di Roma). Gli O.L. dei giorni successivi saranno mostrati automaticamente nel giorno previsto.
           </span>
         </div>
       )}
@@ -278,7 +278,7 @@ export function ServiceOrderList({
         startDate={startDate}
         endDate={endDate}
         staff={staff}
-        maxDate={operationalWindow?.tomorrow}
+        maxDate={operationalVisibility?.maxVisibleDate}
         hasFilter={hasFilter}
         onSearchChange={setSearch}
         onCleaningStaffChange={setCleaningStaffId}
@@ -322,7 +322,7 @@ export function ServiceOrderList({
         <ServiceOrderListTable
           orders={sortedOpen}
           role={role}
-          emptyText={operationalWindow ? 'Nessun O.L. assegnato fino a domani.' : 'Nessun O.L. aperto.'}
+          emptyText={operationalVisibility ? 'Nessun O.L. assegnato fino a oggi.' : 'Nessun O.L. aperto.'}
           userId={userId}
           onStart={setStartModalOrder}
         />

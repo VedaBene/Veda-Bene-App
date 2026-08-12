@@ -1,6 +1,6 @@
 -- Read-only authorization assertions to run after
--- 20260807193218_operational_staff_service_order_visibility.sql in a disposable
--- database or an isolated production-like copy.
+-- the latest operational visibility migration in a disposable database or an
+-- isolated production-like copy.
 
 DO $assertions$
 DECLARE
@@ -27,7 +27,8 @@ BEGIN
      OR helper_definition NOT LIKE '%Europe/Rome%'
      OR helper_definition NOT LIKE '%cleaning_date IS NOT NULL%'
      OR helper_definition NOT LIKE '%service_order_cleaning_staff%'
-     OR helper_definition NOT LIKE '%consegna_staff_id%' THEN
+     OR helper_definition NOT LIKE '%consegna_staff_id%'
+     OR helper_definition LIKE '%+ 1 AS max_cleaning_date%' THEN
     RAISE EXCEPTION 'Unexpected operational visibility helper contract';
   END IF;
 
@@ -99,7 +100,8 @@ BEGIN
   IF update_check_expression IS NULL
      OR update_check_expression NOT LIKE '%cleaning_date IS NOT NULL%'
      OR update_check_expression NOT LIKE '%Europe/Rome%'
-     OR update_check_expression NOT LIKE '%service_order_cleaning_staff%' THEN
+     OR update_check_expression NOT LIKE '%service_order_cleaning_staff%'
+     OR update_check_expression LIKE '%+ 1%' THEN
     RAISE EXCEPTION 'Pulizia update checks are not aligned with the operational scope';
   END IF;
 

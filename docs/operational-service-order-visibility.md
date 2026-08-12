@@ -2,17 +2,18 @@
 
 ## Escopo e impacto
 
-A mudança limita `limpeza` e `consegna` às ordens atribuídas com
-`cleaning_date <= amanhã`, calculado em `Europe/Rome`. Histórico e ordens
-atrasadas permanecem disponíveis; datas nulas e datas posteriores a amanhã são
+A regra vigente limita `limpeza` e `consegna` às ordens atribuídas com
+`cleaning_date <= hoje`, calculado em `Europe/Rome`. Histórico e ordens
+atrasadas permanecem disponíveis; datas nulas e datas de amanhã em diante são
 ocultadas. `admin`, `secretaria` e `cliente` permanecem inalterados, e
 `consegna` continua somente leitura.
 
-A migração incremental é
-`supabase/migrations/20260807193218_operational_staff_service_order_visibility.sql`.
-Ela:
+As migrações incrementais são a base
+`20260807193218_operational_staff_service_order_visibility.sql` e a restrição
+vigente `20260812203455_restrict_operational_staff_visibility_to_today.sql`.
+Em conjunto, elas:
 
-- cria `private.operational_staff_service_order_ids()`;
+- criam e atualizam `private.operational_staff_service_order_ids()`;
 - redefine as policies de leitura de `service_orders` para Pulizia e Consegna;
 - alinha a policy de atualização de Pulizia à mesma janela;
 - restringe a leitura da tabela de vínculos `service_order_cleaning_staff`;
@@ -26,10 +27,10 @@ RLS aplicada, para não depender apenas do filtro do DAL.
 
 ## Pré-condições e locks
 
-A própria migração aborta de forma atômica se as tabelas, coluna `cleaning_date`
-do tipo `DATE`, policies esperadas ou o helper preexistente de imóveis não
-estiverem presentes. Também aborta se existir uma policy de atualização para
-Consegna ou se o novo helper já existir, evitando aceitar drift silenciosamente.
+As migrações abortam de forma atômica se os objetos e contratos de autorização
+esperados não estiverem presentes. A migração vigente exige explicitamente a
+versão anterior do helper e da policy de atualização, e também aborta se existir
+uma policy de atualização para Consegna.
 
 São esperados locks curtos de catálogo nas funções e nas quatro tabelas cujas
 policies são alteradas: `service_orders`, `service_order_cleaning_staff`,
@@ -64,9 +65,9 @@ Em banco descartável ou cópia isolada, testar pela Data API autenticada:
 
 | Perfil e vínculo | Ontem | Hoje | Amanhã | Depois de amanhã | Data nula |
 |---|---:|---:|---:|---:|---:|
-| Pulizia atribuída | permite | permite | permite | bloqueia | bloqueia |
+| Pulizia atribuída | permite | permite | bloqueia | bloqueia | bloqueia |
 | Pulizia não atribuída | bloqueia | bloqueia | bloqueia | bloqueia | bloqueia |
-| Consegna atribuída | permite leitura | permite leitura | permite leitura | bloqueia | bloqueia |
+| Consegna atribuída | permite leitura | permite leitura | bloqueia | bloqueia | bloqueia |
 | Consegna não atribuída | bloqueia | bloqueia | bloqueia | bloqueia | bloqueia |
 
 Para cada caso, validar lista, consulta direta por ID, vínculos de equipe,

@@ -13,8 +13,8 @@
 |------|-----------|
 | `admin` | Acesso total, incluindo os módulos A Receber e A Pagar |
 | `secretaria` | Imóveis + OS, sem acesso aos módulos financeiros nem aos preços dos imóveis |
-| `limpeza` | Suas próprias OSs até amanhã (hora de Roma) + dados básicos do imóvel (sem preços) |
-| `consegna` | Suas próprias OSs até amanhã (hora de Roma), somente leitura |
+| `limpeza` | Suas próprias OSs até hoje (hora de Roma) + dados básicos do imóvel (sem preços) |
+| `consegna` | Suas próprias OSs até hoje (hora de Roma), somente leitura |
 | `cliente` | Seus imóveis + OSs abertas/finalizadas (sem nomes de responsáveis) |
 
 ## Decisões arquiteturais críticas
@@ -31,13 +31,13 @@ As decisões com maior peso e nuance estão registradas em [`docs/decisions/`](d
 - [ADR 008](docs/decisions/008-controles-seguranca-autenticacao.md) — Timeout de sessão por inatividade e bloqueio temporário após falhas de login
 - [ADR 012](docs/decisions/012-fotos-privadas-por-ciclo-da-ordem-de-servico.md) — Fotos privadas antes/depois por ciclo, com URLs assinadas e publicação em duas fases
 - [ADR 014](docs/decisions/014-fallback-jpeg-e-validacao-integral-de-fotos.md) — Fallback JPEG quando o canvas não codifica WebP e validação integral das variantes no servidor
-- [ADR 015](docs/decisions/015-janela-visibilidade-equipe-operacional.md) — Pulizia e Consegna veem somente O.S. atribuídas até amanhã no fuso de Roma
+- [ADR 016](docs/decisions/016-visibilidade-equipe-operacional-somente-ate-hoje.md) — Pulizia e Consegna veem somente O.S. atribuídas até hoje no fuso de Roma
 
 Outras convenções importantes:
 - **Integridade dos dados durante desenvolvimento/manutenção (regra absoluta)**: scripts, migrações e operações de manutenção não podem apagar, recriar ou sobrescrever dados e estruturas existentes em produção. Evoluções de banco devem ser incrementais, aditivas e compatíveis; exigem análise de impacto, invariantes verificáveis e rollback não destrutivo. A regra não modifica o CRUD autorizado nem as ações previstas pelas regras de negócio. Leia obrigatoriamente [`docs/production-data-safety.md`](docs/production-data-safety.md) antes de alterar banco, RLS ou Storage.
 - **`is_urgent`** na tabela `service_orders`: coluna `GENERATED ALWAYS AS STORED` — não pode ser inserida manualmente. É `true` quando `(checkin_at - checkout_at) <= 3h` (3 horas ou menos).
 - **Ordenação de OSs em Aberto**: Na listagem do aplicativo (seção "Aperti") e nos PDFs consolidados de ordens ativas, as ordens de serviço são ordenadas primeiro por `cleaning_date` crescente. Dentro da mesma data, a prioridade é o menor intervalo disponível de limpeza (`checkin_at - checkout_at`). Ordens sem data aparecem por último; dentro de uma data, ordens sem horários de check-in/check-out definidos aparecem após as que possuem uma janela calculável. O desempate final usa `order_number` crescente.
-- **Visibilidade da equipe operacional**: `limpeza` e `consegna` só podem ler O.S. atribuídas ao próprio usuário com `cleaning_date <= amanhã` em `Europe/Rome`; passado permanece visível e data nula é bloqueada. A regra canônica fica no RLS por meio de `private.operational_staff_service_order_ids()` e é espelhada no DAL. `consegna` permanece somente leitura. Ver ADR 015.
+- **Visibilidade da equipe operacional**: `limpeza` e `consegna` só podem ler O.S. atribuídas ao próprio usuário com `cleaning_date <= hoje` em `Europe/Rome`; passado permanece visível e data nula é bloqueada. A regra canônica fica no RLS por meio de `private.operational_staff_service_order_ids()` e é espelhada no DAL. `consegna` permanece somente leitura. Ver ADR 016.
 - **Supabase clients**: `utils/supabase/{client,server,middleware}.ts` para uso comum. `utils/supabase/admin.ts` é um adapter admin server-only; não exporta o client service-role bruto e expõe apenas operações administrativas explícitas. O `middleware.ts` aqui é convenção do `@supabase/ssr`, não do Next.js — o arquivo de proxy do Next.js está na raiz como `proxy.ts` (ver ADR 004).
 - **Segurança de autenticação**: login por senha passa por `POST /api/auth/login` para aplicar bloqueio server-side após falhas; sessões autenticadas expiram após 45 minutos de inatividade. Ver ADR 008 antes de alterar login, sessão, cookies de atividade ou `public.auth_login_attempts`.
 - **Funções privilegiadas**: helpers de RLS com `SECURITY DEFINER` devem ficar em schema privado; RPCs privilegiadas em `public` não devem conceder `EXECUTE` direto a `anon`/`authenticated` sem ADR/revisão explícita.

@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  addCalendarDays,
-  getOperationalServiceOrderWindow,
+  getOperationalServiceOrderVisibility,
   isOperationalStaffRole,
 } from './service-order-visibility'
 
@@ -15,24 +14,20 @@ describe('operational service-order visibility', () => {
   })
 
   it('uses the Rome calendar when UTC is still on the previous day', () => {
-    expect(getOperationalServiceOrderWindow('2026-07-31T22:30:00.000Z')).toEqual({
+    expect(getOperationalServiceOrderVisibility('2026-07-31T22:30:00.000Z')).toEqual({
       today: '2026-08-01',
-      tomorrow: '2026-08-02',
+      maxVisibleDate: '2026-08-01',
     })
   })
 
-  it('advances by calendar day across year boundaries', () => {
-    expect(addCalendarDays('2026-12-31', 1)).toBe('2027-01-01')
-  })
-
-  it('does not depend on a fixed 24-hour Rome offset around daylight saving time', () => {
-    expect(getOperationalServiceOrderWindow('2026-03-29T22:30:00.000Z')).toEqual({
+  it('keeps the maximum visible date on today around daylight saving time', () => {
+    expect(getOperationalServiceOrderVisibility('2026-03-29T22:30:00.000Z')).toEqual({
       today: '2026-03-30',
-      tomorrow: '2026-03-31',
+      maxVisibleDate: '2026-03-30',
     })
-    expect(getOperationalServiceOrderWindow('2026-10-25T23:30:00.000Z')).toEqual({
+    expect(getOperationalServiceOrderVisibility('2026-10-25T23:30:00.000Z')).toEqual({
       today: '2026-10-26',
-      tomorrow: '2026-10-27',
+      maxVisibleDate: '2026-10-26',
     })
   })
 })

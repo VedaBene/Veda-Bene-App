@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { FakeSupabase } from '@/test/fake-supabase'
 import type { Role } from '@/lib/types/database'
-import type { OperationalServiceOrderWindow } from '@/lib/service-order-visibility'
+import type { OperationalServiceOrderVisibility } from '@/lib/service-order-visibility'
 import type { SupabaseServerClient, Viewer } from './viewer'
 import { getServiceOrderDetail, getServiceOrderList } from './service-orders'
 
-const WINDOW: OperationalServiceOrderWindow = {
+const VISIBILITY: OperationalServiceOrderVisibility = {
   today: '2026-08-07',
-  tomorrow: '2026-08-08',
+  maxVisibleDate: '2026-08-07',
 }
 
 function viewer(role: Role): Viewer {
@@ -24,7 +24,7 @@ function order(overrides: Record<string, unknown> = {}) {
     property_id: 'property-1',
     cleaning_staff_id: null,
     consegna_staff_id: 'consegna-user',
-    cleaning_date: WINDOW.today,
+    cleaning_date: VISIBILITY.today,
     checkout_at: null,
     checkin_at: null,
     status: 'open',
@@ -65,20 +65,20 @@ const FILTERS = {
 
 describe('service-order operational visibility in the DAL', () => {
   it.each(['limpeza', 'consegna'] as const)(
-    'caps active orders at tomorrow for %s while preserving overdue orders',
+    'caps active orders at today for %s while preserving overdue orders',
     async role => {
       const fake = new FakeSupabase({
         service_orders: [
           order({ id: 'overdue', cleaning_date: '2026-08-06', order_number: 1 }),
-          order({ id: 'tomorrow', cleaning_date: WINDOW.tomorrow, order_number: 2 }),
-          order({ id: 'future', cleaning_date: '2026-08-09', order_number: 3 }),
+          order({ id: 'today', cleaning_date: VISIBILITY.today, order_number: 2 }),
+          order({ id: 'tomorrow', cleaning_date: '2026-08-08', order_number: 3 }),
           order({ id: 'undated', cleaning_date: null, order_number: 4 }),
         ],
       })
 
-      const result = await getServiceOrderList(asSupabase(fake), viewer(role), FILTERS, WINDOW)
+      const result = await getServiceOrderList(asSupabase(fake), viewer(role), FILTERS, VISIBILITY)
 
-      expect(result.active.map(item => item.id)).toEqual(['tomorrow', 'overdue'])
+      expect(result.active.map(item => item.id)).toEqual(['today', 'overdue'])
     },
   )
 
@@ -89,20 +89,61 @@ describe('service-order operational visibility in the DAL', () => {
       ],
     })
 
-    const result = await getServiceOrderList(asSupabase(fake), viewer('admin'), FILTERS, WINDOW)
+    const result = await getServiceOrderList(asSupabase(fake), viewer('admin'), FILTERS, VISIBILITY)
 
     expect(result.active.map(item => item.id)).toEqual(['future'])
   })
 
   it.each(['limpeza', 'consegna'] as const)(
+    'caps completed history at today for %s when date filters are active',
+    async role => {
+      const fake = new FakeSupabase({
+        service_orders: [
+          order({ id: 'done-overdue', cleaning_date: '2026-08-06', status: 'done', order_number: 1 }),
+          order({ id: 'done-today', cleaning_date: VISIBILITY.today, status: 'done', order_number: 2 }),
+          order({ id: 'done-tomorrow', cleaning_date: '2026-08-08', status: 'done', order_number: 3 }),
+        ],
+      })
+
+      const result = await getServiceOrderList(
+        asSupabase(fake),
+        viewer(role),
+        { ...FILTERS, startDate: '2026-08-01' },
+        VISIBILITY,
+      )
+
+      expect(result.done.map(item => item.id)).toEqual(['done-today', 'done-overdue'])
+      expect(result.doneForExport.map(item => item.id)).toEqual(['done-today', 'done-overdue'])
+    },
+  )
+
+  it.each(['limpeza', 'consegna'] as const)(
+    'returns no rows when a crafted start date begins after today for %s',
+    async role => {
+      const fake = new FakeSupabase({
+        service_orders: [order({ id: 'today', cleaning_date: VISIBILITY.today })],
+      })
+
+      const result = await getServiceOrderList(
+        asSupabase(fake),
+        viewer(role),
+        { ...FILTERS, startDate: '2026-08-08' },
+        VISIBILITY,
+      )
+
+      expect(result.active).toEqual([])
+    },
+  )
+
+  it.each(['limpeza', 'consegna'] as const)(
     'blocks direct future detail reads in the application layer for %s',
     async role => {
       const fake = new FakeSupabase({
-        service_orders: [order({ id: 'future', cleaning_date: '2026-08-09' })],
-        service_order_cleaning_staff: [{ service_order_id: 'future', profile_id: 'limpeza-user' }],
+        service_orders: [order({ id: 'tomorrow', cleaning_date: '2026-08-08' })],
+        service_order_cleaning_staff: [{ service_order_id: 'tomorrow', profile_id: 'limpeza-user' }],
       })
 
-      const result = await getServiceOrderDetail(asSupabase(fake), viewer(role), 'future', WINDOW)
+      const result = await getServiceOrderDetail(asSupabase(fake), viewer(role), 'tomorrow', VISIBILITY)
 
       expect(result).toBeNull()
     },
@@ -114,7 +155,7 @@ describe('service-order operational visibility in the DAL', () => {
       service_order_cleaning_staff: [],
     })
 
-    const result = await getServiceOrderDetail(asSupabase(fake), viewer('admin'), 'future', WINDOW)
+    const result = await getServiceOrderDetail(asSupabase(fake), viewer('admin'), 'future', VISIBILITY)
 
     expect(result?.id).toBe('future')
   })

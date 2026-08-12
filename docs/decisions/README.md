@@ -34,7 +34,8 @@ Isso preserva o histórico de **por que** o sistema chegou no estado atual.
 | [012](012-fotos-privadas-por-ciclo-da-ordem-de-servico.md) | Fotos privadas antes/depois por ciclo da O.S. | Supersedida parcialmente pelo ADR 014 |
 | [013](013-padronizacao-fuso-horario-rome-timestamps.md) | Padronização de fuso horário (Europe/Rome) em inputs e timestamps de OS | Aceita |
 | [014](014-fallback-jpeg-e-validacao-integral-de-fotos.md) | Fallback JPEG e validação integral das fotos de limpeza | Aceita |
-| [015](015-janela-visibilidade-equipe-operacional.md) | Janela de visibilidade das O.S. da equipe operacional | Aceita |
+| [015](015-janela-visibilidade-equipe-operacional.md) | Janela de visibilidade das O.S. da equipe operacional | Supersedida pelo ADR 016 |
+| [016](016-visibilidade-equipe-operacional-somente-ate-hoje.md) | Visibilidade da equipe operacional somente até hoje | Aceita |
 
 
 

@@ -168,15 +168,15 @@ describe('service-order PDF staff columns', () => {
     expect(html).toContain('<tbody><tr><td class="highlight">4</td><td class="highlight">2</td>')
   })
 
-  it('uses an explicit operational visibility label instead of claiming all dates', () => {
+  it('uses an explicit today visibility label instead of claiming all dates', () => {
     const html = buildServiceOrdersPdfHtml(
       [order()],
       '',
       'open',
-      'Fino al 08/08/2026 (Domani)',
+      'Fino al 07/08/2026 (Oggi)',
     )
 
-    expect(html).toContain('Data: Fino al 08/08/2026 (Domani)')
+    expect(html).toContain('Data: Fino al 07/08/2026 (Oggi)')
     expect(html).not.toContain('Data: Tutte le date')
   })
 })

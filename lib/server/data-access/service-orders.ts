@@ -9,9 +9,9 @@ import type {
   StaffOption,
 } from '@/lib/types/view-models'
 import {
-  getOperationalServiceOrderWindow,
+  getOperationalServiceOrderVisibility,
   isOperationalStaffRole,
-  type OperationalServiceOrderWindow,
+  type OperationalServiceOrderVisibility,
 } from '@/lib/service-order-visibility'
 import type { SupabaseServerClient, Viewer } from './viewer'
 
@@ -120,9 +120,9 @@ export async function getServiceOrderList(
   supabase: SupabaseServerClient,
   viewer: Viewer,
   filters: ServiceOrderListFilters,
-  operationalWindow: OperationalServiceOrderWindow = getOperationalServiceOrderWindow(),
+  operationalVisibility: OperationalServiceOrderVisibility = getOperationalServiceOrderVisibility(),
 ): Promise<ServiceOrderListResult> {
-  const todayStr = operationalWindow.today
+  const todayStr = operationalVisibility.today
   const isOperationalStaff = isOperationalStaffRole(viewer.role)
   const isFilterActive = !!(
     filters.propertyId || filters.cleaningStaffId || filters.consegnaStaffId ||
@@ -163,7 +163,7 @@ export async function getServiceOrderList(
 
   for (const queryName of ['active', 'done', 'doneExport'] as const) {
     let query = queryName === 'active' ? activeQuery : queryName === 'done' ? doneQuery : doneExportQuery
-    if (isOperationalStaff) query = query.lte('cleaning_date', operationalWindow.tomorrow)
+    if (isOperationalStaff) query = query.lte('cleaning_date', operationalVisibility.maxVisibleDate)
     if (filters.propertyId) query = query.eq('property_id', filters.propertyId)
     if (filters.consegnaStaffId) query = query.eq('consegna_staff_id', filters.consegnaStaffId)
     if (filters.cleaningStaffId) {
@@ -221,7 +221,7 @@ export async function getServiceOrderDetail(
   supabase: SupabaseServerClient,
   viewer: Viewer,
   id: string,
-  operationalWindow: OperationalServiceOrderWindow = getOperationalServiceOrderWindow(),
+  operationalVisibility: OperationalServiceOrderVisibility = getOperationalServiceOrderVisibility(),
 ): Promise<ServiceOrderFormData | null> {
   let orderQuery = supabase
     .from('service_orders')
@@ -229,7 +229,7 @@ export async function getServiceOrderDetail(
     .eq('id', id)
 
   if (isOperationalStaffRole(viewer.role)) {
-    orderQuery = orderQuery.lte('cleaning_date', operationalWindow.tomorrow)
+    orderQuery = orderQuery.lte('cleaning_date', operationalVisibility.maxVisibleDate)
   }
 
   const { data } = await orderQuery.single()
