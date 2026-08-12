@@ -1,8 +1,26 @@
 import { describe, expect, it } from 'vitest'
 import {
+  formatStaffName,
+  formatStaffNames,
   getCompactRomeDateTimeParts,
   isUrgentCleaningWindow,
 } from './display'
+
+describe('service-order staff display helpers', () => {
+  it('preserves complete names instead of reducing them to the first token', () => {
+    expect(formatStaffName('Henrique 1')).toBe('Henrique 1')
+    expect(formatStaffName('João Fonseca')).toBe('João Fonseca')
+    expect(formatStaffNames([
+      { full_name: 'Andy 04' },
+      { full_name: 'Joe 02' },
+    ])).toBe('Andy 04, Joe 02')
+  })
+
+  it('uses a placeholder when no staff member is assigned', () => {
+    expect(formatStaffName(null)).toBe('—')
+    expect(formatStaffNames([])).toBe('—')
+  })
+})
 
 describe('service-order date display helpers', () => {
   it('derives the compact date and complete calendar-day key in Rome', () => {

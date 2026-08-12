@@ -67,6 +67,14 @@ export function formatDate(value: string | null | undefined) {
   return `${d}/${m}/${y}`
 }
 
+export function formatStaffName(fullName: string | null | undefined) {
+  return fullName || '—'
+}
+
+export function formatStaffNames(staff: readonly { full_name: string }[] | null | undefined) {
+  return staff?.map(({ full_name }) => full_name).join(', ') || '—'
+}
+
 export function hoursUntil(checkout: string, checkin: string): number | null {
   const checkoutIso = toRomeIsoString(checkout)
   const checkinIso = toRomeIsoString(checkin)

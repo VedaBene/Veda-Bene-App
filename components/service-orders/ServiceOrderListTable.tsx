@@ -8,7 +8,14 @@ import type { ServiceOrderListItem } from '@/lib/types/view-models'
 import { canOperateCleaningTracking, getCleaningTrackingAction } from '@/lib/service-order-tracking'
 import { LiveTimer, formatWorkedTime } from './LiveTimer'
 import { UrgencyBadge } from './UrgencyBadge'
-import { PricingModeBadge, ServiceOrderStatusBadge, formatDate, formatDateTime } from './display'
+import {
+  PricingModeBadge,
+  ServiceOrderStatusBadge,
+  formatDate,
+  formatDateTime,
+  formatStaffName,
+  formatStaffNames,
+} from './display'
 
 function EmptyList({ text }: { text: string }) {
   return (
@@ -138,11 +145,11 @@ export function ServiceOrderListTable({
                         Squadra
                       </span>
                       <div className="flex flex-col gap-0.5">
-                        <span className="truncate" title={os.cleaning_staff?.map(s => s.full_name).join(', ') || '—'}>
-                          <span className="opacity-60 font-medium">L:</span> {os.cleaning_staff?.map(s => s.full_name.split(' ')[0]).join(', ') || '—'}
+                        <span className="truncate" title={formatStaffNames(os.cleaning_staff)}>
+                          <span className="opacity-60 font-medium">L:</span> {formatStaffNames(os.cleaning_staff)}
                         </span>
-                        <span className="truncate" title={os.consegna_staff?.full_name ?? '—'}>
-                          <span className="opacity-60 font-medium">C:</span> {os.consegna_staff?.full_name?.split(' ')[0] ?? '—'}
+                        <span className="truncate" title={formatStaffName(os.consegna_staff?.full_name)}>
+                          <span className="opacity-60 font-medium">C:</span> {formatStaffName(os.consegna_staff?.full_name)}
                         </span>
                       </div>
                     </div>
@@ -240,8 +247,8 @@ export function ServiceOrderListTable({
                   <td className="px-3 py-3 text-center text-foreground/70"><span>{formatDateTime(os.checkin_at)}</span></td>
                   {!isCliente && (
                     <>
-                      <td className="px-3 py-3 text-center text-foreground/70"><span>{os.cleaning_staff?.map(s => s.full_name).join(', ') || '—'}</span></td>
-                      <td className="px-3 py-3 text-center text-foreground/70"><span>{os.consegna_staff?.full_name ?? '—'}</span></td>
+                      <td className="px-3 py-3 text-center text-foreground/70"><span>{formatStaffNames(os.cleaning_staff)}</span></td>
+                      <td className="px-3 py-3 text-center text-foreground/70"><span>{formatStaffName(os.consegna_staff?.full_name)}</span></td>
                     </>
                   )}
                   <td className="px-3 py-3">
