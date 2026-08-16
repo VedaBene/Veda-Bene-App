@@ -1,6 +1,6 @@
 'use client'
 
-import { Building2, CalendarDays, ClipboardList, Trash2, Users, Zap } from 'lucide-react'
+import { Building2, CalendarDays, ClipboardList, Trash2, Users, X, Zap } from 'lucide-react'
 import { Field } from '@/components/ui/Field'
 import { Section } from '@/components/ui/Section'
 import type { ServiceOrderPropertyOption, StaffOption } from '@/lib/types/view-models'
@@ -159,18 +159,72 @@ export function VisitDetailsSection({
 }) {
   return (
     <Section title="2. Dettagli Visita" icon={<CalendarDays size={18} />} isOpen={isOpen} onToggle={onToggle}>
-      <Field label="Data Pulizia">
-        <input type="date" value={cleaningDate} onChange={e => onCleaningDateChange(e.target.value)} disabled={!canEdit} className={inputCls} />
+      <Field label="Data Pulizia (opzionale)">
+        <div className="flex items-center gap-1.5">
+          <input
+            type="date"
+            value={cleaningDate}
+            onChange={e => onCleaningDateChange(e.target.value)}
+            disabled={!canEdit}
+            className={inputCls}
+          />
+          {cleaningDate && canEdit && (
+            <button
+              type="button"
+              onClick={() => onCleaningDateChange('')}
+              className="p-2 text-muted-foreground hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors shrink-0"
+              title="Cancella data pulizia"
+            >
+              <X size={16} />
+            </button>
+          )}
+        </div>
       </Field>
 
       <div />
 
-      <Field label="Check-out Ospiti">
-        <input type="datetime-local" value={checkoutAt} onChange={e => onCheckoutAtChange(e.target.value)} disabled={!canEdit} className={inputCls} />
+      <Field label="Check-out Ospiti (opzionale)">
+        <div className="flex items-center gap-1.5">
+          <input
+            type="datetime-local"
+            value={checkoutAt}
+            onChange={e => onCheckoutAtChange(e.target.value)}
+            disabled={!canEdit}
+            className={inputCls}
+          />
+          {checkoutAt && canEdit && (
+            <button
+              type="button"
+              onClick={() => onCheckoutAtChange('')}
+              className="p-2 text-muted-foreground hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors shrink-0"
+              title="Cancella check-out"
+            >
+              <X size={16} />
+            </button>
+          )}
+        </div>
       </Field>
 
-      <Field label="Check-in Prossimi Ospiti">
-        <input type="datetime-local" value={checkinAt} onChange={e => onCheckinAtChange(e.target.value)} disabled={!canEdit} className={inputCls} />
+      <Field label="Check-in Prossimi Ospiti (opzionale)">
+        <div className="flex items-center gap-1.5">
+          <input
+            type="datetime-local"
+            value={checkinAt}
+            onChange={e => onCheckinAtChange(e.target.value)}
+            disabled={!canEdit}
+            className={inputCls}
+          />
+          {checkinAt && canEdit && (
+            <button
+              type="button"
+              onClick={() => onCheckinAtChange('')}
+              className="p-2 text-muted-foreground hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors shrink-0"
+              title="Cancella check-in"
+            >
+              <X size={16} />
+            </button>
+          )}
+        </div>
       </Field>
 
       {urgencyWarning && (
@@ -190,6 +244,7 @@ type OccupancyField = {
   value: string
   baseline?: number | null
   onChange: (value: string) => void
+  disabled?: boolean
 }
 
 export function OccupancySection({
@@ -212,7 +267,7 @@ export function OccupancySection({
     { label: 'Letti Singoli', value: values.singleBeds, baseline: selectedProperty?.single_beds, onChange: setters.singleBeds },
     { label: 'Divani Letto', value: values.sofaBeds, baseline: selectedProperty?.sofa_beds, onChange: setters.sofaBeds },
     { label: 'Poltrone Letto', value: values.armchairBeds, baseline: selectedProperty?.armchair_beds, onChange: setters.armchairBeds },
-    { label: 'Bagni', value: values.bathrooms, baseline: selectedProperty?.bathrooms, onChange: setters.bathrooms },
+    { label: 'Bagni', value: values.bathrooms, baseline: selectedProperty?.bathrooms, onChange: setters.bathrooms, disabled: true },
     { label: 'Bidet', value: values.bidets, baseline: selectedProperty?.bidets, onChange: setters.bidets },
     { label: 'Culle', value: values.cribs, baseline: selectedProperty?.cribs, onChange: setters.cribs },
   ]
@@ -224,7 +279,14 @@ export function OccupancySection({
       </Field>
       {fields.map(field => (
         <Field key={field.label} label={<BaselineLabel label={field.label} baseline={field.baseline} />}>
-          <input type="number" min="0" value={field.value} onChange={e => field.onChange(e.target.value)} disabled={!canEdit} className={inputCls} />
+          <input
+            type="number"
+            min="0"
+            value={field.value}
+            onChange={e => field.onChange(e.target.value)}
+            disabled={!canEdit || field.disabled}
+            className={`${inputCls} ${field.disabled ? 'bg-muted text-muted-foreground cursor-not-allowed' : ''}`}
+          />
         </Field>
       ))}
     </Section>

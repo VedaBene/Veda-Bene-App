@@ -100,11 +100,13 @@ export function toPropertyFormData(property: RawProperty, role: Role): PropertyF
 }
 
 export function toServiceOrderListItem(order: RawServiceOrderList, role: Role): ServiceOrderListItem {
-  const staffArr = Array.isArray(order.cleaning_staff)
-    ? order.cleaning_staff
-    : order.cleaning_staff
-      ? [order.cleaning_staff]
-      : []
+  const staffArr = (
+    Array.isArray(order.cleaning_staff)
+      ? order.cleaning_staff
+      : order.cleaning_staff
+        ? [order.cleaning_staff]
+        : []
+  ).sort((a, b) => (a.full_name || '').localeCompare(b.full_name || ''))
 
   return {
     id: order.id,

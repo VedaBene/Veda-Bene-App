@@ -27,7 +27,11 @@ import { toRomeIsoString } from '@/lib/timezone'
 
 const optStr = z.preprocess(v => (v === '' ? undefined : v), z.string().optional())
 const optIsoDateStr = z.preprocess(
-  v => (v === '' || v == null ? undefined : toRomeIsoString(String(v)) ?? v),
+  v => {
+    if (v === '' || v == null) return undefined
+    const iso = toRomeIsoString(String(v))
+    return iso ?? undefined
+  },
   z.string().optional(),
 )
 const optNum = z.preprocess(
@@ -501,7 +505,7 @@ async function getLastCleaningForPropertyImpl(propertyId: string) {
       order_number,
       cleaning_date,
       completed_at,
-      cleaning_staff:profiles(full_name)
+      cleaning_staff:profiles!service_order_cleaning_staff(full_name)
     `)
     .eq('property_id', parsed.data)
     .eq('status', 'done')

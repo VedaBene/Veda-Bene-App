@@ -30,9 +30,13 @@ describe('timezone helpers (Europe/Rome)', () => {
     expect(toRomeIsoString('')).toBeNull()
     expect(toRomeIsoString(null)).toBeNull()
     expect(toRomeIsoString(undefined)).toBeNull()
+    expect(toRomeIsoString('   ')).toBeNull()
+    expect(toRomeIsoString('data-invalida')).toBeNull()
+    expect(toRomeIsoString('2026-08-15')).toBe('2026-08-15T00:00:00.000Z')
 
     expect(toRomeLocalInputValue('')).toBe('')
     expect(toRomeLocalInputValue(null)).toBe('')
     expect(toRomeLocalInputValue(undefined)).toBe('')
+    expect(toRomeLocalInputValue('invalido')).toBe('')
   })
 })

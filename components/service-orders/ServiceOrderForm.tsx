@@ -129,7 +129,7 @@ export function ServiceOrderForm({
   const [singleBeds, setSingleBeds] = useState(order?.single_beds?.toString() ?? '0')
   const [sofaBeds, setSofaBeds] = useState(order?.sofa_beds?.toString() ?? '0')
   const [armchairBeds, setArmchairBeds] = useState(order?.armchair_beds?.toString() ?? '0')
-  const [bathrooms, setBathrooms] = useState(order?.bathrooms?.toString() ?? '0')
+  const bathrooms = (selectedProperty ? (selectedProperty.bathrooms ?? 0) : (order?.bathrooms ?? 0)).toString()
   const [bidets, setBidets] = useState(order?.bidets?.toString() ?? '0')
   const [cribs, setCribs] = useState(order?.cribs?.toString() ?? '0')
   const [cleaningNotes, setCleaningNotes] = useState(order?.cleaning_notes ?? '')
@@ -141,6 +141,11 @@ export function ServiceOrderForm({
     e.preventDefault()
     setError(null)
     setSuccess(false)
+
+    if (!propertyId) {
+      setError('Immobile obbligatorio')
+      return
+    }
 
     const fd = new FormData()
     fd.set('property_id', propertyId)
@@ -244,7 +249,7 @@ export function ServiceOrderForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 max-w-3xl">
+    <form onSubmit={handleSubmit} noValidate className="space-y-4 max-w-3xl">
       {order && (
         <ServiceOrderStatusControls
           status={order.status}
@@ -349,7 +354,7 @@ export function ServiceOrderForm({
         canEdit={canEdit}
         selectedProperty={selectedProperty}
         values={{ realGuests, doubleBeds, singleBeds, sofaBeds, armchairBeds, bathrooms, bidets, cribs }}
-        setters={{ realGuests: setRealGuests, doubleBeds: setDoubleBeds, singleBeds: setSingleBeds, sofaBeds: setSofaBeds, armchairBeds: setArmchairBeds, bathrooms: setBathrooms, bidets: setBidets, cribs: setCribs }}
+        setters={{ realGuests: setRealGuests, doubleBeds: setDoubleBeds, singleBeds: setSingleBeds, sofaBeds: setSofaBeds, armchairBeds: setArmchairBeds, bathrooms: () => {}, bidets: setBidets, cribs: setCribs }}
       />
 
       {(canEdit || (order && order.cleaning_notes)) && (
