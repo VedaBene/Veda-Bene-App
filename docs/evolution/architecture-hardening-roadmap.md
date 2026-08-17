@@ -1,6 +1,6 @@
 # Roadmap ativo de endurecimento arquitetural
 
-**Status do programa:** Sprint 01 concluída; nenhuma sprint posterior iniciada
+**Status do programa:** Sprint 02 concluída; Sprint 03 não iniciada
 
 **Baseline da auditoria:** 2026-08-15
 
@@ -309,6 +309,9 @@ manual e passam a bloquear regressões futuras.
 
 ### Sprint 02 — Contenção de segredos, supply chain e configuração Auth
 
+**Status:** completed — execução iniciada e concluída em 2026-08-17 após
+validação do gate da Sprint 01 e da baseline local.
+
 **Objetivo:** remover riscos de entrega independentes da arquitetura de domínio
 antes das mudanças de autorização.
 
@@ -343,16 +346,67 @@ ser ativada junto de um deploy não relacionado.
 **Resultado esperado:** nenhum arquivo de ambiente entra no build, a CI detecta
 novas exposições e as vulnerabilidades tratáveis sem mudança major são reduzidas.
 
+**Implementado**
+
+- `.dockerignore` passou a excluir todo `.env*`, reintroduzindo somente
+  `.env.example`, e também bloqueia artefatos comuns de backup/editor. Um build
+  negativo comprovou que `.env.local` e o backup local preexistente não entram
+  no contexto; seus conteúdos não foram lidos, copiados nem exibidos.
+- Gitleaks `8.30.1`, fixado por versão e digest de imagem, foi adicionado à CI
+  com histórico completo, filesystem read-only e `--redact=100`, sem relatório,
+  comentário ou artefato. A única ocorrência histórica corresponde ao incidente
+  revogado de 2026-08-07 e foi isolada por fingerprint em `.gitleaksignore`;
+  qualquer nova ocorrência continua bloqueante.
+- Next.js e `eslint-config-next` foram atualizados juntos de `16.2.12` para
+  `16.3.1`; `@sentry/nextjs`, de `10.50.0` para `10.70.0`; transitivos Babel,
+  `brace-expansion`, `js-yaml` e Vite receberam somente correções compatíveis.
+  React permaneceu em `19.2.4` e Node mínimo em `>=22.0.0`.
+- `npm audit --omit=dev` passou de 13 findings (6 altos, 6 moderados, 1 baixo)
+  para zero. A auditoria completa, incluindo desenvolvimento, também terminou
+  com zero finding.
+- Todos os lotes passaram por lint, typecheck, testes, build,
+  57 pgTAP mais invariantes SQL, secret scan e build Docker sem cache. A imagem
+  final não contém `.env*` nem backups; `/login`, `/forgot-password` e
+  `/update-password` responderam HTTP 200 no smoke local.
+
+**Subpasso DB-C — concluído após autorização específica**
+
+- A autorização específica foi concedida em 2026-08-17. Foi habilitada
+  exclusivamente **Prevent use of leaked passwords / Leaked Password
+  Protection** nas configurações do Supabase Auth; as demais opções do diálogo
+  não foram alteradas.
+- O painel confirmou a opção salva e o Advisor de segurança deixou de reportar
+  `auth_leaked_password_protection`. Permaneceu somente o aviso informativo já
+  conhecido de RLS sem policy em `auth_login_attempts`, coerente com o ADR 008.
+- A proteção consulta HaveIBeenPwned e rejeita senhas comprometidas ao
+  defini-las ou atualizá-las. Convites e o envio do link de recuperação não
+  foram alterados.
+- `/update-password` deixou de repassar mensagens cruas do provedor: senha
+  fraca/comprometida, sessão expirada e falha desconhecida agora recebem textos
+  controlados. Quatro testes unitários cobrem esses casos. O login mantém sua
+  resposta genérica já coberta pelos testes da rota; convite e recuperação
+  convergem para a mesma tela de definição de senha. A validação não criou
+  usuários, não enviou convites/recuperações reais e não usou credenciais reais.
+- Validação final: `npm run lint`, `npm run typecheck`, 30 arquivos/145 Vitest,
+  `npm run build`, 57 pgTAP e invariantes SQL passaram; `npm audit` completo e
+  `--omit=dev` retornaram zero vulnerabilidades; Gitleaks examinou 97 commits sem
+  novo vazamento; build Docker `--no-cache` passou e a imagem final não contém
+  `.env*` nem backups.
+- Nenhum schema, migration, dado, RLS, grant, função, trigger ou Storage de
+  produção foi alterado. Não houve commit, push nem início da Sprint 03.
+- Rollback: desabilitar a mesma opção de Auth e revalidar os fluxos; não há
+  reversão de dados porque a configuração não reescreve senhas nem registros.
+
 **Critérios de conclusão**
 
-- [ ] O contexto de build exclui qualquer `.env*` real e inclui no máximo
+- [x] O contexto de build exclui qualquer `.env*` real e inclui no máximo
   placeholders seguros.
-- [ ] A varredura de segredos passa sem registrar valores sensíveis.
-- [ ] Se houver indício de exposição histórica, a sprint é interrompida e há
+- [x] A varredura de segredos passa sem registrar valores sensíveis.
+- [x] Se houver indício de exposição histórica, a sprint é interrompida e há
   plano de revogação/rotação antes de prosseguir.
-- [ ] Cada lote de dependência passa por lint, typecheck, testes, build e smoke.
-- [ ] Findings residuais do `npm audit` têm justificativa e responsável.
-- [ ] A mudança Auth, se autorizada, é validada separadamente e pode ser
+- [x] Cada lote de dependência passa por lint, typecheck, testes, build e smoke.
+- [x] Findings residuais do `npm audit` têm justificativa e responsável.
+- [x] A mudança Auth, se autorizada, é validada separadamente e pode ser
   revertida por configuração, sem alterar dados.
 
 ### Sprint 03 — Seams server-only para dados sensíveis
@@ -796,7 +850,7 @@ Nunca cole tokens, DSNs, emails, IPs, dados pessoais ou conteúdo de `.env`.
 |---|---|---|---|---|---|---|
 | 00 | completed | 2026-08-15 | 2026-08-15 | Codex | Auditoria de 2026-08-15; roadmap e índices documentais criados; somente Markdown alterado | Próxima etapa: Sprint 01; nenhuma implementação iniciada |
 | 01 | completed | 2026-08-16 | 2026-08-17 | Codex | `npm run test:supabase`: 57 pgTAP, três SQLs existentes e smoke de fotos PASS; lint/typecheck/29 arquivos e 141 Vitest/build PASS; diff e segredos revisados | Grants sensíveis e update amplo de `limpeza` comprovados como `[KNOWN UNSAFE]`; oito alvos TODO aguardam exclusivamente Sprints 04/05; CI remota não disparada sem commit/push |
-| 02 | planned | — | — | — | — | — |
+| 02 | completed | 2026-08-17 | 2026-08-17 | Codex | `.env*`/backups excluídos e imagem comprovada limpa; Gitleaks: 97 commits sem novo vazamento; Next 16.3.1 e Sentry 10.70.0; `npm audit` completo e produção: zero; lint/typecheck/30 arquivos e 145 Vitest/build/57 pgTAP PASS; Leaked Password Protection autorizada, habilitada e confirmada pelo Advisor | Ocorrência histórica continua revogada e isolada por fingerprint; `auth_login_attempts` mantém aviso informativo intencional conforme ADR 008; rollback Auth é desligar a mesma opção; nenhuma mudança de dados/schema/RLS/Storage, commit ou push; Sprint 03 não iniciada |
 | 03 | planned | — | — | — | — | — |
 | 04 | planned | — | — | — | — | — |
 | 05 | planned | — | — | — | — | — |

@@ -2,7 +2,16 @@ node_modules
 .next
 .git
 .gitignore
-.env*.local
+# Never send real environment files or local backups to the Docker daemon.
+.env*
+!.env.example
+
+# Common editor and local backup artifacts.
+*.bak
+*.backup
+*.orig
+*.swp
+*~
 README.md
 Dockerfile
 .dockerignore

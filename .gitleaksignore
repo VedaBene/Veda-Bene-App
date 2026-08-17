@@ -1,0 +1,3 @@
+# Revoked legacy Supabase service-role JWT from the documented 2026-08-07
+# incident. The credential remains disabled and must never be reactivated.
+a4b8df7922209ed8ef5d73bdbbce03205739af93:scripts/recalculate-pending-prices.mjs:jwt:4

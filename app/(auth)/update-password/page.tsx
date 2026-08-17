@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
-import { getAuthErrorFromUrl } from '@/utils/supabase/auth-errors'
+import { getAuthErrorFromUrl, getPasswordUpdateError } from '@/utils/supabase/auth-errors'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { Lock, AlertCircle, CheckCircle, Loader2 } from 'lucide-react'
@@ -78,12 +78,7 @@ export default function UpdatePasswordPage() {
     const { error } = await supabase.auth.updateUser({ password })
 
     if (error) {
-      const hasMissingSession = error.message.toLowerCase().includes('session')
-      setError(
-        hasMissingSession
-          ? 'A sessão do link expirou. Solicite um novo link e tente novamente.'
-          : error.message,
-      )
+      setError(getPasswordUpdateError(error))
       setIsLoading(false)
       return
     }

@@ -38,3 +38,26 @@ export function getAuthErrorFromUrl(search: string, hash: string) {
     message: getFriendlyAuthError(code, description) ?? 'Não foi possível concluir a autenticação.',
   }
 }
+
+type PasswordUpdateError = {
+  code?: string
+  message?: string
+  name?: string
+}
+
+export function getPasswordUpdateError(error: PasswordUpdateError) {
+  if (error.code === 'weak_password' || error.name === 'AuthWeakPasswordError') {
+    return 'Esta senha é insegura ou já apareceu em vazamentos. Escolha uma senha diferente e mais forte.'
+  }
+
+  if (
+    error.code === 'session_expired' ||
+    error.code === 'session_not_found' ||
+    error.name === 'AuthSessionMissingError' ||
+    error.message?.toLowerCase().includes('session')
+  ) {
+    return 'A sessão do link expirou. Solicite um novo link e tente novamente.'
+  }
+
+  return 'Não foi possível definir a senha. Tente novamente ou solicite um novo link.'
+}

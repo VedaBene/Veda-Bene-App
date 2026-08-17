@@ -1,0 +1,22 @@
+title = "Veda Bene secret scanning"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "supabase-secret-key"
+description = "Supabase secret key"
+regex = '''sb_secret_[A-Za-z0-9._-]{20,}'''
+keywords = ["sb_secret_"]
+
+[[rules]]
+id = "supabase-service-role-assignment"
+description = "Supabase service-role credential assigned in source"
+regex = '''(?i)SUPABASE_SERVICE_ROLE_KEY\s*[:=]\s*["']?(?:eyJ[A-Za-z0-9._-]{20,}|sb_secret_[A-Za-z0-9._-]{20,})'''
+keywords = ["SUPABASE_SERVICE_ROLE_KEY"]
+
+[[rules]]
+id = "sentry-dsn"
+description = "Sentry DSN embedded in source"
+regex = '''https://[A-Fa-f0-9]{16,}@[A-Za-z0-9.-]+\.ingest(?:\.[A-Za-z0-9.-]+)?\.sentry\.io/[0-9]+'''
+keywords = ["sentry.io"]
