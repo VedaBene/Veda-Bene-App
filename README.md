@@ -122,6 +122,7 @@ Este projeto roda no Next.js 16, que tem **breaking changes** em relação a ver
 ## Documentação do projeto
 
 - [Segurança dos dados de produção](docs/production-data-safety.md) — regra obrigatória para migrações, validação, implantação e rollback.
+- [Roadmap ativo de endurecimento arquitetural](docs/evolution/architecture-hardening-roadmap.md) — plano pós-auditoria por sprints, gates de validação e controles obrigatórios para mudanças de banco.
 - [Ordens de Serviço — regras de listagem e exportação](docs/service-orders.md) — filtros, prioridade operacional, informações exibidas e PDFs por status.
 - [Architecture Decision Records](docs/decisions/README.md) — decisões arquiteturais duráveis e seus motivos.
 - [Registros de manutenção](docs/maintenance/README.md) — correções relevantes, atualizações de dependências, validações e histórico de implantação.

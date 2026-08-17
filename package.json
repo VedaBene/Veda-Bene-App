@@ -12,6 +12,7 @@
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
+    "test:supabase": "node scripts/test-supabase-local.mjs",
     "local:seed:photos": "node --env-file=.env.development.local scripts/setup-local-photo-test.mjs"
   },
   "dependencies": {
@@ -35,6 +36,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.12",
+    "supabase": "2.114.0",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.1.6"

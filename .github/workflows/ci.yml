@@ -32,3 +32,25 @@ jobs:
 
       - name: Production build
         run: npm run build
+
+  database-authorization:
+    name: Supabase Authorization Matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      SUPABASE_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test RLS, grants, and direct calls in disposable Supabase
+        run: npm run test:supabase

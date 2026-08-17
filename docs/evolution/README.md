@@ -1,9 +1,20 @@
-# Veda Bene Evolution History
+# Veda Bene Evolution History And Active Roadmap
 
-This folder records the completed staged technical evolution of Veda Bene.
+This folder records the completed staged technical evolution of Veda Bene and
+hosts the active post-audit hardening roadmap.
 
-The active stages are complete. Treat this folder as historical architecture
-context, not as a mandatory reading path for every task. Read it when work
+## Active Roadmap
+
+The current implementation plan is
+[`architecture-hardening-roadmap.md`](architecture-hardening-roadmap.md). It was
+created from the 2026-08-15 technical audit and defines sequential sprints,
+entry/exit gates, progress tracking, and mandatory safeguards for database work.
+No implementation sprint starts automatically; each one requires an explicit
+execution request.
+
+The historical stages below are complete. Treat their stage files as historical
+architecture context, not as a mandatory reading path for every task. Read this
+folder when work
 touches DAL/data access, authorization/validation, service orders,
 reporting/exports/dashboard, Supabase/Postgres/RLS, privileged helpers/RPCs, or
 when the user explicitly asks about the staged evolution.
@@ -16,10 +27,11 @@ history:
 1. `AGENTS.md` for repository-level agent rules.
 2. `CLAUDE.md` for current project architecture context.
 3. `docs/decisions/README.md` and the ADRs relevant to the requested stage.
-4. `docs/evolution/strategic-roadmap.md` for the complete staged plan.
-5. `docs/evolution/execution-log.md` for the historical execution state.
-6. The specific `docs/evolution/stage-XX-*.md` file requested by the user.
-7. The relevant Next.js 16 guide in `node_modules/next/dist/docs/` before code changes.
+4. `docs/evolution/architecture-hardening-roadmap.md` for active post-audit work.
+5. `docs/evolution/strategic-roadmap.md` for the completed historical plan.
+6. `docs/evolution/execution-log.md` for the historical execution state.
+7. The specific `docs/evolution/stage-XX-*.md` file requested by the user.
+8. The relevant Next.js 16 guide in `node_modules/next/dist/docs/` before code changes.
 
 ## Historical Execution Contract
 
