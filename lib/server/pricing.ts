@@ -1,9 +1,9 @@
 import 'server-only'
 
 import type { PricingMode } from '@/lib/types/database'
-import type { SupabaseServerClient } from '@/lib/server/authz'
 import {
   loadAuthorizedOrderPricingContext,
+  persistAuthorizedServiceOrderTotalPrice,
   type OrderPricingContext,
 } from '@/lib/server/data-access/sensitive-data'
 
@@ -61,7 +61,6 @@ export function calculateTotalPrice(
 
 // Recalcula `total_price` da OS quando dados do imóvel ou minutos trabalhados ficam disponíveis.
 export async function recalculateOrderPricing(
-  supabase: SupabaseServerClient,
   orderId: string,
 ): Promise<number | null> {
   const ctx = await loadOrderPricingContext(orderId)
@@ -79,7 +78,7 @@ export async function recalculateOrderPricing(
       )
     : null
 
-  await supabase.from('service_orders').update({ total_price }).eq('id', orderId)
+  await persistAuthorizedServiceOrderTotalPrice(orderId, total_price)
   return total_price
 }
 

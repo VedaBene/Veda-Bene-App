@@ -2,6 +2,7 @@ import {
   cp,
   mkdtemp,
   readFile,
+  rename,
   rm,
   writeFile,
 } from 'node:fs/promises'
@@ -123,7 +124,25 @@ async function prepareDisposableProject() {
     throw new Error('Could not isolate the disposable Supabase project_id.')
   }
   await writeFile(configPath, isolatedConfig, 'utf8')
-  return { projectId, temporaryRoot }
+
+  const migrationsDir = join(temporarySupabaseDir, 'migrations')
+  const guardMigrationFile = '20260818031745_guard_service_order_updates.sql'
+  const guardMigrationPath = join(migrationsDir, guardMigrationFile)
+  const guardMigrationSql = await readFile(guardMigrationPath, 'utf8')
+
+  // Start from the preceding baseline so the exact Sprint 04 migration can be
+  // exercised between before/after fingerprints in one psql session.
+  await rename(
+    guardMigrationPath,
+    join(temporaryRoot, `${guardMigrationFile}.pending`),
+  )
+
+  return {
+    guardMigrationFile,
+    guardMigrationSql,
+    projectId,
+    temporaryRoot,
+  }
 }
 
 async function removeDisposableProject(temporaryRoot) {
@@ -137,9 +156,8 @@ async function removeDisposableProject(temporaryRoot) {
   await rm(resolvedTemporaryRoot, { recursive: true, force: true })
 }
 
-async function executeSqlFileInContainer(label, containerName, databaseName, filePath) {
+function executeSqlTextInContainer(label, containerName, databaseName, sql) {
   process.stdout.write(`\n[Supabase local] ${label}\n`)
-  const sql = await readFile(filePath, 'utf8')
   const result = spawnSync('docker', [
     'exec', '-i', containerName,
     'psql',
@@ -165,6 +183,146 @@ async function executeSqlFileInContainer(label, containerName, databaseName, fil
     }
     throw new Error(`${label} failed with exit code ${result.status ?? 'unknown'}.`)
   }
+}
+
+async function executeSqlFileInContainer(label, containerName, databaseName, filePath) {
+  const sql = await readFile(filePath, 'utf8')
+  executeSqlTextInContainer(label, containerName, databaseName, sql)
+}
+
+function runServiceOrderGuardMigrationSmoke(
+  workdir,
+  projectId,
+  guardMigrationFile,
+  guardMigrationSql,
+) {
+  localDatabaseUrlFromStatus(workdir)
+  const containerName = `supabase_db_${projectId}`
+  const fixtureAndSnapshotSql = String.raw`
+INSERT INTO auth.users (id, email)
+VALUES ('65000000-0000-0000-0000-000000000001', 'guard-migration@local.invalid');
+
+UPDATE public.profiles
+SET full_name = 'Guard Migration Fixture', role = 'limpeza'
+WHERE id = '65000000-0000-0000-0000-000000000001';
+
+INSERT INTO public.owners (id, name, email)
+VALUES (
+  '65000000-0000-0000-0000-000000000002',
+  'Guard Migration Owner',
+  'guard-owner@local.invalid'
+);
+
+INSERT INTO public.properties (id, name, client_type, owner_id, zone)
+VALUES (
+  '65000000-0000-0000-0000-000000000003',
+  'Guard Migration Property',
+  'particular',
+  '65000000-0000-0000-0000-000000000002',
+  'Other areas'
+);
+
+INSERT INTO public.service_orders (
+  id, property_id, cleaning_date, status, total_price, pricing_mode,
+  cleaning_cycle
+)
+VALUES (
+  '65000000-0000-0000-0000-000000000004',
+  '65000000-0000-0000-0000-000000000003',
+  (timezone('Europe/Rome', now()))::date,
+  'open',
+  321.45,
+  'standard',
+  1
+);
+
+INSERT INTO public.service_order_cleaning_staff (service_order_id, profile_id)
+VALUES (
+  '65000000-0000-0000-0000-000000000004',
+  '65000000-0000-0000-0000-000000000001'
+);
+
+INSERT INTO public.service_order_photos (
+  id, service_order_id, cycle_no, phase, status, content_type, display_path,
+  thumbnail_path, uploaded_by, sort_order
+)
+VALUES (
+  '65000000-0000-0000-0000-000000000005',
+  '65000000-0000-0000-0000-000000000004',
+  1,
+  'before',
+  'pending',
+  'image/webp',
+  'guard-migration/display.webp',
+  'guard-migration/thumb.webp',
+  '65000000-0000-0000-0000-000000000001',
+  0
+);
+
+CREATE TEMP TABLE guard_migration_before AS
+SELECT
+  (SELECT count(*) FROM public.service_orders) AS order_count,
+  (SELECT array_agg(id ORDER BY id) FROM public.service_orders) AS order_ids,
+  (SELECT array_agg(order_number ORDER BY order_number) FROM public.service_orders) AS order_numbers,
+  (SELECT md5(coalesce(string_agg(md5(to_jsonb(rows)::text), '' ORDER BY id), ''))
+   FROM public.service_orders AS rows) AS order_digest,
+  (SELECT md5(coalesce(string_agg(md5(to_jsonb(rows)::text), '' ORDER BY service_order_id, profile_id), ''))
+   FROM public.service_order_cleaning_staff AS rows) AS assignment_digest,
+  (SELECT md5(coalesce(string_agg(md5(to_jsonb(rows)::text), '' ORDER BY id), ''))
+   FROM public.service_order_photos AS rows) AS photo_digest,
+  (SELECT md5(coalesce(string_agg(md5(to_jsonb(rows)::text), '' ORDER BY id), ''))
+   FROM storage.objects AS rows) AS storage_object_digest,
+  (SELECT md5(coalesce(string_agg(grantee || ':' || privilege_type || ':' || is_grantable, ',' ORDER BY grantee, privilege_type), ''))
+   FROM information_schema.role_table_grants
+   WHERE table_schema = 'public'
+     AND table_name = 'service_orders'
+     AND privilege_type = 'SELECT') AS select_grant_digest;
+`
+  const invariantSql = String.raw`
+DO $guard_invariants$
+DECLARE
+  before_row pg_temp.guard_migration_before%ROWTYPE;
+  after_row pg_temp.guard_migration_before%ROWTYPE;
+BEGIN
+  SELECT * INTO before_row FROM pg_temp.guard_migration_before;
+  SELECT
+    (SELECT count(*) FROM public.service_orders),
+    (SELECT array_agg(id ORDER BY id) FROM public.service_orders),
+    (SELECT array_agg(order_number ORDER BY order_number) FROM public.service_orders),
+    (SELECT md5(coalesce(string_agg(md5(to_jsonb(rows)::text), '' ORDER BY id), '')) FROM public.service_orders AS rows),
+    (SELECT md5(coalesce(string_agg(md5(to_jsonb(rows)::text), '' ORDER BY service_order_id, profile_id), '')) FROM public.service_order_cleaning_staff AS rows),
+    (SELECT md5(coalesce(string_agg(md5(to_jsonb(rows)::text), '' ORDER BY id), '')) FROM public.service_order_photos AS rows),
+    (SELECT md5(coalesce(string_agg(md5(to_jsonb(rows)::text), '' ORDER BY id), '')) FROM storage.objects AS rows),
+    (SELECT md5(coalesce(string_agg(grantee || ':' || privilege_type || ':' || is_grantable, ',' ORDER BY grantee, privilege_type), ''))
+     FROM information_schema.role_table_grants
+     WHERE table_schema = 'public'
+       AND table_name = 'service_orders'
+       AND privilege_type = 'SELECT')
+  INTO after_row;
+
+  IF before_row IS DISTINCT FROM after_row THEN
+    RAISE EXCEPTION 'Sprint 04 migration changed protected data or SELECT grants';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_trigger
+    WHERE tgrelid = 'public.service_orders'::regclass
+      AND tgname = 'guard_service_order_updates'
+      AND NOT tgisinternal
+  ) THEN
+    RAISE EXCEPTION 'Sprint 04 trigger was not created';
+  END IF;
+END
+$guard_invariants$;
+`
+
+  executeSqlTextInContainer(
+    `Apply ${guardMigrationFile} and compare before/after fingerprints`,
+    containerName,
+    'postgres',
+    `${fixtureAndSnapshotSql}\n${guardMigrationSql}\n${invariantSql}`,
+  )
 }
 
 async function runPhotoMigrationSmoke(workdir, projectId) {
@@ -206,7 +364,12 @@ async function runPhotoMigrationSmoke(workdir, projectId) {
 }
 
 async function main() {
-  const { projectId, temporaryRoot: workdir } = await prepareDisposableProject()
+  const {
+    guardMigrationFile,
+    guardMigrationSql,
+    projectId,
+    temporaryRoot: workdir,
+  } = await prepareDisposableProject()
   let stackStarted = false
 
   try {
@@ -221,6 +384,13 @@ async function main() {
       '--workdir', workdir,
       'db', 'reset', '--local', '--no-seed',
     ])
+
+    runServiceOrderGuardMigrationSmoke(
+      workdir,
+      projectId,
+      guardMigrationFile,
+      guardMigrationSql,
+    )
 
     executeCli('Run role × table × operation × column pgTAP matrix', [
       '--workdir', workdir,
@@ -239,8 +409,16 @@ async function main() {
       ])
     }
 
+    executeCli('Run local Supabase schema lint', [
+      '--workdir', workdir,
+      'db', 'lint', '--local',
+      '--schema', 'public,private',
+      '--level', 'warning',
+      '--fail-on', 'error',
+    ], { showOutput: true })
+
     await runPhotoMigrationSmoke(workdir, projectId)
-    process.stdout.write('\nSupabase Sprint 01 authorization tests passed without a remote target.\n')
+    process.stdout.write('\nSupabase authorization and Sprint 04 migration tests passed without a remote target.\n')
   } finally {
     if (stackStarted) {
       executeCli('Stop and delete only the isolated local stack', [

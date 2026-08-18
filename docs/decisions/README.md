@@ -36,6 +36,7 @@ Isso preserva o histórico de **por que** o sistema chegou no estado atual.
 | [014](014-fallback-jpeg-e-validacao-integral-de-fotos.md) | Fallback JPEG e validação integral das fotos de limpeza | Aceita |
 | [015](015-janela-visibilidade-equipe-operacional.md) | Janela de visibilidade das O.S. da equipe operacional | Supersedida pelo ADR 016 |
 | [016](016-visibilidade-equipe-operacional-somente-ate-hoje.md) | Visibilidade da equipe operacional somente até hoje | Aceita |
+| [017](017-guard-de-integridade-para-updates-de-service-orders.md) | Guard de integridade para updates de Ordens de Serviço | Proposta; implementação local pronta |
 
 
 

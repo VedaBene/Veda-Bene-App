@@ -100,6 +100,11 @@ export class FakeQuery implements PromiseLike<{ data: Row[] | Row | null; count:
     return this
   }
 
+  maybeSingle(): this {
+    this.singleResult = true
+    return this
+  }
+
   then<TResult1 = { data: Row[] | Row | null; count: number | null; error: null }, TResult2 = never>(
     onfulfilled?: ((value: { data: Row[] | Row | null; count: number | null; error: null }) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,

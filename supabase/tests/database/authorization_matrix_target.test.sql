@@ -40,6 +40,8 @@ SELECT ok(
   '[TARGET][OPEN GAP][service_orders][select][consegna_fee] authenticated has no direct grant'
 );
 
+SELECT todo_end();
+
 INSERT INTO auth.users (id, email)
 VALUES ('55000000-0000-0000-0000-000000000001', 'target-limpeza@auth-matrix.example.invalid');
 UPDATE public.profiles
@@ -66,12 +68,12 @@ SELECT set_config(
 );
 SET LOCAL ROLE authenticated;
 
-SELECT results_eq(
-  $$UPDATE public.service_orders SET total_price = 999 WHERE id = '58000000-0000-0000-0000-000000000001' RETURNING id$$,
-  ARRAY[]::uuid[],
-  '[TARGET][OPEN GAP][limpeza][service_orders][update][total_price] blocked by database'
+SELECT throws_ok(
+  $$UPDATE public.service_orders SET total_price = 999 WHERE id = '58000000-0000-0000-0000-000000000001'$$,
+  '42501',
+  'Aggiornamento O.L. non autorizzato.',
+  '[TARGET][SPRINT 04][limpeza][service_orders][update][total_price] blocked by database'
 );
 
-SELECT todo_end();
 SELECT * FROM finish();
 ROLLBACK;

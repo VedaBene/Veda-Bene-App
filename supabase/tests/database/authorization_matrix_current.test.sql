@@ -135,7 +135,7 @@ SELECT results_eq($$UPDATE public.service_orders SET completion_notes = 'synthet
 SELECT pg_temp.authenticate_as('11000000-0000-0000-0000-000000000002', 'secretaria');
 SELECT results_eq($$UPDATE public.service_orders SET completion_notes = 'synthetic secretaria update' WHERE id = '44000000-0000-0000-0000-000000000001' RETURNING id$$, ARRAY['44000000-0000-0000-0000-000000000001'::uuid], '[CURRENT][secretaria][service_orders][update][completion_notes] allowed');
 SELECT pg_temp.authenticate_as('11000000-0000-0000-0000-000000000003', 'limpeza');
-SELECT results_eq($$UPDATE public.service_orders SET completion_notes = 'synthetic limpeza update' WHERE id = '44000000-0000-0000-0000-000000000001' RETURNING id$$, ARRAY['44000000-0000-0000-0000-000000000001'::uuid], '[CURRENT][limpeza][service_orders][update][completion_notes] allowed in assigned scope');
+SELECT throws_ok($$UPDATE public.service_orders SET completion_notes = 'synthetic limpeza update' WHERE id = '44000000-0000-0000-0000-000000000001'$$, '42501', 'Aggiornamento O.L. non autorizzato.', '[CURRENT][SPRINT 04][limpeza][service_orders][update][completion_notes] blocked outside a tracking transition');
 SELECT pg_temp.authenticate_as('11000000-0000-0000-0000-000000000004', 'consegna');
 SELECT results_eq($$UPDATE public.service_orders SET completion_notes = 'synthetic consegna update' WHERE id = '44000000-0000-0000-0000-000000000001' RETURNING id$$, ARRAY[]::uuid[], '[CURRENT][consegna][service_orders][update][completion_notes] blocked by RLS');
 SELECT pg_temp.authenticate_as('11000000-0000-0000-0000-000000000005', 'cliente');
@@ -177,7 +177,7 @@ SELECT pg_temp.authenticate_as('11000000-0000-0000-0000-000000000005', 'cliente'
 SELECT results_eq($$SELECT total_price FROM public.service_orders WHERE id = '44000000-0000-0000-0000-000000000002'$$, ARRAY[600::numeric], '[CURRENT][KNOWN UNSAFE][cliente][service_orders][select][total_price] directly readable');
 
 SELECT pg_temp.authenticate_as('11000000-0000-0000-0000-000000000003', 'limpeza');
-SELECT results_eq($$UPDATE public.service_orders SET total_price = 777 WHERE id = '44000000-0000-0000-0000-000000000001' RETURNING total_price$$, ARRAY[777::numeric], '[CURRENT][KNOWN UNSAFE][limpeza][service_orders][update][total_price] directly mutable');
+SELECT throws_ok($$UPDATE public.service_orders SET total_price = 777 WHERE id = '44000000-0000-0000-0000-000000000001'$$, '42501', 'Aggiornamento O.L. non autorizzato.', '[CURRENT][SPRINT 04][limpeza][service_orders][update][total_price] blocked by database');
 
 -- Direct privileged calls cannot be used to expand access.
 SELECT pg_temp.authenticate_as('11000000-0000-0000-0000-000000000001', 'admin');
