@@ -1,10 +1,11 @@
 # Sprint 04 — Dossiê DB-P do guard de integridade de O.S.
 
-**Status:** implementação local pronta; implantação remota pendente de autorização
+**Status:** concluída localmente e validada em produção após autorização específica
 
 **Data do diagnóstico:** 2026-08-18
 
-**Classificação:** DB-P — migration Postgres validada somente em banco local descartável
+**Classificação:** DB-P — migration Postgres validada localmente e implantada em
+produção com invariantes preservados
 
 ## 1. Veredito arquitetural
 
@@ -621,8 +622,8 @@ fluxo legítimo.
   idênticos antes/depois.
 - Lint, typecheck, Vitest, build, SQLs anteriores, novos SQLs, lint/advisors
   locais e inspeção de segredos/diff aprovados.
-- Roadmap registra “implementação local pronta; implantação remota pendente de
-  autorização”, sem marcar Sprint 04 como `completed`.
+- Roadmap registra `completed` somente após autorização específica, implantação,
+  smoke transacional revertido, invariantes remotos e observação pós-deploy.
 
 ## 10. Evidências da implementação local
 
@@ -645,6 +646,31 @@ Em 2026-08-18, depois de concluídas e registradas as seções 1–9 deste dossi
 - nenhuma migration, query mutável, alteração de Storage ou comando de deploy
   foi executado contra projeto remoto.
 
-O gate remoto permanece fechado. A evidência local não altera a exigência de
-autorização específica, backup, invariantes prévias, janela de baixa escrita e
-observação posterior descritas na seção 8.5.
+## 11. Evidências da implantação e validação remota
+
+Em 2026-08-18, depois de autorização explícita do responsável e confirmação de
+backup/restauração ensaiados:
+
+- o PR #2 foi aprovado por CI e integrado em `master` no commit `51512d2`;
+- o Coolify implantou esse commit com sucesso entre 04:50:33 e 04:52:29 UTC;
+- a integração GitHub do Supabase aplicou automaticamente a migration
+  `20260818031745_guard_service_order_updates`; ela não foi reaplicada
+  manualmente;
+- função, trigger, policies, grant de `UPDATE` e histórico de migrations foram
+  conferidos depois da aplicação, sem drift;
+- um smoke remoto em transação única validou `admin`, `secretaria`, `limpeza`,
+  `consegna`, `cliente`, papel inválido/ausente e o fluxo técnico
+  `service_role`; início/conclusão legítimos passaram, enquanto preço e O.S.
+  não atribuída foram bloqueados; a transação terminou em `ROLLBACK`;
+- O.S. (1.203 registros), relações de equipe (1.206), fotos (2.639), objetos de
+  Storage (5.278) e grants de `SELECT` mantiveram exatamente as mesmas
+  contagens e fingerprints antes e depois da migration e do smoke;
+- a janela de observação de 30 minutos não registrou erro inesperado do
+  Postgres, resposta 4xx/5xx da API, `lock_timeout` ou `statement_timeout`;
+- o Advisor de segurança não introduziu finding novo. O aviso informativo
+  preexistente de `auth_login_attempts` continua documentado pela ADR 008.
+
+Nenhuma restauração, exclusão, `DROP`, alteração de registros, mudança de
+Storage ou restrição de grants de `SELECT` foi executada. A Sprint 05 permanece
+planejada e não iniciada. O rollback continua sendo a correção progressiva não
+destrutiva definida na seção 8.6.

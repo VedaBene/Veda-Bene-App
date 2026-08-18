@@ -1,6 +1,6 @@
 # Roadmap ativo de endurecimento arquitetural
 
-**Status do programa:** Sprint 04 com implementação local pronta; implantação remota pendente de autorização
+**Status do programa:** Sprint 04 concluída; Sprint 05 planejada e não iniciada
 
 **Baseline da auditoria:** 2026-08-15
 
@@ -161,7 +161,7 @@ Estados permitidos: `planned`, `in_progress`, `completed`, `blocked` e
 | 01 | P0 | CI prova RLS/grants reais em banco descartável | DB-L | 00 | completed |
 | 02 | P0 | Build, segredos, dependências e Auth endurecidos | DB-0 / DB-C | 01 | completed |
 | 03 | P0 | Seams server-only preparados para o cutover | DB-0 | 02 | completed |
-| 04 | P0 | Alterações diretas indevidas de O.S. bloqueadas | DB-P | 03 | in_progress |
+| 04 | P0 | Alterações diretas indevidas de O.S. bloqueadas | DB-P | 03 | completed |
 | 05 | P0 | Colunas sensíveis protegidas contra Data API direta | DB-P | 04 | planned |
 | 06 | P1 | Períodos financeiros corretos em `Europe/Rome` | DB-0 | 05 | planned |
 | 07 | P1 | Bloqueio de login resistente à concorrência | DB-P | 06 | planned |
@@ -514,9 +514,10 @@ continuará funcionando quando os grants sensíveis forem removidos na Sprint 05
 
 ### Sprint 04 — Guard de integridade para updates de O.S.
 
-**Status:** in_progress — implementação local pronta em 2026-08-18; implantação
-remota pendente de autorização específica. Nenhum ambiente remoto foi acessado
-ou modificado nesta sprint.
+**Status:** completed — implementação local, implantação e validação remota
+concluídas em 2026-08-18 após autorização específica, backup/restauração
+confirmados e janela operacional sem O.S. em curso. A Sprint 05 não foi
+iniciada.
 
 **Dossiê DB-P:**
 [`sprint-04-service-order-update-guard-db-p.md`](sprint-04-service-order-update-guard-db-p.md)
@@ -555,7 +556,7 @@ iguais.
 **Critérios de conclusão**
 
 - [x] Dossiê DB-P completo.
-- [ ] Aplicação remota separadamente autorizada, executada e validada.
+- [x] Aplicação remota separadamente autorizada, executada e validada.
 - [x] A migration não altera nem remove registros.
 - [x] Row count, chaves e valores existentes são idênticos antes/depois.
 - [x] Tentativas negativas falham no banco para cada papel operacional.
@@ -915,7 +916,7 @@ Nunca cole tokens, DSNs, emails, IPs, dados pessoais ou conteúdo de `.env`.
 | 01 | completed | 2026-08-16 | 2026-08-17 | Codex | `npm run test:supabase`: 57 pgTAP, três SQLs existentes e smoke de fotos PASS; lint/typecheck/29 arquivos e 141 Vitest/build PASS; diff e segredos revisados | Grants sensíveis e update amplo de `limpeza` comprovados como `[KNOWN UNSAFE]`; oito alvos TODO aguardam exclusivamente Sprints 04/05; CI remota não disparada sem commit/push |
 | 02 | completed | 2026-08-17 | 2026-08-17 | Codex | `.env*`/backups excluídos e imagem comprovada limpa; Gitleaks: 97 commits sem novo vazamento; Next 16.3.1 e Sentry 10.70.0; `npm audit` completo e produção: zero; lint/typecheck/30 arquivos e 145 Vitest/build/57 pgTAP PASS; Leaked Password Protection autorizada, habilitada e confirmada pelo Advisor | Ocorrência histórica continua revogada e isolada por fingerprint; `auth_login_attempts` mantém aviso informativo intencional conforme ADR 008; rollback Auth é desligar a mesma opção; nenhuma mudança de dados/schema/RLS/Storage, commit ou push; Sprint 03 não iniciada |
 | 03 | completed | 2026-08-17 | 2026-08-17 | Codex | Matriz e adapter server-only versionados; lint/typecheck/32 arquivos e 152 Vitest/build com 20 rotas PASS; 57 pgTAP/invariantes/fotos PASS; smoke autenticado local de cinco papéis, telas, guards, dashboard, extratos e CSVs PASS; testes arquiteturais e auditoria do diff PASS | `avg_cleaning_hours` classificado como sensível contextual sem ampliar acesso; grants excessivos continuam conhecidos até a Sprint 05 e limites temporais continuam na Sprint 06; `output/` preexistente preservado; nenhuma mudança de banco/produção, commit ou push |
-| 04 | in_progress | 2026-08-18 | — | Codex | Implementação local pronta: dossiê DB-P e ADR 017; migration incremental exercitada entre fingerprints idênticos; 103 pgTAP (46 do guard), invariantes e smoke de fotos PASS; lint Supabase sem erros; lint/typecheck/32 arquivos e 155 Vitest/build com 20 rotas PASS | Implantação remota pendente de autorização específica; sete TODOs de SELECT permanecem exclusivamente para a Sprint 05; nenhum ambiente remoto acessado ou modificado |
+| 04 | completed | 2026-08-18 | 2026-08-18 | Codex | Local: dossiê DB-P e ADR 017; 103 pgTAP (46 do guard), invariantes/fotos, lint Supabase, lint/typecheck/155 Vitest/build PASS. Produção: PR #2 e CI verde; Coolify implantou `51512d2`; integração Supabase aplicou `20260818031745`; smoke transacional com `ROLLBACK` passou para cinco papéis e fluxo técnico; fingerprints pré/pós idênticos; 30 min de logs/advisors sem erro inesperado, 5xx ou timeout | Sete TODOs de SELECT permanecem exclusivamente para a Sprint 05; aviso informativo preexistente de `auth_login_attempts` segue aceito pela ADR 008; rollback é correção progressiva não destrutiva |
 | 05 | planned | — | — | — | — | — |
 | 06 | planned | — | — | — | — | — |
 | 07 | planned | — | — | — | — | — |
