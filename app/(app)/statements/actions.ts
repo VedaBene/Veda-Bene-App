@@ -35,8 +35,8 @@ export async function fetchPayableData(
   const parsedFilters = payableStatementFiltersSchema.safeParse({ startDate, endDate, employeeId })
   if (!parsedFilters.success) throw new Error(validationMessage(parsedFilters.error))
 
-  const { supabase } = await getAuthorizedClient(['admin'])
-  return getPayableStatementRows(supabase, parsedFilters.data)
+  await getAuthorizedClient(['admin'])
+  return getPayableStatementRows(parsedFilters.data)
 }
 
 export async function fetchAgencies(): Promise<ClientOption[]> {
@@ -58,8 +58,8 @@ export async function fetchReceivableReport(
   const parsedFilters = receivableStatementFiltersSchema.safeParse({ startDate, endDate, clientType, clientId })
   if (!parsedFilters.success) throw new Error(validationMessage(parsedFilters.error))
 
-  const { supabase } = await getAuthorizedClient(['admin'])
-  return getReceivableReport(supabase, parsedFilters.data)
+  await getAuthorizedClient(['admin'])
+  return getReceivableReport(parsedFilters.data)
 }
 
 export async function fetchPayableDetail(
@@ -70,6 +70,6 @@ export async function fetchPayableDetail(
   const parsedFilters = payableStatementFiltersSchema.safeParse({ startDate, endDate, employeeId })
   if (!parsedFilters.success) throw new Error(validationMessage(parsedFilters.error))
 
-  const { supabase } = await getAuthorizedClient(['admin'])
-  return getPayableDetailRows(supabase, parsedFilters.data)
+  await getAuthorizedClient(['admin'])
+  return getPayableDetailRows(parsedFilters.data)
 }

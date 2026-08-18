@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
 
   const { startDate, endDate, clientType, clientId } = parsedFilters.data
   try {
-    const report = await getReceivableReport(supabase, { startDate, endDate, clientType, clientId })
+    const report = await getReceivableReport({ startDate, endDate, clientType, clientId })
     if (report.pendingCount > 0) {
       return NextResponse.json(
         {

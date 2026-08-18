@@ -1,9 +1,17 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { FakeSupabase } from '@/test/fake-supabase'
 import type { Role } from '@/lib/types/database'
 import type { OperationalServiceOrderVisibility } from '@/lib/service-order-visibility'
 import type { SupabaseServerClient, Viewer } from './viewer'
 import { getServiceOrderDetail, getServiceOrderList } from './service-orders'
+
+vi.mock('./sensitive-data', () => ({
+  loadAverageHoursForVisibleServiceOrders: vi.fn(async (ids: string[]) =>
+    new Map(ids.map(id => [id, 2])),
+  ),
+  loadAuthorizedServiceOrderPropertyOptions: vi.fn(),
+  loadAuthorizedServiceOrderOperationalFinancialFields: vi.fn(async () => null),
+}))
 
 const VISIBILITY: OperationalServiceOrderVisibility = {
   today: '2026-08-07',

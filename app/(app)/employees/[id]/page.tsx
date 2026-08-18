@@ -1,13 +1,13 @@
 import { notFound, redirect } from 'next/navigation'
-import { createClient } from '@/utils/supabase/server'
 import { EmployeeForm } from '@/components/employees/EmployeeForm'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { deleteEmployee } from '../actions'
 import { canManageEmployees } from '@/lib/employee-permissions'
 import { toEmployeeFormData } from '@/lib/server/view-models'
 import { idParamSchema } from '@/lib/server/validation/contracts'
-import type { Role } from '@/lib/types/database'
 import type { EmployeeFormData } from '@/lib/types/view-models'
+import { getCurrentViewer } from '@/lib/server/data-access/viewer'
+import { loadEmployeeDetailForAdministration } from '@/lib/server/data-access/sensitive-data'
 
 export default async function EmployeeDetailPage({
   params,
@@ -18,33 +18,16 @@ export default async function EmployeeDetailPage({
   if (!parsedParams.success) notFound()
 
   const { id } = parsedParams.data
-  const supabase = await createClient()
-
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  const role = (profile?.role ?? 'cliente') as Role
+  const { viewer } = await getCurrentViewer()
+  const role = viewer.role
 
   if (!canManageEmployees(role)) redirect('/service-orders')
 
-  const employeeSelect =
-    'id, full_name, email, phone, birth_date, nationality, address, role, hourly_rate, monthly_salary, overtime_rate'
-
-  const { data: rawEmployee } = await supabase
-    .from('profiles')
-    .select(employeeSelect)
-    .eq('id', id)
-    .single()
+  const rawEmployee = await loadEmployeeDetailForAdministration(id)
 
   if (!rawEmployee) notFound()
 
-  const employee = rawEmployee as unknown as EmployeeFormData
+  const employee = rawEmployee as EmployeeFormData
 
   return (
     <div className="animate-fade-in-up">

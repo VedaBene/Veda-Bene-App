@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
   }
 
   const { startDate, endDate, employeeId } = parsedFilters.data
-  const data = await getPayableDetailRows(supabase, { startDate, endDate, employeeId })
+  const data = await getPayableDetailRows({ startDate, endDate, employeeId })
   const csv = formatPayableCSV(data)
   const filename = `estratto-da-pagare_${startDate}_${endDate}.csv`
 

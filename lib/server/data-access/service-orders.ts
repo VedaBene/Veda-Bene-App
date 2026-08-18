@@ -14,6 +14,11 @@ import {
   type OperationalServiceOrderVisibility,
 } from '@/lib/service-order-visibility'
 import type { SupabaseServerClient, Viewer } from './viewer'
+import {
+  loadAuthorizedServiceOrderPropertyOptions,
+  loadAuthorizedServiceOrderOperationalFinancialFields,
+  loadAverageHoursForVisibleServiceOrders,
+} from './sensitive-data'
 
 export type ServiceOrderListResult = {
   active: ServiceOrderListItem[]
@@ -51,14 +56,12 @@ const SERVICE_ORDER_LIST_SELECT = `
   worked_minutes,
   pricing_mode,
   cleaning_notes,
-  property:properties(id, name, avg_cleaning_hours),
+  property:properties(id, name),
   cleaning_staff:profiles!service_order_cleaning_staff(id, full_name),
   consegna_staff:profiles!consegna_staff_id(id, full_name)
 `
 
-function getServiceOrderDetailSelect(viewer: Viewer): string {
-  const isAdminOrSecretaria = viewer.role === 'admin' || viewer.role === 'secretaria'
-
+function getServiceOrderDetailSelect(): string {
   return [
     'id',
     'property_id',
@@ -83,23 +86,8 @@ function getServiceOrderDetailSelect(viewer: Viewer): string {
     'completion_notes',
     'worked_minutes',
     'pricing_mode',
-    'consegna_fee',
     'cleaning_notes',
-    ...(isAdminOrSecretaria
-      ? ['extra_services_description', 'extra_services_price']
-      : []),
   ].join(', ')
-}
-
-function getServiceOrderPropertyOptionSelect(viewer: Viewer): string {
-  const common =
-    'id, name, min_guests, max_guests, double_beds, single_beds, sofa_beds, armchair_beds, bathrooms, bidets, cribs'
-
-  if (viewer.role === 'cliente') return common
-
-  const withHours = `id, name, avg_cleaning_hours, min_guests, max_guests, double_beds, single_beds, sofa_beds, armchair_beds, bathrooms, bidets, cribs`
-  if (viewer.role === 'admin') return `${withHours}, base_price`
-  return withHours
 }
 
 async function getMatchingPropertyIds(
@@ -198,18 +186,36 @@ export async function getServiceOrderList(
     doneExportQuery,
   ])
 
+  const allOrders = [...(activeOrders ?? []), ...(doneOrders ?? []), ...(doneExportOrders ?? [])]
+  const propertyIds = allOrders.flatMap(order => {
+    const property = order.property as unknown as { id?: string } | null
+    return property?.id ? [property.id] : []
+  })
+  const averageHoursByProperty = await loadAverageHoursForVisibleServiceOrders(propertyIds)
+  const withAuthorizedHours = <T extends { property?: unknown }>(orders: T[]): T[] => orders.map(order => {
+    const property = order.property as { id?: string } | null | undefined
+    if (!property?.id) return order
+    return {
+      ...order,
+      property: {
+        ...property,
+        avg_cleaning_hours: averageHoursByProperty.get(property.id) ?? null,
+      },
+    }
+  })
+
   const doneTotalPages = isFilterActive
     ? Math.ceil((doneCount ?? 0) / filters.donePageSize)
     : 1
 
   return {
-    active: ((activeOrders ?? []) as unknown as ServiceOrderListItem[]).map(order =>
+    active: (withAuthorizedHours(activeOrders ?? []) as unknown as ServiceOrderListItem[]).map(order =>
       toServiceOrderListItem(order, viewer.role),
     ),
-    done: ((doneOrders ?? []) as unknown as ServiceOrderListItem[]).map(order =>
+    done: (withAuthorizedHours(doneOrders ?? []) as unknown as ServiceOrderListItem[]).map(order =>
       toServiceOrderListItem(order, viewer.role),
     ),
-    doneForExport: ((doneExportOrders ?? []) as unknown as ServiceOrderListItem[]).map(order =>
+    doneForExport: (withAuthorizedHours(doneExportOrders ?? []) as unknown as ServiceOrderListItem[]).map(order =>
       toServiceOrderListItem(order, viewer.role),
     ),
     doneTotalPages,
@@ -223,9 +229,10 @@ export async function getServiceOrderDetail(
   id: string,
   operationalVisibility: OperationalServiceOrderVisibility = getOperationalServiceOrderVisibility(),
 ): Promise<ServiceOrderFormData | null> {
+  const isAdminOrSecretaria = viewer.role === 'admin' || viewer.role === 'secretaria'
   let orderQuery = supabase
     .from('service_orders')
-    .select(getServiceOrderDetailSelect(viewer))
+    .select(getServiceOrderDetailSelect())
     .eq('id', id)
 
   if (isOperationalStaffRole(viewer.role)) {
@@ -243,9 +250,14 @@ export async function getServiceOrderDetail(
 
   const cleaning_staff_ids = (staffRelations ?? []).map((r: { profile_id: string }) => r.profile_id)
 
+  const operationalFinancialFields = isAdminOrSecretaria
+    ? await loadAuthorizedServiceOrderOperationalFinancialFields(id)
+    : null
+
   return toServiceOrderFormData(
     {
       ...(data as unknown as ServiceOrderFormData),
+      ...(operationalFinancialFields ?? {}),
       cleaning_staff_ids,
     },
     viewer.role,
@@ -257,11 +269,8 @@ export async function getServiceOrderFormOptions(
   supabase: SupabaseServerClient,
   viewer: Viewer,
 ): Promise<ServiceOrderFormOptions> {
-  const [{ data: properties }, { data: staff }] = await Promise.all([
-    supabase
-      .from('properties')
-      .select(getServiceOrderPropertyOptionSelect(viewer))
-      .order('name'),
+  const [{ role, rows: properties }, { data: staff }] = await Promise.all([
+    loadAuthorizedServiceOrderPropertyOptions(),
     supabase
       .from('profiles')
       .select('id, full_name, role')
@@ -269,8 +278,10 @@ export async function getServiceOrderFormOptions(
       .order('full_name'),
   ])
 
+  if (role !== viewer.role) throw new Error('Contexto de autorização inconsistente')
+
   return {
-    properties: (properties ?? []) as unknown as ServiceOrderPropertyOption[],
+    properties,
     staff: (staff ?? []) as StaffOption[],
   }
 }

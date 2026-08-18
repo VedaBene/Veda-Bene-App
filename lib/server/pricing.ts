@@ -1,5 +1,11 @@
+import 'server-only'
+
 import type { PricingMode } from '@/lib/types/database'
 import type { SupabaseServerClient } from '@/lib/server/authz'
+import {
+  loadAuthorizedOrderPricingContext,
+  type OrderPricingContext,
+} from '@/lib/server/data-access/sensitive-data'
 
 const RIPASSO_RATE = 0.6
 const OUT_LONG_STAY_HOURLY_RATE = 25
@@ -58,25 +64,17 @@ export async function recalculateOrderPricing(
   supabase: SupabaseServerClient,
   orderId: string,
 ): Promise<number | null> {
-  const ctx = await loadOrderPricingContext(supabase, orderId)
+  const ctx = await loadOrderPricingContext(orderId)
   if (!ctx) return null
-
-  const { data: order } = await supabase
-    .from('service_orders')
-    .select('pricing_mode, extra_services_price')
-    .eq('id', orderId)
-    .single()
-
-  if (!order) return null
 
   const total_price = ctx.property
     ? calculateTotalPrice(
-        order.pricing_mode,
+        ctx.pricingMode,
         ctx.property.base_price,
         ctx.property.extra_per_person,
         ctx.realGuests,
         ctx.property.min_guests,
-        order.extra_services_price ?? null,
+        ctx.extraServicesPrice,
         ctx.workedMinutes,
       )
     : null
@@ -85,16 +83,7 @@ export async function recalculateOrderPricing(
   return total_price
 }
 
-export type OrderPricingContext = {
-  propertyId: string
-  realGuests: number | null
-  workedMinutes: number | null
-  property: {
-    base_price: number | null
-    extra_per_person: number | null
-    min_guests: number | null
-  } | null
-}
+export type { OrderPricingContext }
 
 // Carrega num único select aninhado tudo que `calculateTotalPrice` precisa
 // para uma OS já existente (update / updateExtraServices). Retorna null se
@@ -105,34 +94,8 @@ export type OrderPricingContext = {
 // não o ainda persistido na OS. Quando o id passado bate com o atual,
 // reaproveita o join e evita a query extra.
 export async function loadOrderPricingContext(
-  supabase: SupabaseServerClient,
   orderId: string,
   overridePropertyId?: string,
 ): Promise<OrderPricingContext | null> {
-  const { data } = await supabase
-    .from('service_orders')
-    .select('property_id, real_guests, worked_minutes, property:properties(base_price, extra_per_person, min_guests)')
-    .eq('id', orderId)
-    .single()
-
-  if (!data) return null
-
-  type PricingFields = { base_price: number | null; extra_per_person: number | null; min_guests: number | null }
-  let property = data.property as unknown as PricingFields | null
-
-  if (overridePropertyId && overridePropertyId !== data.property_id) {
-    const { data: overrideProp } = await supabase
-      .from('properties')
-      .select('base_price, extra_per_person, min_guests')
-      .eq('id', overridePropertyId)
-      .single()
-    property = overrideProp ?? null
-  }
-
-  return {
-    propertyId: overridePropertyId ?? data.property_id,
-    realGuests: data.real_guests ?? null,
-    workedMinutes: data.worked_minutes ?? null,
-    property,
-  }
+  return loadAuthorizedOrderPricingContext(orderId, overridePropertyId)
 }

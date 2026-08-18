@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { getAuthorizedClient } from '@/lib/server/authz'
 import { calculateTotalPrice, loadOrderPricingContext, recalculateOrderPricing } from '@/lib/server/pricing'
+import { loadAuthorizedPropertyPricingContext } from '@/lib/server/data-access/sensitive-data'
 import { captureQueryError, withLogging } from '@/lib/server/logger'
 import { validateCleaningTrackingTransition } from '@/lib/service-order-tracking'
 import { isCleaningPhotosEnabled } from '@/lib/server/features'
@@ -83,11 +84,7 @@ async function createServiceOrderImpl(formData: FormData) {
 
   const { data } = parsed
 
-  const { data: property } = await supabase
-    .from('properties')
-    .select('base_price, extra_per_person, min_guests')
-    .eq('id', data.property_id)
-    .single()
+  const property = await loadAuthorizedPropertyPricingContext(data.property_id)
 
   const total_price = property
     ? calculateTotalPrice(
@@ -162,7 +159,7 @@ async function updateServiceOrderImpl(id: string, formData: FormData) {
 
   const { data } = parsed
 
-  const ctx = await loadOrderPricingContext(supabase, parsedId.data, data.property_id)
+  const ctx = await loadOrderPricingContext(parsedId.data, data.property_id)
   const total_price = ctx?.property
     ? calculateTotalPrice(
         data.pricing_mode,
@@ -399,7 +396,7 @@ async function updateExtraServicesImpl(
 
   const { supabase } = await getAuthorizedClient()
 
-  const ctx = await loadOrderPricingContext(supabase, parsed.data.id)
+  const ctx = await loadOrderPricingContext(parsed.data.id)
   if (!ctx) return { success: false as const, error: 'O.L. non trovato' }
 
   const total_price = ctx.property

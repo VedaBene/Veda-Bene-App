@@ -52,6 +52,7 @@ Outras convenções importantes:
 
 ## Documentos de referência
 - [`docs/production-data-safety.md`](docs/production-data-safety.md) — política obrigatória de preservação de dados, migrações e rollback em produção
+- [`docs/sensitive-data-matrix.md`](docs/sensitive-data-matrix.md) — matriz canônica de campos sensíveis, papéis, casos de uso e seams server-only da Sprint 03
 - [`docs/service-orders.md`](docs/service-orders.md) — regras atuais da listagem, filtros, prioridade operacional e PDFs de Ordens de Serviço
 - [`docs/operational-service-order-visibility.md`](docs/operational-service-order-visibility.md) — impacto, testes, implantação e rollback da janela da equipe operacional
 - [`docs/maintenance/README.md`](docs/maintenance/README.md) — índice de correções relevantes, atualizações de dependências, validações e implantações

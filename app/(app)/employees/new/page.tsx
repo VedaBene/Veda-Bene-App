@@ -1,23 +1,12 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/utils/supabase/server'
 import { EmployeeForm } from '@/components/employees/EmployeeForm'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { canManageEmployees } from '@/lib/employee-permissions'
-import type { Role } from '@/lib/types/database'
+import { getCurrentViewer } from '@/lib/server/data-access/viewer'
 
 export default async function NewEmployeePage() {
-  const supabase = await createClient()
-
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  const role = (profile?.role ?? 'cliente') as Role
+  const { viewer } = await getCurrentViewer()
+  const role = viewer.role
 
   if (!canManageEmployees(role)) redirect('/service-orders')
 

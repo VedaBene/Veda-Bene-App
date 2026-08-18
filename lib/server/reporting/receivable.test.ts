@@ -1,7 +1,16 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { FakeSupabase } from '@/test/fake-supabase'
 import type { SupabaseServerClient } from '@/lib/server/data-access/viewer'
-import { getReceivableReport } from './receivable'
+import type { ReceivableStatementFilters } from '@/lib/server/validation/contracts'
+import { getReceivableReport as getAuthorizedReceivableReport } from './receivable'
+
+const sensitiveDataMocks = vi.hoisted(() => ({
+  loadReceivableFinancialSource: vi.fn(),
+}))
+
+vi.mock('@/lib/server/data-access/sensitive-data', () => ({
+  loadReceivableFinancialSource: sensitiveDataMocks.loadReceivableFinancialSource,
+}))
 
 const filters = {
   startDate: '2026-05-01',
@@ -10,6 +19,12 @@ const filters = {
 
 function asSupabase(fake: FakeSupabase): SupabaseServerClient {
   return fake as unknown as SupabaseServerClient
+}
+
+async function getReceivableReport(supabase: SupabaseServerClient, input: ReceivableStatementFilters) {
+  const fake = supabase as unknown as FakeSupabase
+  sensitiveDataMocks.loadReceivableFinancialSource.mockResolvedValue(fake.rows('service_orders'))
+  return getAuthorizedReceivableReport(input)
 }
 
 function order(overrides: Record<string, unknown> = {}) {
@@ -284,29 +299,21 @@ describe('receivable report producer', () => {
 
   it('propagates a Supabase query failure instead of returning an empty report', async () => {
     const queryError = new Error('database unavailable')
-    const query = {
-      select() { return this },
-      eq() { return this },
-      gte() { return this },
-      lte() { return this },
-      order() { return this },
-      range: async () => ({ data: null, error: queryError }),
-    }
-    const failingClient = {
-      from: () => query,
-    } as unknown as SupabaseServerClient
+    sensitiveDataMocks.loadReceivableFinancialSource.mockRejectedValueOnce(
+      new Error('Não foi possível carregar o relatório a receber.', { cause: queryError }),
+    )
 
-    await expect(getReceivableReport(failingClient, filters))
+    await expect(getAuthorizedReceivableReport(filters))
       .rejects.toThrow('Não foi possível carregar o relatório a receber.')
   })
 
-  it('selects base price only in the dedicated administrative report query', async () => {
+  it('delegates the administrative query to the sensitive-data adapter', async () => {
     const fake = new FakeSupabase({ service_orders: [order()] })
 
     await getReceivableReport(asSupabase(fake), filters)
 
     const select = fake.selectCalls.find(call => call.table === 'service_orders')?.columns ?? ''
-    expect(select).toContain('base_price')
-    expect(select).not.toContain('*')
+    expect(select).toBe('')
+    expect(sensitiveDataMocks.loadReceivableFinancialSource).toHaveBeenCalledWith(filters)
   })
 })

@@ -19,6 +19,10 @@ export class FakeSupabase {
 
   constructor(private readonly tableData: Record<string, Row[]>) {}
 
+  rows(table: string): Row[] {
+    return this.tableData[table] ?? []
+  }
+
   from(table: string): FakeQuery {
     return new FakeQuery(this, table, this.tableData[table] ?? [])
   }

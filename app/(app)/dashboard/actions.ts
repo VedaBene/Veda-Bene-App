@@ -7,11 +7,11 @@ import type { DashboardData } from '@/lib/types/dashboard'
 import type { Role } from '@/lib/types/database'
 
 export async function fetchDashboardData(): Promise<{ data: DashboardData; role: Role }> {
-  const { supabase, viewer } = await getCurrentViewer()
+  const { viewer } = await getCurrentViewer()
   if (viewer.role !== 'admin') redirect('/service-orders')
 
   return {
     role: viewer.role,
-    data: await getDashboardData(supabase),
+    data: await getDashboardData(),
   }
 }

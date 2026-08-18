@@ -11,21 +11,13 @@ import type {
 } from '@/lib/types/reporting'
 import type { PayableStatementFilters } from '@/lib/server/validation/contracts'
 import type { SupabaseServerClient } from '@/lib/server/data-access/viewer'
+import {
+  loadDashboardFinancialSource,
+  loadPayableFinancialSource,
+  type StaffCompensationSource,
+} from '@/lib/server/data-access/sensitive-data'
 
-type PayableOrder = {
-  id: string
-  order_number: number
-  completed_at: string | null
-  cleaning_staff: { id: string }[] | null
-  property: { name?: string | null; avg_cleaning_hours: number | null } | null
-}
-
-type StaffProfile = {
-  id: string
-  full_name: string
-  hourly_rate: number | null
-  monthly_salary: number | null
-}
+type StaffProfile = StaffCompensationSource
 
 function roundMoney(value: number): number {
   return Math.round(value * 100) / 100
@@ -60,66 +52,6 @@ function unwrap<T>(
   return value.data ?? []
 }
 
-async function fetchPayableOrders(
-  supabase: SupabaseServerClient,
-  filters: PayableStatementFilters,
-  includePropertyName: boolean,
-): Promise<PayableOrder[]> {
-  const propertySelect = includePropertyName
-    ? 'property:properties(name, avg_cleaning_hours)'
-    : 'property:properties(avg_cleaning_hours)'
-
-  let query = supabase
-    .from('service_orders')
-    .select(`
-      id, order_number, completed_at,
-      cleaning_staff:profiles!service_order_cleaning_staff(id),
-      ${propertySelect}
-    `)
-    .eq('status', 'done')
-    .gte('completed_at', filters.startDate)
-    .lte('completed_at', filters.endDate)
-
-  if (includePropertyName) {
-    query = query.order('completed_at', { ascending: true })
-  }
-
-  const { data } = await query
-  return (data ?? []) as unknown as PayableOrder[]
-}
-
-async function fetchStaffProfiles(
-  supabase: SupabaseServerClient,
-  staffIds: Iterable<string>,
-  logScope?: string,
-): Promise<Map<string, StaffProfile>> {
-  const ids = [...new Set(staffIds)]
-  if (ids.length === 0) return new Map()
-
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('id, full_name, hourly_rate, monthly_salary')
-    .in('id', ids)
-
-  if (error && logScope) {
-    captureQueryError(logScope, 'staff_profiles', error)
-  }
-
-  return new Map((data ?? []).map(profile => [profile.id, profile]))
-}
-
-function cleaningStaffIds(orders: Pick<PayableOrder, 'cleaning_staff'>[]): string[] {
-  const staffIds = new Set<string>()
-  for (const order of orders) {
-    if (order.cleaning_staff) {
-      for (const s of order.cleaning_staff) {
-        staffIds.add(s.id)
-      }
-    }
-  }
-  return [...staffIds]
-}
-
 export async function getReportingEmployees(supabase: SupabaseServerClient): Promise<EmployeeOption[]> {
   const { data } = await supabase
     .from('profiles')
@@ -149,10 +81,9 @@ export async function getReportingOwners(supabase: SupabaseServerClient): Promis
 }
 
 export async function getPayableStatementRows(
-  supabase: SupabaseServerClient,
   filters: PayableStatementFilters,
 ): Promise<PayableRow[]> {
-  const detailRows = await getPayableDetailRows(supabase, filters)
+  const detailRows = await getPayableDetailRows(filters)
   const map = new Map<string, PayableRow>()
 
   for (const detail of detailRows) {
@@ -187,13 +118,12 @@ export async function getPayableStatementRows(
 }
 
 export async function getPayableDetailRows(
-  supabase: SupabaseServerClient,
   filters: PayableStatementFilters,
 ): Promise<PayableDetailRow[]> {
-  const orders = await fetchPayableOrders(supabase, filters, true)
+  const { orders, profiles } = await loadPayableFinancialSource(filters, true)
   if (orders.length === 0) return []
 
-  const profileById = await fetchStaffProfiles(supabase, cleaningStaffIds(orders))
+  const profileById = new Map(profiles.map(profile => [profile.id, profile]))
   if (profileById.size === 0) return []
 
   const rows: PayableDetailRow[] = []
@@ -278,63 +208,20 @@ function getTopProperties(
     .slice(0, 5)
 }
 
-export async function getDashboardReportingData(supabase: SupabaseServerClient): Promise<DashboardData> {
+export async function getDashboardReportingData(): Promise<DashboardData> {
   const now = new Date()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10)
   const today = now.toISOString().slice(0, 10)
   const yearStart = new Date(now.getFullYear(), 0, 1).toISOString().slice(0, 10)
   const threeMonthsAgoStart = new Date(now.getFullYear(), now.getMonth() - 2, 1).toISOString().slice(0, 10)
 
-  const [
-    propertiesRes,
-    hoursRes,
-    revenueRes,
-    topMonthRes,
-    topYearRes,
-    recentOrdersRes,
-  ] = await Promise.allSettled([
-    supabase
-      .from('service_orders')
-      .select('property_id')
-      .eq('status', 'done')
-      .gte('completed_at', monthStart)
-      .lte('completed_at', today),
-
-    supabase
-      .from('service_orders')
-      .select('worked_minutes, property:properties(avg_cleaning_hours)')
-      .eq('status', 'done')
-      .gte('completed_at', monthStart)
-      .lte('completed_at', today),
-
-    supabase
-      .from('service_orders')
-      .select('total_price')
-      .eq('status', 'done')
-      .gte('completed_at', monthStart)
-      .lte('completed_at', today),
-
-    supabase
-      .from('service_orders')
-      .select('property_id, property:properties(id, name)')
-      .eq('status', 'done')
-      .gte('cleaning_date', monthStart)
-      .lte('cleaning_date', today),
-
-    supabase
-      .from('service_orders')
-      .select('property_id, property:properties(id, name)')
-      .eq('status', 'done')
-      .gte('cleaning_date', yearStart)
-      .lte('cleaning_date', today),
-
-    supabase
-      .from('service_orders')
-      .select('completed_at, total_price, cleaning_staff:profiles!service_order_cleaning_staff(id), worked_minutes, property:properties(avg_cleaning_hours)')
-      .eq('status', 'done')
-      .gte('completed_at', threeMonthsAgoStart)
-      .lte('completed_at', today),
-  ])
+  const source = await loadDashboardFinancialSource({ monthStart, today, yearStart, threeMonthsAgoStart })
+  const propertiesRes = source.properties
+  const hoursRes = source.hours
+  const revenueRes = source.revenue
+  const topMonthRes = source.topMonth
+  const topYearRes = source.topYear
+  const recentOrdersRes = source.recentOrders
 
   const propertiesData = unwrap<{ property_id: string }>(propertiesRes, 'properties_this_month')
   const propertiesThisMonth = new Set(propertiesData.map(o => o.property_id)).size
@@ -384,7 +271,8 @@ export async function getDashboardReportingData(supabase: SupabaseServerClient):
     ),
   }))
 
-  const profilesMap = await fetchStaffProfiles(supabase, cleaningStaffIds(recentOrders), 'dashboard')
+  const profilesData = unwrap<StaffProfile>(source.profiles, 'staff_profiles')
+  const profilesMap = new Map(profilesData.map(profile => [profile.id, profile]))
 
   const staffCostByMonth: MonthStat[] = months.map(({ key, label }) => {
     const monthOrders = recentOrders.filter(order => datePrefix(order.completed_at) === key)

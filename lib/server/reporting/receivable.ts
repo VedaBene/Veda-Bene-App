@@ -2,7 +2,10 @@ import 'server-only'
 
 import { captureQueryError } from '@/lib/server/logger'
 import { CONSEGNA_FEE } from '@/lib/server/pricing'
-import type { SupabaseServerClient } from '@/lib/server/data-access/viewer'
+import {
+  loadReceivableFinancialSource,
+  type ReceivableOrderSource,
+} from '@/lib/server/data-access/sensitive-data'
 import type { ReceivableStatementFilters } from '@/lib/server/validation/contracts'
 import type {
   ReceivableOrderRow,
@@ -11,45 +14,9 @@ import type {
 } from '@/lib/types/reporting'
 import type { PricingMode } from '@/lib/types/database'
 
-const PAGE_SIZE = 1000
 const PRICING_MODES: PricingMode[] = ['standard', 'ripasso', 'out_long_stay']
 
-type ReceivableOrderRecord = {
-  id: string
-  order_number: number
-  cleaning_date: string | null
-  pricing_mode: PricingMode | null
-  real_guests: number | null
-  double_beds: number
-  single_beds: number
-  sofa_beds: number
-  bathrooms: number
-  bidets: number
-  cribs: number
-  extra_services_description: string | null
-  extra_services_price: number | null
-  consegna_fee: number | null
-  total_price: number | null
-  property: {
-    id: string
-    name: string
-    client_type: 'rental' | 'particular'
-    base_price: number | null
-    agency: { id: string; name: string } | null
-    owner: { id: string; name: string } | null
-  } | null
-}
-
-const RECEIVABLE_SELECT = `
-  id, order_number, cleaning_date, pricing_mode, real_guests,
-  double_beds, single_beds, sofa_beds, bathrooms, bidets, cribs,
-  extra_services_description, extra_services_price, consegna_fee, total_price,
-  property:properties(
-    id, name, client_type, base_price,
-    agency:agencies(id, name),
-    owner:owners(id, name)
-  )
-`
+type ReceivableOrderRecord = ReceivableOrderSource
 
 function roundMoney(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100
@@ -82,37 +49,6 @@ function matchesFilters(
 
 function isPricingMode(value: PricingMode | null): value is PricingMode {
   return value != null && PRICING_MODES.includes(value)
-}
-
-async function fetchAllReceivableOrders(
-  supabase: SupabaseServerClient,
-  filters: ReceivableStatementFilters,
-): Promise<ReceivableOrderRecord[]> {
-  const orders: ReceivableOrderRecord[] = []
-
-  for (let from = 0; ; from += PAGE_SIZE) {
-    const { data, error } = await supabase
-      .from('service_orders')
-      .select(RECEIVABLE_SELECT)
-      .eq('status', 'done')
-      .gte('cleaning_date', filters.startDate)
-      .lte('cleaning_date', filters.endDate)
-      .order('cleaning_date', { ascending: true })
-      .order('order_number', { ascending: true })
-      .order('id', { ascending: true })
-      .range(from, from + PAGE_SIZE - 1)
-
-    if (error) {
-      captureQueryError('receivable', 'service_orders', error)
-      throw new Error('Não foi possível carregar o relatório a receber.', { cause: error })
-    }
-
-    const page = (data ?? []) as unknown as ReceivableOrderRecord[]
-    orders.push(...page)
-    if (page.length < PAGE_SIZE) break
-  }
-
-  return orders
 }
 
 function toRow(
@@ -256,10 +192,15 @@ function buildSection(
 }
 
 export async function getReceivableReport(
-  supabase: SupabaseServerClient,
   filters: ReceivableStatementFilters,
 ): Promise<ReceivableReport> {
-  const orders = await fetchAllReceivableOrders(supabase, filters)
+  let orders: ReceivableOrderRecord[]
+  try {
+    orders = await loadReceivableFinancialSource(filters)
+  } catch (error) {
+    captureQueryError('receivable', 'service_orders', error)
+    throw error
+  }
   const rows = orders.flatMap(order => {
     const row = toRow(order, filters)
     return row ? [row] : []

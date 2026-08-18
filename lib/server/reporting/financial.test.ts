@@ -1,10 +1,18 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { FakeSupabase } from '@/test/fake-supabase'
 import {
-  getPayableDetailRows,
-  getPayableStatementRows,
+  getPayableDetailRows as getAuthorizedPayableDetailRows,
+  getPayableStatementRows as getAuthorizedPayableStatementRows,
 } from './financial'
 import type { SupabaseServerClient } from '@/lib/server/data-access/viewer'
+
+const sensitiveDataMocks = vi.hoisted(() => ({
+  loadPayableFinancialSource: vi.fn(),
+}))
+
+vi.mock('@/lib/server/data-access/sensitive-data', () => ({
+  loadPayableFinancialSource: sensitiveDataMocks.loadPayableFinancialSource,
+}))
 
 const filters = {
   startDate: '2026-01-01',
@@ -13,6 +21,24 @@ const filters = {
 
 function asSupabase(fake: FakeSupabase): SupabaseServerClient {
   return fake as unknown as SupabaseServerClient
+}
+
+function configurePayableSource(supabase: SupabaseServerClient) {
+  const fake = supabase as unknown as FakeSupabase
+  sensitiveDataMocks.loadPayableFinancialSource.mockResolvedValue({
+    orders: fake.rows('service_orders'),
+    profiles: fake.rows('profiles'),
+  })
+}
+
+async function getPayableDetailRows(supabase: SupabaseServerClient, input: typeof filters) {
+  configurePayableSource(supabase)
+  return getAuthorizedPayableDetailRows(input)
+}
+
+async function getPayableStatementRows(supabase: SupabaseServerClient, input: typeof filters) {
+  configurePayableSource(supabase)
+  return getAuthorizedPayableStatementRows(input)
 }
 
 describe('canonical financial reporting producers', () => {

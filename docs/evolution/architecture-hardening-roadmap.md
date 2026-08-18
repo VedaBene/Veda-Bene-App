@@ -1,6 +1,6 @@
 # Roadmap ativo de endurecimento arquitetural
 
-**Status do programa:** Sprint 02 concluída; Sprint 03 não iniciada
+**Status do programa:** Sprint 03 concluída; Sprint 04 não iniciada
 
 **Baseline da auditoria:** 2026-08-15
 
@@ -411,6 +411,10 @@ novas exposições e as vulnerabilidades tratáveis sem mudança major são redu
 
 ### Sprint 03 — Seams server-only para dados sensíveis
 
+**Status:** completed — implementação e gates concluídos em 2026-08-17. O
+pgTAP foi reexecutado em stack descartável e o smoke autenticado passou para os
+cinco papéis. Nenhuma conexão remota ou alteração de banco foi realizada.
+
 **Objetivo:** preparar a aplicação para funcionar após a restrição de grants,
 sem mudar ainda o banco nem o comportamento visível.
 
@@ -447,15 +451,66 @@ DTO mínimo e nunca devolver o client Supabase ao chamador.
 **Resultado esperado:** a aplicação preparada funciona com os grants atuais e
 continuará funcionando quando os grants sensíveis forem removidos na Sprint 05.
 
+**Implementação e evidências de 2026-08-17**
+
+- A matriz canônica foi versionada em `docs/sensitive-data-matrix.md`, cobrindo
+  campos, papéis, casos de uso, operações, DTOs e consumidores. A divergência
+  preexistente sobre `properties.avg_cleaning_hours` foi resolvida como acesso
+  sensível contextual: administração/finanças são de `admin`, enquanto a
+  estimativa operacional só acompanha linhas/opções já autorizadas por RLS.
+- O adapter `lib/server/data-access/sensitive-data.ts` mantém o client
+  privilegiado privado, autentica e autoriza pelo perfil confiável antes de
+  criá-lo, valida IDs/filtros e expõe somente operações de negócio estreitas:
+  administração de imóveis e funcionários, opções e horas operacionais de O.S.,
+  campos financeiros autorizados de O.S., contextos de pricing, fontes de A
+  Pagar/A Receber e fonte financeira do dashboard.
+- Chamadores sensíveis de imóveis, funcionários, O.S., pricing, dashboard,
+  extratos e exports CSV/PDF foram migrados. Fórmulas, DTOs de saída e escopo
+  visível por papel foram preservados; clientes não receberam campos novos.
+- Arquivos alterados: `CLAUDE.md`, `docs/sensitive-data-matrix.md`, este roadmap,
+  `lib/server/data-access/{sensitive-data,properties,service-orders,dashboard}.ts`,
+  `lib/server/{pricing,reporting/financial,reporting/receivable}.ts`, páginas de
+  funcionários, actions de dashboard/O.S./extratos, rotas de exportação A
+  Pagar/A Receber e `utils/supabase/admin.ts`; seus testes próximos, o teste
+  arquitetural e o fake Supabase foram atualizados em conjunto. O gate local
+  repetível foi adicionado em `scripts/test-sensitive-data-smoke-local.mjs` e
+  `package.json`; `next.config.ts` apenas impede que esse gate altere
+  `AGENTS.md` durante o `next dev` efêmero.
+- `utils/supabase/admin.ts` passou a autenticar e exigir `admin` antes da criação
+  do client privilegiado. Nenhum client bruto ou proxy genérico foi exportado.
+- `test/architecture-sensitive-data.test.ts` verifica via AST/grafo de imports
+  que selects sensíveis não escapem do adapter, que `select('*')` não seja usado
+  nas tabelas classificadas, que módulos privilegiados não alcancem o bundle
+  client e que não haja export de client bruto. Os testes do adapter cobrem
+  autorização antes do privilégio, DTO mínimo e interseção com linhas visíveis
+  por RLS.
+- Validação da aplicação: `npm run lint`, `npm run typecheck`, 32 arquivos/152
+  testes Vitest e `npm run build` (20 rotas) passaram. A auditoria do diff não
+  encontrou alteração em `supabase/**`, segredo novo ou marcador privilegiado
+  no bundle client.
+- `npm run test:supabase` passou com 57 pgTAP, invariantes e smoke de migrations
+  de fotos; os oito `TODO` continuam sendo gaps conhecidos das Sprints 04/05.
+  `npm run test:smoke:sensitive-data` criou uma stack e cinco usuários locais
+  descartáveis, autenticou `admin`, `secretaria`, `limpeza`, `consegna` e
+  `cliente`, validou telas, guards, campos permitidos/negados, dashboard,
+  extratos e CSVs, e removeu integralmente o ambiente ao terminar.
+- O smoke revelou uma incompatibilidade com UUIDs históricos do baseline que
+  não carregam bits de versão RFC. O adapter agora valida a representação UUID
+  canônica aceita pelo Postgres sem rejeitar registros existentes; o teste do
+  adapter cobre essa regressão.
+- Não houve alteração de schema, migration, dados, RLS, grants, Auth, Storage ou
+  produção. Não houve commit, push nem início da Sprint 04.
+
 **Critérios de conclusão**
 
-- [ ] Matriz de dados sensíveis aprovada e versionada.
-- [ ] Nenhum componente client recebe campo adicional.
-- [ ] Nenhum raw service-role client é exportado.
-- [ ] Não há acesso direto a coluna sensível fora dos adapters aprovados.
-- [ ] Comparação funcional por papel confirma o mesmo comportamento de tela,
+- [x] Matriz de dados sensíveis implementada, versionada e com decisão contextual
+  explícita para `avg_cleaning_hours`.
+- [x] Nenhum componente client recebe campo adicional.
+- [x] Nenhum raw service-role client é exportado.
+- [x] Não há acesso direto a coluna sensível fora dos adapters aprovados.
+- [x] Comparação funcional autenticada por papel confirma o mesmo comportamento de tela,
   CSV, PDF e dashboard.
-- [ ] A Sprint 01 continua verde.
+- [x] A Sprint 01 continua verde em reexecução SQL sobre o diff atual.
 
 ### Sprint 04 — Guard de integridade para updates de O.S.
 
@@ -851,7 +906,7 @@ Nunca cole tokens, DSNs, emails, IPs, dados pessoais ou conteúdo de `.env`.
 | 00 | completed | 2026-08-15 | 2026-08-15 | Codex | Auditoria de 2026-08-15; roadmap e índices documentais criados; somente Markdown alterado | Próxima etapa: Sprint 01; nenhuma implementação iniciada |
 | 01 | completed | 2026-08-16 | 2026-08-17 | Codex | `npm run test:supabase`: 57 pgTAP, três SQLs existentes e smoke de fotos PASS; lint/typecheck/29 arquivos e 141 Vitest/build PASS; diff e segredos revisados | Grants sensíveis e update amplo de `limpeza` comprovados como `[KNOWN UNSAFE]`; oito alvos TODO aguardam exclusivamente Sprints 04/05; CI remota não disparada sem commit/push |
 | 02 | completed | 2026-08-17 | 2026-08-17 | Codex | `.env*`/backups excluídos e imagem comprovada limpa; Gitleaks: 97 commits sem novo vazamento; Next 16.3.1 e Sentry 10.70.0; `npm audit` completo e produção: zero; lint/typecheck/30 arquivos e 145 Vitest/build/57 pgTAP PASS; Leaked Password Protection autorizada, habilitada e confirmada pelo Advisor | Ocorrência histórica continua revogada e isolada por fingerprint; `auth_login_attempts` mantém aviso informativo intencional conforme ADR 008; rollback Auth é desligar a mesma opção; nenhuma mudança de dados/schema/RLS/Storage, commit ou push; Sprint 03 não iniciada |
-| 03 | planned | — | — | — | — | — |
+| 03 | completed | 2026-08-17 | 2026-08-17 | Codex | Matriz e adapter server-only versionados; lint/typecheck/32 arquivos e 152 Vitest/build com 20 rotas PASS; 57 pgTAP/invariantes/fotos PASS; smoke autenticado local de cinco papéis, telas, guards, dashboard, extratos e CSVs PASS; testes arquiteturais e auditoria do diff PASS | `avg_cleaning_hours` classificado como sensível contextual sem ampliar acesso; grants excessivos continuam conhecidos até a Sprint 05 e limites temporais continuam na Sprint 06; `output/` preexistente preservado; nenhuma mudança de banco/produção, commit ou push |
 | 04 | planned | — | — | — | — | — |
 | 05 | planned | — | — | — | — | — |
 | 06 | planned | — | — | — | — | — |

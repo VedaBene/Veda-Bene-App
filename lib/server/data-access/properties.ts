@@ -4,6 +4,10 @@ import { toPropertyFormData, toPropertyListItem } from '@/lib/server/view-models
 import type { PropertyListFilters } from '@/lib/server/validation/contracts'
 import type { PropertyFormData, PropertyListItem } from '@/lib/types/view-models'
 import type { SupabaseServerClient, Viewer } from './viewer'
+import {
+  loadPropertyDetailForAdministration,
+  loadPropertyListForAdministration,
+} from './sensitive-data'
 
 export type PropertyListResult = {
   items: PropertyListItem[]
@@ -22,8 +26,7 @@ export type PropertyFormOptions = {
 }
 
 function getPropertyListSelect(viewer: Viewer): string {
-  if (viewer.role === 'admin') return 'id, name, zone, address, client_type, base_price'
-  if (viewer.role === 'secretaria') return 'id, name, zone, address, client_type'
+  if (viewer.role === 'admin' || viewer.role === 'secretaria') return 'id, name, zone, address, client_type'
   return 'id, name, zone, address'
 }
 
@@ -51,7 +54,6 @@ function getPropertyDetailSelect(viewer: Viewer): string {
     ...(viewer.role === 'admin' || viewer.role === 'secretaria'
       ? ['client_type', 'agency_id', 'owner_id', 'phone']
       : []),
-    ...(viewer.role === 'admin' ? ['base_price', 'extra_per_person', 'avg_cleaning_hours'] : []),
   ].join(', ')
 }
 
@@ -60,6 +62,14 @@ export async function getPropertyList(
   viewer: Viewer,
   filters: PropertyListFilters,
 ): Promise<PropertyListResult> {
+  if (viewer.role === 'admin') {
+    const { rows, count } = await loadPropertyListForAdministration(filters)
+    return {
+      items: rows.map(property => toPropertyListItem(property, viewer.role)),
+      totalPages: Math.ceil(count / filters.pageSize),
+    }
+  }
+
   const page = Math.max(1, filters.page)
   const from = (page - 1) * filters.pageSize
   const to = from + filters.pageSize - 1
@@ -89,6 +99,11 @@ export async function getPropertyDetail(
   viewer: Viewer,
   id: string,
 ): Promise<PropertyFormData | null> {
+  if (viewer.role === 'admin') {
+    const property = await loadPropertyDetailForAdministration(id)
+    return property ? toPropertyFormData(property, viewer.role) : null
+  }
+
   const { data } = await supabase
     .from('properties')
     .select(getPropertyDetailSelect(viewer))
