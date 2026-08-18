@@ -1,6 +1,6 @@
 # ADR 017 — Guard de integridade para updates de Ordens de Serviço
 
-**Status**: Proposta; implementação local pronta e implantação remota pendente
+**Status**: Aceita e implantada em 2026-08-18
 **Data**: 2026-08-18
 
 ## Contexto
