@@ -60,6 +60,7 @@ async function authorizeBeforePrivilege(roles: Role[]) {
 }
 
 const idBatchSchema = z.array(postgresUuidSchema).max(MAX_ID_BATCH)
+const nullableOrderTotalSchema = z.number().finite().min(0).nullable()
 const propertyListFiltersSchema = z.object({
   page: z.number().int().min(1).max(1000),
   pageSize: pageSizeSchema,
@@ -342,6 +343,35 @@ export async function loadAuthorizedOrderPricingContext(
     extraServicesPrice: financialOrder.extra_services_price ?? null,
     property,
   }
+}
+
+export async function persistAuthorizedServiceOrderTotalPrice(
+  orderId: string,
+  totalPrice: number | null,
+): Promise<void> {
+  const id = postgresUuidSchema.parse(orderId)
+  const total_price = nullableOrderTotalSchema.parse(totalPrice)
+  const { scopedClient, privilegedClient } = await authorizeBeforePrivilege([
+    'admin',
+    'secretaria',
+    'limpeza',
+  ])
+
+  const { data: visibleOrder, error: visibleError } = await scopedClient
+    .from('service_orders')
+    .select('id')
+    .eq('id', id)
+    .maybeSingle()
+  if (visibleError) {
+    throw new Error('Não foi possível confirmar a ordem autorizada.', { cause: visibleError })
+  }
+  if (!visibleOrder) throw new Error('O.L. non trovato o non autorizzato.')
+
+  const { error } = await privilegedClient
+    .from('service_orders')
+    .update({ total_price })
+    .eq('id', id)
+  if (error) throw new Error('Não foi possível atualizar o preço da ordem.', { cause: error })
 }
 
 export type PayableOrderSource = {

@@ -15,6 +15,7 @@ import {
   loadAverageHoursForVisibleServiceOrders,
   loadEmployeeListForAdministration,
   loadPropertyListForAdministration,
+  persistAuthorizedServiceOrderTotalPrice,
 } from './sensitive-data'
 
 function authorize(role: Role, scoped: FakeSupabase, privileged: FakeSupabase) {
@@ -109,5 +110,33 @@ describe('authorized sensitive-data adapter', () => {
 
     expect(result.get(visibleId)).toBe(2)
     expect(result.has(hiddenId)).toBe(false)
+  })
+
+  it('persists only total_price after confirming the operational row through RLS', async () => {
+    const orderId = '00000000-0000-4000-8000-000000000040'
+    const scoped = new FakeSupabase({ service_orders: [{ id: orderId }] })
+    const privileged = new FakeSupabase({ service_orders: [{ id: orderId, total_price: 10 }] })
+    authorize('limpeza', scoped, privileged)
+
+    await persistAuthorizedServiceOrderTotalPrice(orderId, 125.5)
+
+    expect(scoped.selectCalls).toEqual([
+      { table: 'service_orders', columns: 'id', options: undefined },
+    ])
+    expect(privileged.updates).toEqual([{
+      table: 'service_orders',
+      values: { total_price: 125.5 },
+      filters: [{ kind: 'eq', column: 'id', value: orderId }],
+    }])
+  })
+
+  it('does not use the privileged write when the order is outside the viewer RLS scope', async () => {
+    const orderId = '00000000-0000-4000-8000-000000000041'
+    const privileged = new FakeSupabase({ service_orders: [{ id: orderId, total_price: 10 }] })
+    authorize('limpeza', new FakeSupabase({ service_orders: [] }), privileged)
+
+    await expect(persistAuthorizedServiceOrderTotalPrice(orderId, 125.5))
+      .rejects.toThrow('O.L. non trovato o non autorizzato.')
+    expect(privileged.updates).toEqual([])
   })
 })

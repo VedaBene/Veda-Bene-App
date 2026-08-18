@@ -256,7 +256,7 @@ async function reopenServiceOrderImpl(id: string) {
   if (error) return { success: false as const, error: error.message }
   if (!reopenedOrder) return { success: false as const, error: 'La O.L. è già stata riaperta da un altro operatore.' }
 
-  await recalculateOrderPricing(supabase, parsedId.data)
+  await recalculateOrderPricing(parsedId.data)
 
   revalidatePath('/service-orders')
   revalidatePath(`/service-orders/${parsedId.data}`)
@@ -375,7 +375,7 @@ async function finishCleaningImpl(id: string, notes: string, photoIds: string[] 
   if (error) return { success: false as const, error: error.message }
   if (!updatedOrder) return { success: false as const, error: 'La pulizia è già stata completata da un altro operatore.' }
 
-  await recalculateOrderPricing(supabase, parsedId.data)
+  await recalculateOrderPricing(parsedId.data)
 
   revalidatePath('/service-orders')
   revalidatePath(`/service-orders/${parsedId.data}`)

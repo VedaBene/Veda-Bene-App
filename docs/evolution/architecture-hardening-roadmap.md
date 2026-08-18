@@ -1,10 +1,10 @@
 # Roadmap ativo de endurecimento arquitetural
 
-**Status do programa:** Sprint 03 concluída; Sprint 04 não iniciada
+**Status do programa:** Sprint 04 com implementação local pronta; implantação remota pendente de autorização
 
 **Baseline da auditoria:** 2026-08-15
 
-**Última atualização:** 2026-08-17
+**Última atualização:** 2026-08-18
 
 **Nota técnica de referência:** 6,8/10
 
@@ -159,9 +159,9 @@ Estados permitidos: `planned`, `in_progress`, `completed`, `blocked` e
 |---|---:|---|---|---|---|
 | 00 | P0 | Baseline e protocolo persistentes | DB-0 | — | completed |
 | 01 | P0 | CI prova RLS/grants reais em banco descartável | DB-L | 00 | completed |
-| 02 | P0 | Build, segredos, dependências e Auth endurecidos | DB-0 / DB-C | 01 | planned |
-| 03 | P0 | Seams server-only preparados para o cutover | DB-0 | 02 | planned |
-| 04 | P0 | Alterações diretas indevidas de O.S. bloqueadas | DB-P | 03 | planned |
+| 02 | P0 | Build, segredos, dependências e Auth endurecidos | DB-0 / DB-C | 01 | completed |
+| 03 | P0 | Seams server-only preparados para o cutover | DB-0 | 02 | completed |
+| 04 | P0 | Alterações diretas indevidas de O.S. bloqueadas | DB-P | 03 | in_progress |
 | 05 | P0 | Colunas sensíveis protegidas contra Data API direta | DB-P | 04 | planned |
 | 06 | P1 | Períodos financeiros corretos em `Europe/Rome` | DB-0 | 05 | planned |
 | 07 | P1 | Bloqueio de login resistente à concorrência | DB-P | 06 | planned |
@@ -514,6 +514,13 @@ continuará funcionando quando os grants sensíveis forem removidos na Sprint 05
 
 ### Sprint 04 — Guard de integridade para updates de O.S.
 
+**Status:** in_progress — implementação local pronta em 2026-08-18; implantação
+remota pendente de autorização específica. Nenhum ambiente remoto foi acessado
+ou modificado nesta sprint.
+
+**Dossiê DB-P:**
+[`sprint-04-service-order-update-guard-db-p.md`](sprint-04-service-order-update-guard-db-p.md)
+
 **Objetivo:** impedir no banco que perfis operacionais alterem colunas fora das
 transições autorizadas, mesmo por chamada direta à Data API.
 
@@ -547,12 +554,13 @@ iguais.
 
 **Critérios de conclusão**
 
-- [ ] Dossiê DB-P completo e aplicação remota separadamente autorizada.
-- [ ] A migration não altera nem remove registros.
-- [ ] Row count, chaves e valores existentes são idênticos antes/depois.
-- [ ] Tentativas negativas falham no banco para cada papel operacional.
-- [ ] Admin/secretaria e transições legítimas passam nos testes existentes.
-- [ ] Locks, timeouts, plano de implantação e rollback não destrutivo foram
+- [x] Dossiê DB-P completo.
+- [ ] Aplicação remota separadamente autorizada, executada e validada.
+- [x] A migration não altera nem remove registros.
+- [x] Row count, chaves e valores existentes são idênticos antes/depois.
+- [x] Tentativas negativas falham no banco para cada papel operacional.
+- [x] Admin/secretaria e transições legítimas passam nos testes existentes.
+- [x] Locks, timeouts, plano de implantação e rollback não destrutivo foram
   ensaiados.
 
 ### Sprint 05 — Cutover da confidencialidade de colunas
@@ -577,7 +585,7 @@ impedir leitura direta de colunas sensíveis pela Data API.
 
 **Arquivos/componentes prováveis**
 
-- `docs/decisions/017-*.md` e `docs/decisions/README.md`
+- `docs/decisions/018-*.md` e `docs/decisions/README.md`
 - `supabase/migrations/<timestamp>_restrict_sensitive_column_grants.sql`
 - `supabase/tests/*column_privileges*.sql`
 - adapters/DAL preparados na Sprint 03
@@ -907,7 +915,7 @@ Nunca cole tokens, DSNs, emails, IPs, dados pessoais ou conteúdo de `.env`.
 | 01 | completed | 2026-08-16 | 2026-08-17 | Codex | `npm run test:supabase`: 57 pgTAP, três SQLs existentes e smoke de fotos PASS; lint/typecheck/29 arquivos e 141 Vitest/build PASS; diff e segredos revisados | Grants sensíveis e update amplo de `limpeza` comprovados como `[KNOWN UNSAFE]`; oito alvos TODO aguardam exclusivamente Sprints 04/05; CI remota não disparada sem commit/push |
 | 02 | completed | 2026-08-17 | 2026-08-17 | Codex | `.env*`/backups excluídos e imagem comprovada limpa; Gitleaks: 97 commits sem novo vazamento; Next 16.3.1 e Sentry 10.70.0; `npm audit` completo e produção: zero; lint/typecheck/30 arquivos e 145 Vitest/build/57 pgTAP PASS; Leaked Password Protection autorizada, habilitada e confirmada pelo Advisor | Ocorrência histórica continua revogada e isolada por fingerprint; `auth_login_attempts` mantém aviso informativo intencional conforme ADR 008; rollback Auth é desligar a mesma opção; nenhuma mudança de dados/schema/RLS/Storage, commit ou push; Sprint 03 não iniciada |
 | 03 | completed | 2026-08-17 | 2026-08-17 | Codex | Matriz e adapter server-only versionados; lint/typecheck/32 arquivos e 152 Vitest/build com 20 rotas PASS; 57 pgTAP/invariantes/fotos PASS; smoke autenticado local de cinco papéis, telas, guards, dashboard, extratos e CSVs PASS; testes arquiteturais e auditoria do diff PASS | `avg_cleaning_hours` classificado como sensível contextual sem ampliar acesso; grants excessivos continuam conhecidos até a Sprint 05 e limites temporais continuam na Sprint 06; `output/` preexistente preservado; nenhuma mudança de banco/produção, commit ou push |
-| 04 | planned | — | — | — | — | — |
+| 04 | in_progress | 2026-08-18 | — | Codex | Implementação local pronta: dossiê DB-P e ADR 017; migration incremental exercitada entre fingerprints idênticos; 103 pgTAP (46 do guard), invariantes e smoke de fotos PASS; lint Supabase sem erros; lint/typecheck/32 arquivos e 155 Vitest/build com 20 rotas PASS | Implantação remota pendente de autorização específica; sete TODOs de SELECT permanecem exclusivamente para a Sprint 05; nenhum ambiente remoto acessado ou modificado |
 | 05 | planned | — | — | — | — | — |
 | 06 | planned | — | — | — | — | — |
 | 07 | planned | — | — | — | — | — |
