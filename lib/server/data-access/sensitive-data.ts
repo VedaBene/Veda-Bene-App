@@ -10,6 +10,7 @@ import {
   pageSizeSchema,
   receivableStatementFiltersSchema,
 } from '@/lib/server/validation/contracts'
+import { romeDateRangeToUtcInterval } from '@/lib/utils/date-rome'
 import type { Role } from '@/lib/types/database'
 import type {
   EmployeeFormData,
@@ -399,12 +400,14 @@ export async function loadPayableFinancialSource(
     ? 'property:properties(name, avg_cleaning_hours)'
     : 'property:properties(avg_cleaning_hours)'
 
+  const { startUtc, nextDayUtc } = romeDateRangeToUtcInterval(parsed.startDate, parsed.endDate)
+
   let query = privilegedClient
     .from('service_orders')
     .select(`id, order_number, completed_at, cleaning_staff:profiles!service_order_cleaning_staff(id), ${propertySelect}`)
     .eq('status', 'done')
-    .gte('completed_at', parsed.startDate)
-    .lte('completed_at', parsed.endDate)
+    .gte('completed_at', startUtc)
+    .lt('completed_at', nextDayUtc)
   if (includePropertyName) query = query.order('completed_at', { ascending: true })
 
   const { data: orders, error: ordersError } = await query
@@ -504,20 +507,24 @@ export async function loadDashboardFinancialSource(
 ): Promise<DashboardFinancialSource> {
   const parsed = dashboardPeriodsSchema.parse(periods)
   const { privilegedClient } = await authorizeBeforePrivilege(['admin'])
+
+  const monthInterval = romeDateRangeToUtcInterval(parsed.monthStart, parsed.today)
+  const threeMonthsInterval = romeDateRangeToUtcInterval(parsed.threeMonthsAgoStart, parsed.today)
+
   const [properties, hours, revenue, topMonth, topYear, recentOrders] = await Promise.allSettled([
     privilegedClient.from('service_orders').select('property_id').eq('status', 'done')
-      .gte('completed_at', parsed.monthStart).lte('completed_at', parsed.today),
+      .gte('completed_at', monthInterval.startUtc).lt('completed_at', monthInterval.nextDayUtc),
     privilegedClient.from('service_orders').select('worked_minutes, property:properties(avg_cleaning_hours)')
-      .eq('status', 'done').gte('completed_at', parsed.monthStart).lte('completed_at', parsed.today),
+      .eq('status', 'done').gte('completed_at', monthInterval.startUtc).lt('completed_at', monthInterval.nextDayUtc),
     privilegedClient.from('service_orders').select('total_price').eq('status', 'done')
-      .gte('completed_at', parsed.monthStart).lte('completed_at', parsed.today),
+      .gte('completed_at', monthInterval.startUtc).lt('completed_at', monthInterval.nextDayUtc),
     privilegedClient.from('service_orders').select('property_id, property:properties(id, name)')
       .eq('status', 'done').gte('cleaning_date', parsed.monthStart).lte('cleaning_date', parsed.today),
     privilegedClient.from('service_orders').select('property_id, property:properties(id, name)')
       .eq('status', 'done').gte('cleaning_date', parsed.yearStart).lte('cleaning_date', parsed.today),
     privilegedClient.from('service_orders')
       .select('completed_at, total_price, cleaning_staff:profiles!service_order_cleaning_staff(id), worked_minutes, property:properties(avg_cleaning_hours)')
-      .eq('status', 'done').gte('completed_at', parsed.threeMonthsAgoStart).lte('completed_at', parsed.today),
+      .eq('status', 'done').gte('completed_at', threeMonthsInterval.startUtc).lt('completed_at', threeMonthsInterval.nextDayUtc),
   ])
 
   const recentValue = recentOrders.status === 'fulfilled'

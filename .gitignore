@@ -25,6 +25,7 @@
 *.pem
 /supabase/.temp
 /supabase/.branches
+/output
 
 # debug
 npm-debug.log*

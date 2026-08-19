@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { FakeSupabase } from '@/test/fake-supabase'
 import {
+  getDashboardReportingData,
   getPayableDetailRows as getAuthorizedPayableDetailRows,
   getPayableStatementRows as getAuthorizedPayableStatementRows,
 } from './financial'
@@ -8,10 +9,12 @@ import type { SupabaseServerClient } from '@/lib/server/data-access/viewer'
 
 const sensitiveDataMocks = vi.hoisted(() => ({
   loadPayableFinancialSource: vi.fn(),
+  loadDashboardFinancialSource: vi.fn(),
 }))
 
 vi.mock('@/lib/server/data-access/sensitive-data', () => ({
   loadPayableFinancialSource: sensitiveDataMocks.loadPayableFinancialSource,
+  loadDashboardFinancialSource: sensitiveDataMocks.loadDashboardFinancialSource,
 }))
 
 const filters = {
@@ -120,7 +123,6 @@ describe('canonical financial reporting producers', () => {
       ],
     })
 
-    // Esperado: 4 horas divididas por 2 = 2 horas para cada
     await expect(getPayableDetailRows(asSupabase(fake), filters)).resolves.toEqual([
       {
         employee_id: 'staff-1',
@@ -213,4 +215,50 @@ describe('canonical financial reporting producers', () => {
     await expect(getPayableStatementRows(asSupabase(fake), filters)).resolves.toEqual([])
   })
 
+  it('correctly aggregates dashboard monthly stats grouping completed_at by Rome calendar month', async () => {
+    sensitiveDataMocks.loadDashboardFinancialSource.mockResolvedValue({
+      properties: { status: 'fulfilled', value: { data: [{ property_id: 'p1' }] } },
+      hours: { status: 'fulfilled', value: { data: [{ worked_minutes: 120, property: { avg_cleaning_hours: 2 } }] } },
+      revenue: { status: 'fulfilled', value: { data: [{ total_price: 150 }] } },
+      topMonth: { status: 'fulfilled', value: { data: [{ property_id: 'p1', property: { id: 'p1', name: 'Campo' } }] } },
+      topYear: { status: 'fulfilled', value: { data: [{ property_id: 'p1', property: { id: 'p1', name: 'Campo' } }] } },
+      recentOrders: {
+        status: 'fulfilled',
+        value: {
+          data: [
+            {
+              // 22:30 UTC on 31/07 is 00:30 on 01/08 in Rome (CEST) -> belongs to August
+              completed_at: '2026-07-31T22:30:00.000Z',
+              total_price: 200,
+              cleaning_staff: [{ id: 'staff-1' }],
+              worked_minutes: 60,
+              property: { avg_cleaning_hours: 1 },
+            },
+          ],
+        },
+      },
+      profiles: {
+        status: 'fulfilled',
+        value: {
+          data: [
+            { id: 'staff-1', full_name: 'Ana', hourly_rate: 20, monthly_salary: null },
+          ],
+        },
+      },
+    })
+
+    const dashboard = await getDashboardReportingData()
+
+    expect(dashboard.propertiesThisMonth).toBe(1)
+    expect(dashboard.hoursThisMonth).toBe(2)
+    expect(dashboard.revenueThisMonth).toBe(150)
+    expect(dashboard.topMonth).toHaveLength(1)
+    expect(dashboard.topYear).toHaveLength(1)
+
+    // Verify monthly stats
+    const augStat = dashboard.revenueByMonth.find(m => m.month === '2026-08')
+    if (augStat) {
+      expect(augStat.value).toBe(200)
+    }
+  })
 })

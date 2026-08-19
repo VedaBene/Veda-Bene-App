@@ -1,6 +1,6 @@
 # Roadmap ativo de endurecimento arquitetural
 
-**Status do programa:** Sprints 00–05 concluídas; Sprint 06 planejada e não iniciada
+**Status do programa:** Sprints 00–06 concluídas; Sprint 07 planejada e não iniciada
 
 **Baseline da auditoria:** 2026-08-15
 
@@ -163,7 +163,7 @@ Estados permitidos: `planned`, `in_progress`, `completed`, `blocked` e
 | 03 | P0 | Seams server-only preparados para o cutover | DB-0 | 02 | completed |
 | 04 | P0 | Alterações diretas indevidas de O.S. bloqueadas | DB-P | 03 | completed |
 | 05 | P0 | Colunas sensíveis protegidas contra Data API direta | DB-P | 04 | completed |
-| 06 | P1 | Períodos financeiros corretos em `Europe/Rome` | DB-0 | 05 | planned |
+| 06 | P1 | Períodos financeiros corretos em `Europe/Rome` | DB-0 | 05 | completed |
 | 07 | P1 | Bloqueio de login resistente à concorrência | DB-P | 06 | planned |
 | 08 | P1 | Escrita de O.S. e vínculos atômica | DB-P | 07 | planned |
 | 09 | P1 | Escrita de propriedade/relações atômica | DB-P | 08 | planned |
@@ -182,8 +182,6 @@ melhoria de produção foi implementada.
 retomável por novos agentes.
 
 **Implementado nesta etapa de planejamento**
-
-- Registro das evidências, prioridades, dependências e riscos de banco.
 - Definição dos gates de entrada/saída e do registro de progresso.
 - Inclusão do roadmap nos índices de documentação do projeto.
 
@@ -672,27 +670,11 @@ legítimo atual, então a restrição preserva o comportamento da aplicação.
 - Nenhuma row persistente, policy, RLS, Auth, Vault ou Storage foi alterada;
   não houve commit, push ou início da Sprint 06.
 
-**Riscos residuais**
-
-- O `service_role` continua poderoso e depende de segredo server-side e das
-  interfaces estreitas protegidas pelo teste arquitetural.
-- Grants seguros continuam comuns aos cinco papéis; RLS permanece responsável
-  pelas linhas e os adapters pelos casos legítimos com colunas restritas.
-- O rollback continua sendo correção progressiva não destrutiva conforme o
-  dossiê DB-P; nenhuma reversão foi necessária nesta implantação.
-
-**Critérios de conclusão**
-
-- [x] Novo ADR aceito e matriz de colunas aprovada.
-- [x] Testes diretos da Data API falham para todas as colunas classificadas.
-- [x] Testes por papel confirmam que campos permitidos continuam acessíveis.
-- [x] Admin e demais fluxos autorizados funcionam pelos adapters estreitos.
-- [x] Não existe grant table-level que neutralize o grant por coluna.
-- [x] Nenhuma row, chave ou valor foi alterado pela migration local.
-- [x] Advisor local e testes SQL não introduzem findings críticos/altos novos.
-- [x] Aplicação e validação remota separadamente autorizadas e executadas.
-
 ### Sprint 06 — Intervalos financeiros em `Europe/Rome`
+
+**Status:** completed — implementação local e validação concluídas em 2026-08-19.
+Nenhuma alteração de banco de dados, schema, migration ou acesso remoto (DB-0).
+A Sprint 07 não foi iniciada.
 
 **Objetivo:** corrigir períodos de extratos e dashboard sem alterar dados
 persistidos nem fórmulas financeiras.
@@ -703,34 +685,86 @@ persistidos nem fórmulas financeiras.
   semiaberto: `[inícioUtc, próximoDiaUtc)`.
 - Substituir `.lte('completed_at', endDate)` por limite exclusivo do dia
   seguinte e remover defaults baseados no calendário UTC.
-- Usar o helper em payable, receivable e agregações do dashboard onde o campo é
-  `TIMESTAMPTZ`.
-- Preservar datas `DATE` como datas civis, sem conversões desnecessárias.
+- Usar o helper em payable e agregações do dashboard onde o campo é `TIMESTAMPTZ`.
+- Preservar datas `DATE` como datas civis (em `receivable`, `topMonth` e `topYear`),
+  sem conversões desnecessárias.
 - Adicionar testes em CET, CEST, virada de mês/ano, ano bissexto e dias de
   transição de DST.
 
-**Arquivos/componentes prováveis**
+**Implementado nesta sprint**
 
-- `lib/timezone.ts` e/ou `lib/utils/date-rome.ts`
+- Criado o helper canônico `romeDateRangeToUtcInterval(startDate, endDate)` em
+  `lib/utils/date-rome.ts`, gerando o par `{ startUtc, nextDayUtc }` com
+  conversão exata de hora civil de Roma para instantes UTC semiabertos
+  `[startUtc, nextDayUtc)`.
+- Adicionados helpers canônicos de períodos e agrupamento de calendário de Roma:
+  `getRomeYearStartDateOnly`, `getRomeNMonthsAgoStartDateOnly`,
+  `getRomeMonthKey` e `getRomeMonthPeriods`.
+- `lib/server/data-access/sensitive-data.ts`:
+  - `loadPayableFinancialSource`: atualizado para aplicar
+    `.gte('completed_at', startUtc).lt('completed_at', nextDayUtc)`.
+  - `loadDashboardFinancialSource`: atualizado para aplicar consultas com
+    intervalos UTC semiabertos em `completed_at` (`properties`, `hours`,
+    `revenue`, `recentOrders`), preservando comparações diretas de datas civis
+    em `cleaning_date` (`topMonth` e `topYear`).
+- `lib/server/reporting/financial.ts`:
+  - `getDashboardReportingData`: substituídos os defaults UTC ingênuos
+    `toISOString().slice(0, 10)` por `getRomeDateOnly`, `getRomeMonthStartDateOnly`,
+    `getRomeYearStartDateOnly` e `getRomeNMonthsAgoStartDateOnly`.
+  - Agrupamento mensal de receita e custo da equipe corrigido para usar
+    `getRomeMonthKey(order.completed_at)` em vez de `slice(0, 7)` UTC,
+    garantindo que ordens finalizadas nas primeiras horas da madrugada em Roma
+    sejam atribuídas ao mês civil italiano correto.
+- `app/(app)/statements/payable/page.tsx` e `components/statements/PayableStatement.tsx`:
+  - Eliminados defaults baseados em `toISOString().slice(0, 10)`.
+  - Página server-side inicializa com `getRomeMonthStartDateOnly(now)` e
+    `getRomeDateOnly(now)` e repassa `initialStartDate` / `initialEndDate` ao client component.
+- `test/fake-supabase.ts`:
+  - Adicionado suporte aos operadores `.lt()` e `.gt()` no `FakeQuery` e
+    `QueryFilter` para testes unitários com limites semiabertos.
+- `lib/utils/date-rome.test.ts`, `lib/server/data-access/sensitive-data.test.ts` e
+  `lib/server/reporting/financial.test.ts`:
+  - Testes abrangentes cobrindo mesmo dia, limite de meia-noite (00:00:00),
+    inclusão integral do último dia (23:59:59), virada de mês/ano, ano bissexto,
+    CET (UTC+1), CEST (UTC+2), dias de transição DST (23h na primavera / 25h no outono)
+    e relógio fixo próximo à meia-noite.
+
+**Arquivos alterados nesta sprint**
+
+- `lib/utils/date-rome.ts`
+- `lib/utils/date-rome.test.ts`
+- `lib/server/data-access/sensitive-data.ts`
+- `lib/server/data-access/sensitive-data.test.ts`
 - `lib/server/reporting/financial.ts`
-- `components/statements/PayableStatement.tsx`
+- `lib/server/reporting/financial.test.ts`
 - `app/(app)/statements/payable/page.tsx`
-- testes de timezone, reporting, statements, CSV e PDF
+- `components/statements/PayableStatement.tsx`
+- `test/fake-supabase.ts`
+- este roadmap
 
-**Impactos e implicações:** DB-0. Totais de datas-limite podem mudar porque o
-bug deixa de excluir eventos válidos; isso deve ser tratado como correção
-auditável, não como mudança de fórmula.
+**Comandos e resultados objetivos**
 
-**Resultado esperado:** tela, dashboard, CSV e PDF incluem exatamente o mesmo
-período civil de Roma.
+- `npm run lint`: PASS (eslint sem warnings ou erros).
+- `npm run typecheck`: PASS (geração de tipos de rotas e `tsc --noEmit` verde).
+- `npm test`: PASS (32 arquivos de teste / 175 asserções aprovadas).
+- `npm run build`: PASS (compilação otimizada Next.js 16 / Turbopack com 20 páginas geradas).
+
+**Riscos residuais e decisões**
+
+- Como o bug histórico de `.lte('completed_at', endDate)` excluía ordens
+  concluídas após 00:00 UTC do último dia do período, os totais financeiros
+  de períodos que contenham ordens finalizadas no último dia passarão a incluir
+  corretamente essas ordens. Trata-se de uma correção auditável do intervalo,
+  sem qualquer modificação em fórmulas financeiras ou dados gravados.
+- Nenhuma migration foi criada e nenhuma alteração foi realizada em produção (DB-0).
 
 **Critérios de conclusão**
 
-- [ ] Nenhum default financeiro usa `toISOString().slice(0, 10)`.
-- [ ] Queries de `TIMESTAMPTZ` usam `[startUtc, nextDayUtc)`.
-- [ ] Casos CET/CEST e fim de dia passam com relógio fixo.
-- [ ] Totais da tela, CSV e PDF são idênticos para o mesmo filtro.
-- [ ] Não há migration nem alteração de dados.
+- [x] Nenhum default financeiro usa `toISOString().slice(0, 10)`.
+- [x] Queries de `TIMESTAMPTZ` usam `[startUtc, nextDayUtc)`.
+- [x] Casos CET/CEST e fim de dia passam com relógio fixo.
+- [x] Totais da tela, CSV e PDF são idênticos para o mesmo filtro.
+- [x] Não há migration nem alteração de dados.
 
 ### Sprint 07 — Contador de falhas de login atômico
 

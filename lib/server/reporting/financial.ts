@@ -16,23 +16,19 @@ import {
   loadPayableFinancialSource,
   type StaffCompensationSource,
 } from '@/lib/server/data-access/sensitive-data'
+import {
+  getRomeDateOnly,
+  getRomeMonthKey,
+  getRomeMonthPeriods,
+  getRomeMonthStartDateOnly,
+  getRomeNMonthsAgoStartDateOnly,
+  getRomeYearStartDateOnly,
+} from '@/lib/utils/date-rome'
 
 type StaffProfile = StaffCompensationSource
 
 function roundMoney(value: number): number {
   return Math.round(value * 100) / 100
-}
-
-function datePrefix(date: string | null): string {
-  return date?.slice(0, 7) ?? ''
-}
-
-function monthKey(date: Date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-}
-
-function monthLabel(date: Date) {
-  return date.toLocaleString('pt-BR', { month: 'short' }).replace('.', '')
 }
 
 function unwrap<T>(
@@ -210,10 +206,10 @@ function getTopProperties(
 
 export async function getDashboardReportingData(): Promise<DashboardData> {
   const now = new Date()
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10)
-  const today = now.toISOString().slice(0, 10)
-  const yearStart = new Date(now.getFullYear(), 0, 1).toISOString().slice(0, 10)
-  const threeMonthsAgoStart = new Date(now.getFullYear(), now.getMonth() - 2, 1).toISOString().slice(0, 10)
+  const today = getRomeDateOnly(now)
+  const monthStart = getRomeMonthStartDateOnly(now)
+  const yearStart = getRomeYearStartDateOnly(now)
+  const threeMonthsAgoStart = getRomeNMonthsAgoStartDateOnly(2, now)
 
   const source = await loadDashboardFinancialSource({ monthStart, today, yearStart, threeMonthsAgoStart })
   const propertiesRes = source.properties
@@ -256,17 +252,14 @@ export async function getDashboardReportingData(): Promise<DashboardData> {
     property: { avg_cleaning_hours: number | null } | null
   }>(recentOrdersRes, 'recent_orders')
 
-  const months = Array.from({ length: 3 }, (_, i) => {
-    const d = new Date(now.getFullYear(), now.getMonth() - (2 - i), 1)
-    return { key: monthKey(d), label: monthLabel(d) }
-  })
+  const months = getRomeMonthPeriods(3, now)
 
   const revenueByMonth: MonthStat[] = months.map(({ key, label }) => ({
     month: key,
     label,
     value: roundMoney(
       recentOrders
-        .filter(order => datePrefix(order.completed_at) === key)
+        .filter(order => order.completed_at && getRomeMonthKey(order.completed_at) === key)
         .reduce((sum, order) => sum + (order.total_price ?? 0), 0),
     ),
   }))
@@ -275,7 +268,9 @@ export async function getDashboardReportingData(): Promise<DashboardData> {
   const profilesMap = new Map(profilesData.map(profile => [profile.id, profile]))
 
   const staffCostByMonth: MonthStat[] = months.map(({ key, label }) => {
-    const monthOrders = recentOrders.filter(order => datePrefix(order.completed_at) === key)
+    const monthOrders = recentOrders.filter(
+      order => order.completed_at && getRomeMonthKey(order.completed_at) === key,
+    )
     let cost = 0
 
     for (const order of monthOrders) {

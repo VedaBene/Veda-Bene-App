@@ -3,7 +3,9 @@ type Row = Record<string, unknown>
 type QueryFilter =
   | { kind: 'eq'; column: string; value: unknown }
   | { kind: 'gte'; column: string; value: unknown }
+  | { kind: 'gt'; column: string; value: unknown }
   | { kind: 'lte'; column: string; value: unknown }
+  | { kind: 'lt'; column: string; value: unknown }
   | { kind: 'in'; column: string; values: unknown[] }
   | { kind: 'or'; clauses: { column: string; value: unknown }[] }
 
@@ -61,8 +63,18 @@ export class FakeQuery implements PromiseLike<{ data: Row[] | Row | null; count:
     return this
   }
 
+  gt(column: string, value: unknown): this {
+    this.filters.push({ kind: 'gt', column, value })
+    return this
+  }
+
   lte(column: string, value: unknown): this {
     this.filters.push({ kind: 'lte', column, value })
+    return this
+  }
+
+  lt(column: string, value: unknown): this {
+    this.filters.push({ kind: 'lt', column, value })
     return this
   }
 
@@ -144,8 +156,12 @@ function matchesFilter(row: Row, filter: QueryFilter): boolean {
       return row[filter.column] === filter.value
     case 'gte':
       return row[filter.column] != null && String(row[filter.column]) >= String(filter.value)
+    case 'gt':
+      return row[filter.column] != null && String(row[filter.column]) > String(filter.value)
     case 'lte':
       return row[filter.column] != null && String(row[filter.column]) <= String(filter.value)
+    case 'lt':
+      return row[filter.column] != null && String(row[filter.column]) < String(filter.value)
     case 'in':
       return filter.values.includes(row[filter.column])
     case 'or':

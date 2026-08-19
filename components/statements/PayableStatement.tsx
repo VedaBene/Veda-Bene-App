@@ -7,28 +7,24 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Download, FileText, Filter, Wallet } from 'lucide-react'
 import type { EmployeeOption, PayableRow } from '@/lib/types/reporting'
-
-function today() {
-  return new Date().toISOString().slice(0, 10)
-}
-
-function firstOfMonth() {
-  const d = new Date()
-  return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10)
-}
+import { getRomeDateOnly, getRomeMonthStartDateOnly } from '@/lib/utils/date-rome'
 
 const inputCls =
   'px-3 py-2.5 border border-input-border rounded-lg text-sm text-foreground bg-white transition-all duration-200 focus:ring-2 focus:ring-input-focus/20 focus:border-input-focus outline-none'
 
 export function PayableStatement({
   initial,
+  initialStartDate,
+  initialEndDate,
   employees,
 }: {
   initial: PayableRow[]
+  initialStartDate?: string
+  initialEndDate?: string
   employees: EmployeeOption[]
 }) {
-  const [startDate, setStartDate] = useState(firstOfMonth())
-  const [endDate, setEndDate] = useState(today())
+  const [startDate, setStartDate] = useState(initialStartDate ?? getRomeMonthStartDateOnly())
+  const [endDate, setEndDate] = useState(initialEndDate ?? getRomeDateOnly())
   const [employeeId, setEmployeeId] = useState<string>('all')
   const [data, setData] = useState(initial)
   const [isPending, startTransition] = useTransition()

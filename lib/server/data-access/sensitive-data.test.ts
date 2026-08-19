@@ -13,7 +13,9 @@ vi.mock('./viewer', () => ({ getCurrentViewer: mocks.getCurrentViewer }))
 import {
   loadAuthorizedServiceOrderPropertyOptions,
   loadAverageHoursForVisibleServiceOrders,
+  loadDashboardFinancialSource,
   loadEmployeeListForAdministration,
+  loadPayableFinancialSource,
   loadPropertyListForAdministration,
   persistAuthorizedServiceOrderTotalPrice,
 } from './sensitive-data'
@@ -138,5 +140,83 @@ describe('authorized sensitive-data adapter', () => {
     await expect(persistAuthorizedServiceOrderTotalPrice(orderId, 125.5))
       .rejects.toThrow('O.L. non trovato o non autorizzato.')
     expect(privileged.updates).toEqual([])
+  })
+
+  it('queries payable financial source with exact Rome UTC half-open boundaries', async () => {
+    const privileged = new FakeSupabase({
+      service_orders: [
+        {
+          id: '00000000-0000-4000-8000-000000000050',
+          order_number: 50,
+          status: 'done',
+          completed_at: '2026-07-31T22:30:00.000Z', // 00:30 CEST on 2026-08-01 (included)
+          cleaning_staff: [{ id: '00000000-0000-4000-8000-000000000001' }],
+          property: { name: 'Campo', avg_cleaning_hours: 3 },
+        },
+        {
+          id: '00000000-0000-4000-8000-000000000051',
+          order_number: 51,
+          status: 'done',
+          completed_at: '2026-08-31T21:45:00.000Z', // 23:45 CEST on 2026-08-31 (included)
+          cleaning_staff: [{ id: '00000000-0000-4000-8000-000000000001' }],
+          property: { name: 'Navona', avg_cleaning_hours: 2 },
+        },
+        {
+          id: '00000000-0000-4000-8000-000000000052',
+          order_number: 52,
+          status: 'done',
+          completed_at: '2026-08-31T22:00:00.000Z', // 00:00 CEST on 2026-09-01 (excluded by .lt)
+          cleaning_staff: [{ id: '00000000-0000-4000-8000-000000000001' }],
+          property: { name: 'Colosseo', avg_cleaning_hours: 4 },
+        },
+        {
+          id: '00000000-0000-4000-8000-000000000053',
+          order_number: 53,
+          status: 'done',
+          completed_at: '2026-07-31T21:59:59.000Z', // 23:59 CEST on 2026-07-31 (excluded by .gte)
+          cleaning_staff: [{ id: '00000000-0000-4000-8000-000000000001' }],
+          property: { name: 'Vaticano', avg_cleaning_hours: 5 },
+        },
+      ],
+      profiles: [
+        {
+          id: '00000000-0000-4000-8000-000000000001',
+          full_name: 'Ana',
+          hourly_rate: 15,
+          monthly_salary: null,
+        },
+      ],
+    })
+    authorize('admin', new FakeSupabase({}), privileged)
+
+    const result = await loadPayableFinancialSource(
+      { startDate: '2026-08-01', endDate: '2026-08-31' },
+      true,
+    )
+
+    expect(result.orders).toHaveLength(2)
+    expect(result.orders.map(o => o.order_number)).toEqual([50, 51])
+  })
+
+  it('queries dashboard financial sources separating TIMESTAMPTZ UTC intervals from DATE boundaries', async () => {
+    const privileged = new FakeSupabase({
+      service_orders: [],
+      profiles: [],
+    })
+    authorize('admin', new FakeSupabase({}), privileged)
+
+    const result = await loadDashboardFinancialSource({
+      monthStart: '2026-08-01',
+      today: '2026-08-15',
+      yearStart: '2026-01-01',
+      threeMonthsAgoStart: '2026-06-01',
+    })
+
+    expect(result.properties.status).toBe('fulfilled')
+    expect(result.hours.status).toBe('fulfilled')
+    expect(result.revenue.status).toBe('fulfilled')
+    expect(result.topMonth.status).toBe('fulfilled')
+    expect(result.topYear.status).toBe('fulfilled')
+    expect(result.recentOrders.status).toBe('fulfilled')
   })
 })
