@@ -1,18 +1,21 @@
 # Matriz canônica de dados sensíveis
 
-**Status:** aprovada para a Sprint 03
-**Data:** 2026-08-17
-**Escopo:** comportamento atual da aplicação antes do cutover de grants da Sprint 05
+**Status:** matriz final da Sprint 05; implementação, aplicação e validação
+remota concluídas em 2026-08-19
+**Data:** 2026-08-19
+**Escopo:** contrato preservado pela aplicação e pelo cutover de grants da Sprint 05
 
 Esta matriz define os acessos que a aplicação precisa preservar quando os
-grants de leitura forem restringidos. Ela não concede acesso novo, não altera
-RLS/grants e formaliza a decisão de compatibilidade da Sprint 03. Toda leitura
+grants de leitura forem restringidos. Ela não concede acesso novo nem altera
+RLS; formaliza a compatibilidade preparada na Sprint 03 e o contrato final da
+Sprint 05. Toda leitura
 privilegiada abaixo pertence a `lib/server/data-access/sensitive-data.ts`, que
 autentica, obtém o papel por `profiles.role`, autoriza e valida entradas antes
 de criar o client que ignora RLS.
 
 | Tabela | Campo sensível | Papéis autorizados no caso de uso | Caso de uso | Operação/camada responsável | DTO mínimo | Consumidores |
 |---|---|---|---|---|---|---|
+| `profiles` | `email`, `phone`, `birth_date`, `nationality`, `address` | `admin` | Administrar dados pessoais de funcionários | `loadEmployeeListForAdministration`, `loadEmployeeDetailForAdministration` | `EmployeeListItem`, `EmployeeFormData` | `/employees`, `/employees/[id]`, `EmployeeList`, `EmployeeForm` |
 | `profiles` | `hourly_rate`, `monthly_salary`, `overtime_rate` | `admin` | Administrar cadastro e remuneração | `loadEmployeeListForAdministration`, `loadEmployeeDetailForAdministration` | `EmployeeListItem`, `EmployeeFormData` | `/employees`, `/employees/[id]`, `EmployeeList`, `EmployeeForm` |
 | `profiles` | `hourly_rate`, `monthly_salary` | `admin` | Produzir A Pagar e custo de equipe no dashboard | `loadPayableFinancialSource`, `loadDashboardFinancialSource` | `StaffCompensationSource` convertido em `PayableRow`, `PayableDetailRow` e `DashboardData` | actions de extratos, CSV/PDF A Pagar, dashboard |
 | `properties` | `base_price` | `admin` | Listar/editar imóveis com preço | `loadPropertyListForAdministration`, `loadPropertyDetailForAdministration` | `PropertyListItem`, `PropertyFormData` | páginas e formulários de imóveis |
@@ -25,6 +28,34 @@ de criar o client que ignora RLS.
 | `service_orders` | `pricing_mode`, `extra_services_price`, `total_price` | `admin`, `secretaria`, `limpeza` apenas no recálculo autorizado da O.S. visível | Recalcular e persistir `total_price` server-side | `loadAuthorizedOrderPricingContext`, `persistAuthorizedServiceOrderTotalPrice` | `OrderPricingContext`; nenhum valor-base é retornado ao navegador; persistência privilegiada limitada a `total_price` após autorização e prova de visibilidade via RLS | `recalculateOrderPricing` e actions de O.S. |
 | `service_orders` | `total_price`, `extra_services_price`, `consegna_fee` | `admin` | A Receber e dashboard financeiro | `loadReceivableFinancialSource`, `loadDashboardFinancialSource` | `ReceivableReport`, `DashboardData` | dashboard, extrato A Receber, CSV/PDF |
 
+## Contrato de grants da Sprint 05
+
+O role PostgreSQL `authenticated` não possui mais `SELECT` de tabela nas três
+tabelas no baseline local da Sprint 05. Ele recebe somente estas colunas:
+
+- `profiles`: `id`, `full_name`, `role`, `created_at`;
+- `properties`: todas as colunas atuais exceto `base_price`,
+  `extra_per_person` e `avg_cleaning_hours`;
+- `service_orders`: todas as colunas atuais exceto `total_price`,
+  `extra_services_description`, `extra_services_price` e `consegna_fee`.
+
+Assim, `pricing_mode`, notas operacionais e campos necessários a joins/listas
+permanecem diretos e sujeitos a RLS. Até `admin` obtém as colunas restritas
+somente pelos casos de uso server-only acima. A lista exata de colunas seguras,
+preconditions e postconditions está no
+[`dossiê DB-P da Sprint 05`](evolution/sprint-05-column-confidentiality-cutover-db-p.md).
+
+O preflight remoto também encontrou `TRUNCATE`, `REFERENCES`, `TRIGGER` e
+`MAINTAIN` table-level concedidos a `authenticated`. A migration os revoga por
+não possuírem uso legítimo na aplicação. `INSERT`, `UPDATE` e `DELETE` são
+preservados para manter o CRUD atual, ainda submetido a RLS, validação
+server-side e ao guard de O.S. da Sprint 04.
+
+A combinação anterior de `profiles_secretaria_select` e
+`profiles_staff_peer_select` com grant table-level também expunha PII de perfis
+fora do contrato da UI. Essas cinco colunas foram incluídas na matriz final
+porque o adapter administrativo já atende o único uso legítimo atual.
+
 ## Invariantes de autorização
 
 - O papel nunca é aceito como argumento da operação privilegiada.
@@ -36,8 +67,8 @@ de criar o client que ignora RLS.
 - Nenhuma operação aceita tabela, coluna, string de `select` ou escopo livre.
 - Os DTOs existentes continuam sendo a fronteira enviada ao navegador.
 - Escritas atuais de propriedades, remuneração e O.S. continuam nas Server
-  Actions autenticadas e sujeitas ao RLS/grants atuais; a Sprint 03 não altera
-  grants nem transforma o adapter em um proxy genérico de mutação.
+  Actions autenticadas e sujeitas a RLS/grants; os grants de `INSERT`, `UPDATE`
+  e `DELETE` são preservados e o adapter não se torna proxy genérico de mutação.
 
 ## Decisão de compatibilidade para `avg_cleaning_hours`
 
@@ -53,14 +84,13 @@ exclusivos de `admin`; como estimativa operacional, o valor só pode acompanhar
 uma opção ou O.S. que o papel já pode ver, com o escopo confirmado primeiro por
 RLS. `cliente` não recebe o catálogo de opções, apenas a estimativa ligada à sua
 própria O.S. visível. Essa decisão preserva o contrato anterior sem ampliar
-papéis, linhas ou consumidores. A ADR 002 permanece histórica; o novo ADR da
-Sprint 05 deverá registrar explicitamente essa classificação ao definir o
-cutover de grants.
+papéis, linhas ou consumidores. A ADR 018 registra essa classificação e
+supersede a ADR 002 sem editar seu histórico.
 
 ## Fora do escopo desta matriz
 
 - Dados básicos já protegidos por RLS e sem classificação financeira.
 - Fotos e objetos de Storage, que possuem adapter e contrato próprios.
 - Lockout de login, cujo uso privado de privilégio pertence à Sprint 07.
-- Qualquer mudança de schema, RLS, policy, grant, função, trigger, Auth ou
-  Storage.
+- Qualquer mudança de schema, RLS, policy, função, trigger, Auth ou Storage;
+  grants de `INSERT`, `UPDATE` e `DELETE` também permanecem inalterados.

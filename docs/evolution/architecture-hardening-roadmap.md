@@ -1,10 +1,10 @@
 # Roadmap ativo de endurecimento arquitetural
 
-**Status do programa:** Sprint 04 concluída; Sprint 05 planejada e não iniciada
+**Status do programa:** Sprints 00–05 concluídas; Sprint 06 planejada e não iniciada
 
 **Baseline da auditoria:** 2026-08-15
 
-**Última atualização:** 2026-08-18
+**Última atualização:** 2026-08-19
 
 **Nota técnica de referência:** 6,8/10
 
@@ -162,7 +162,7 @@ Estados permitidos: `planned`, `in_progress`, `completed`, `blocked` e
 | 02 | P0 | Build, segredos, dependências e Auth endurecidos | DB-0 / DB-C | 01 | completed |
 | 03 | P0 | Seams server-only preparados para o cutover | DB-0 | 02 | completed |
 | 04 | P0 | Alterações diretas indevidas de O.S. bloqueadas | DB-P | 03 | completed |
-| 05 | P0 | Colunas sensíveis protegidas contra Data API direta | DB-P | 04 | planned |
+| 05 | P0 | Colunas sensíveis protegidas contra Data API direta | DB-P | 04 | completed |
 | 06 | P1 | Períodos financeiros corretos em `Europe/Rome` | DB-0 | 05 | planned |
 | 07 | P1 | Bloqueio de login resistente à concorrência | DB-P | 06 | planned |
 | 08 | P1 | Escrita de O.S. e vínculos atômica | DB-P | 07 | planned |
@@ -566,6 +566,12 @@ iguais.
 
 ### Sprint 05 — Cutover da confidencialidade de colunas
 
+**Status:** completed — implementação local, aplicação e validação remota
+concluídas em 2026-08-19; Sprint 06 não iniciada.
+
+**Dossiê DB-P:**
+[`sprint-05-column-confidentiality-cutover-db-p.md`](sprint-05-column-confidentiality-cutover-db-p.md)
+
 **Objetivo:** retirar da ADR 002 a responsabilidade de ser a única defesa e
 impedir leitura direta de colunas sensíveis pela Data API.
 
@@ -601,15 +607,90 @@ de aplicação preparada na Sprint 03 é o ponto de rollback compatível.
 remuneração, preço ou campos financeiros fora do contrato; a aplicação mantém
 as telas e relatórios autorizados.
 
+**Matriz final de grants**
+
+| Tabela | Colunas restritas a `authenticated` | Colunas diretas seguras |
+|---|---|---|
+| `profiles` | `email`, `phone`, `birth_date`, `nationality`, `address`, `hourly_rate`, `monthly_salary`, `overtime_rate` | `id`, `full_name`, `role`, `created_at` |
+| `properties` | `base_price`, `extra_per_person`, `avg_cleaning_hours` | todas as demais 25 colunas atuais |
+| `service_orders` | `total_price`, `extra_services_description`, `extra_services_price`, `consegna_fee` | todas as demais 27 colunas atuais, incluindo `pricing_mode` e notas operacionais |
+
+A matriz final ampliou `profiles` após encontrar exposição direta de PII pela
+combinação de `profiles_secretaria_select`/`profiles_staff_peer_select` com o
+grant de tabela. O adapter administrativo da Sprint 03 já atendia o único uso
+legítimo atual, então a restrição preserva o comportamento da aplicação.
+
+**Implementação e evidências locais/remotas de 2026-08-19**
+
+- ADR 018 criado e ADR 002 preservada como histórico supersedido; nenhuma view
+  foi criada.
+- Migration `20260819030134_restrict_sensitive_column_grants.sql` criada pelo
+  comando oficial `supabase migration new`, sem `DROP`, `IF EXISTS`, DML ou
+  alteração de RLS/schema/Storage. Preconditions verificam drift e
+  postconditions exigem as listas exatas de colunas.
+- O runner reconstruiu o baseline anterior, aplicou as migrations das Sprints
+  04/05 em sequência e confirmou fingerprints idênticos de dados, policies e
+  grants não relacionados.
+- `npm run test:supabase`: 171 pgTAP PASS (49 matriz corrente, 8 alvos, 68 de
+  confidencialidade e 46 do guard), invariantes/fotos PASS, lint de schemas e
+  Advisor de segurança local sem issues.
+- `npm run test:smoke:sensitive-data`: histórico local das migrations presente;
+  Data API direta retornou o bloqueio esperado para todas as colunas restritas
+  em `admin`, `secretaria`, `limpeza`, `consegna` e `cliente`; colunas/joins
+  seguros e fontes `service_role` passaram. Telas, guards, dashboard, extratos e
+  CSVs passaram para os cinco papéis. Escritas legítimas de remuneração,
+  pricing de imóvel e extras financeiros de O.S. também passaram para os
+  papéis autorizados; a migration não altera grants de escrita.
+- Preflight remoto read-only separadamente autorizado: projeto saudável;
+  histórico termina em `20260818031745`; schema, ordem das colunas, RLS,
+  policies, ausência das views legadas e invariantes agregadas conferem com o
+  baseline; nenhuma linha ou PII foi retornada. O Advisor manteve apenas o INFO
+  conhecido de `auth_login_attempts` e warnings/INFO de performance fora do
+  escopo desta sprint.
+- O preflight encontrou `TRUNCATE`, `REFERENCES`, `TRIGGER` e `MAINTAIN`
+  table-level desnecessários para `authenticated`. A migration e os testes
+  locais foram endurecidos para revogá-los, preservando exatamente
+  `INSERT`/`UPDATE`/`DELETE` e o `SELECT` seguro por coluna.
+- `db push --dry-run --skip-vault --project-ref <projeto>` PASS: somente a
+  migration `20260819030134` seria aplicada; nenhum seed ou role seria enviado.
+- `npm run lint`, `npm run typecheck`, 32 arquivos/155 Vitest e `npm run build`
+  (20 rotas) passaram. A suíte inclui os formatadores/contratos de PDF de O.S.,
+  A Pagar e A Receber, que consomem as mesmas fontes server-only validadas no
+  smoke.
+- Backup/PITR, restauração ensaiada e aplicação foram separadamente
+  confirmados/autorizados. A migration `20260819030134` foi aplicada sem seed,
+  roles, Vault ou `--linked` e passou a constar no histórico remoto.
+- Hashes de dados/policies, contagens, unicidade e chaves nulas ficaram
+  idênticos antes/depois. O smoke remoto transacional passou as 68 asserções
+  para os cinco papéis e deixou zero fixtures após `ROLLBACK`.
+- ACLs pós-cutover correspondem exatamente à matriz: sem `SELECT` table-level,
+  somente colunas seguras, `INSERT`/`UPDATE`/`DELETE` preservados e
+  `service_role` integral para os adapters.
+- Advisor sem finding crítico/alto novo; 30 minutos de API/Postgres e consulta
+  final ao Sentry terminaram sem 5xx, erro inesperado ou issue nova. O dry-run
+  final retornou `upToDate: true`.
+- Nenhuma row persistente, policy, RLS, Auth, Vault ou Storage foi alterada;
+  não houve commit, push ou início da Sprint 06.
+
+**Riscos residuais**
+
+- O `service_role` continua poderoso e depende de segredo server-side e das
+  interfaces estreitas protegidas pelo teste arquitetural.
+- Grants seguros continuam comuns aos cinco papéis; RLS permanece responsável
+  pelas linhas e os adapters pelos casos legítimos com colunas restritas.
+- O rollback continua sendo correção progressiva não destrutiva conforme o
+  dossiê DB-P; nenhuma reversão foi necessária nesta implantação.
+
 **Critérios de conclusão**
 
-- [ ] Novo ADR aceito e matriz de colunas aprovada.
-- [ ] Testes diretos da Data API falham para todas as colunas classificadas.
-- [ ] Testes por papel confirmam que campos permitidos continuam acessíveis.
-- [ ] Admin e demais fluxos autorizados funcionam pelos adapters estreitos.
-- [ ] Não existe grant table-level que neutralize o grant por coluna.
-- [ ] Nenhuma row, chave ou valor foi alterado pela migration.
-- [ ] Advisor e testes SQL não introduzem findings críticos/altos novos.
+- [x] Novo ADR aceito e matriz de colunas aprovada.
+- [x] Testes diretos da Data API falham para todas as colunas classificadas.
+- [x] Testes por papel confirmam que campos permitidos continuam acessíveis.
+- [x] Admin e demais fluxos autorizados funcionam pelos adapters estreitos.
+- [x] Não existe grant table-level que neutralize o grant por coluna.
+- [x] Nenhuma row, chave ou valor foi alterado pela migration local.
+- [x] Advisor local e testes SQL não introduzem findings críticos/altos novos.
+- [x] Aplicação e validação remota separadamente autorizadas e executadas.
 
 ### Sprint 06 — Intervalos financeiros em `Europe/Rome`
 
@@ -917,7 +998,7 @@ Nunca cole tokens, DSNs, emails, IPs, dados pessoais ou conteúdo de `.env`.
 | 02 | completed | 2026-08-17 | 2026-08-17 | Codex | `.env*`/backups excluídos e imagem comprovada limpa; Gitleaks: 97 commits sem novo vazamento; Next 16.3.1 e Sentry 10.70.0; `npm audit` completo e produção: zero; lint/typecheck/30 arquivos e 145 Vitest/build/57 pgTAP PASS; Leaked Password Protection autorizada, habilitada e confirmada pelo Advisor | Ocorrência histórica continua revogada e isolada por fingerprint; `auth_login_attempts` mantém aviso informativo intencional conforme ADR 008; rollback Auth é desligar a mesma opção; nenhuma mudança de dados/schema/RLS/Storage, commit ou push; Sprint 03 não iniciada |
 | 03 | completed | 2026-08-17 | 2026-08-17 | Codex | Matriz e adapter server-only versionados; lint/typecheck/32 arquivos e 152 Vitest/build com 20 rotas PASS; 57 pgTAP/invariantes/fotos PASS; smoke autenticado local de cinco papéis, telas, guards, dashboard, extratos e CSVs PASS; testes arquiteturais e auditoria do diff PASS | `avg_cleaning_hours` classificado como sensível contextual sem ampliar acesso; grants excessivos continuam conhecidos até a Sprint 05 e limites temporais continuam na Sprint 06; `output/` preexistente preservado; nenhuma mudança de banco/produção, commit ou push |
 | 04 | completed | 2026-08-18 | 2026-08-18 | Codex | Local: dossiê DB-P e ADR 017; 103 pgTAP (46 do guard), invariantes/fotos, lint Supabase, lint/typecheck/155 Vitest/build PASS. Produção: PR #2 e CI verde; Coolify implantou `51512d2`; integração Supabase aplicou `20260818031745`; smoke transacional com `ROLLBACK` passou para cinco papéis e fluxo técnico; fingerprints pré/pós idênticos; 30 min de logs/advisors sem erro inesperado, 5xx ou timeout | Sete TODOs de SELECT permanecem exclusivamente para a Sprint 05; aviso informativo preexistente de `auth_login_attempts` segue aceito pela ADR 008; rollback é correção progressiva não destrutiva |
-| 05 | planned | — | — | — | — | — |
+| 05 | completed | 2026-08-19 | 2026-08-19 | Codex | Local: ADR 018, matriz/dossiê DB-P, migration `20260819030134`, 171 pgTAP/invariantes/fotos/lint/Advisor, smoke de cinco papéis, lint/typecheck/155 Vitest/build PASS. Produção: backup/restauração confirmados; migration aplicada; hashes pré/pós idênticos; 68 asserções remotas com `ROLLBACK`; ACLs exatas; dry-run final atualizado; 30 min de API/Postgres e Sentry sem erro novo | PII de perfis protegida e grants administrativos excessivos removidos; `service_role` permanece restrito aos adapters; rollback progressivo não foi necessário; nenhuma row/policy/RLS/Auth/Vault/Storage persistente alterada, commit ou push; Sprint 06 não iniciada |
 | 06 | planned | — | — | — | — | — |
 | 07 | planned | — | — | — | — | — |
 | 08 | planned | — | — | — | — | — |

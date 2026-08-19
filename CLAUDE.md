@@ -22,7 +22,7 @@
 As decisões com maior peso e nuance estão registradas em [`docs/decisions/`](docs/decisions/):
 
 - [ADR 001](docs/decisions/001-rls-via-app-role-no-jwt.md) — RLS via `app_role` no JWT (por que policies comparam `= '"admin"'` e não `= 'admin'`)
-- [ADR 002](docs/decisions/002-cls-via-filtro-select.md) — CLS via filtro de `select()` na aplicação (as views `properties_public`/`profiles_public` foram removidas)
+- [ADR 002](docs/decisions/002-cls-via-filtro-select.md) — decisão histórica de CLS via filtro de `select()`, supersedida pela ADR 018
 - [ADR 003](docs/decisions/003-cliente-b2c-via-email-match.md) — Identificação de cliente B2C via match de email (função `client_property_ids` SECURITY DEFINER)
 - [ADR 004](docs/decisions/004-proxy-ts-em-vez-de-middleware-ts.md) — `proxy.ts` em vez de `middleware.ts` (convenção do Next.js 16)
 - [ADR 005](docs/decisions/005-rls-helpers-em-schema-privado.md) — Helpers privilegiados de RLS ficam em schema privado, não em `public`
@@ -32,6 +32,7 @@ As decisões com maior peso e nuance estão registradas em [`docs/decisions/`](d
 - [ADR 012](docs/decisions/012-fotos-privadas-por-ciclo-da-ordem-de-servico.md) — Fotos privadas antes/depois por ciclo, com URLs assinadas e publicação em duas fases
 - [ADR 014](docs/decisions/014-fallback-jpeg-e-validacao-integral-de-fotos.md) — Fallback JPEG quando o canvas não codifica WebP e validação integral das variantes no servidor
 - [ADR 016](docs/decisions/016-visibilidade-equipe-operacional-somente-ate-hoje.md) — Pulizia e Consegna veem somente O.S. atribuídas até hoje no fuso de Roma
+- [ADR 018](docs/decisions/018-confidencialidade-de-colunas-via-grants-e-adapters.md) — grants de coluna + adapters server-only; aplicada e validada remotamente em 2026-08-19
 
 Outras convenções importantes:
 - **Integridade dos dados durante desenvolvimento/manutenção (regra absoluta)**: scripts, migrações e operações de manutenção não podem apagar, recriar ou sobrescrever dados e estruturas existentes em produção. Evoluções de banco devem ser incrementais, aditivas e compatíveis; exigem análise de impacto, invariantes verificáveis e rollback não destrutivo. A regra não modifica o CRUD autorizado nem as ações previstas pelas regras de negócio. Leia obrigatoriamente [`docs/production-data-safety.md`](docs/production-data-safety.md) antes de alterar banco, RLS ou Storage.
@@ -41,6 +42,7 @@ Outras convenções importantes:
 - **Supabase clients**: `utils/supabase/{client,server,middleware}.ts` para uso comum. `utils/supabase/admin.ts` é um adapter admin server-only; não exporta o client service-role bruto e expõe apenas operações administrativas explícitas. O `middleware.ts` aqui é convenção do `@supabase/ssr`, não do Next.js — o arquivo de proxy do Next.js está na raiz como `proxy.ts` (ver ADR 004).
 - **Segurança de autenticação**: login por senha passa por `POST /api/auth/login` para aplicar bloqueio server-side após falhas; sessões autenticadas expiram após 45 minutos de inatividade. Ver ADR 008 antes de alterar login, sessão, cookies de atividade ou `public.auth_login_attempts`.
 - **Funções privilegiadas**: helpers de RLS com `SECURITY DEFINER` devem ficar em schema privado; RPCs privilegiadas em `public` não devem conceder `EXECUTE` direto a `anon`/`authenticated` sem ADR/revisão explícita.
+- **Confidencialidade de colunas**: a versão atual remove `SELECT`, `TRUNCATE`, `REFERENCES`, `TRIGGER` e `MAINTAIN` table-level de `authenticated` em `profiles`, `properties` e `service_orders`, preserva `INSERT`/`UPDATE`/`DELETE`, concede `SELECT` somente em colunas seguras e usa `lib/server/data-access/sensitive-data.ts` para PII, remuneração, preços e valores restritos. Até `admin` não lê essas colunas diretamente pela Data API. O cutover remoto da Sprint 05 foi aplicado e validado em 2026-08-19; ver ADR 018.
 - **Preço da OS**: calculado no Server Action ao criar/atualizar (busca `base_price` + `extra_per_person` do imóvel), nunca pelo cliente. `secretaria` pode escolher `pricing_mode`, mas não recebe `base_price` nem valores calculados no navegador.
   - Fórmula centralizada em `calculateTotalPrice` (`lib/server/pricing.ts`). Para OS **já existente**, carregue o contexto com `loadOrderPricingContext(supabase, orderId, overridePropertyId?)` antes de chamar — não replique os fetches inline.
 - **Horas de uma OS**: para métricas operacionais, dashboards de produtividade e histórico, use `resolveOrderHours(order, property)` em `lib/server/hours.ts` — retorna `worked_minutes/60` quando registrado, ou `avg_cleaning_hours` do imóvel como fallback. Para remuneração/extrato a pagar, use `resolveOrderPayableHours(property)`, que considera sempre o `avg_cleaning_hours` do imóvel.
@@ -52,7 +54,7 @@ Outras convenções importantes:
 
 ## Documentos de referência
 - [`docs/production-data-safety.md`](docs/production-data-safety.md) — política obrigatória de preservação de dados, migrações e rollback em produção
-- [`docs/sensitive-data-matrix.md`](docs/sensitive-data-matrix.md) — matriz canônica de campos sensíveis, papéis, casos de uso e seams server-only da Sprint 03
+- [`docs/sensitive-data-matrix.md`](docs/sensitive-data-matrix.md) — matriz canônica final de campos sensíveis, grants, papéis, casos de uso e seams server-only das Sprints 03/05
 - [`docs/service-orders.md`](docs/service-orders.md) — regras atuais da listagem, filtros, prioridade operacional e PDFs de Ordens de Serviço
 - [`docs/operational-service-order-visibility.md`](docs/operational-service-order-visibility.md) — impacto, testes, implantação e rollback da janela da equipe operacional
 - [`docs/maintenance/README.md`](docs/maintenance/README.md) — índice de correções relevantes, atualizações de dependências, validações e implantações

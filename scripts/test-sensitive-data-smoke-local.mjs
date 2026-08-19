@@ -250,7 +250,114 @@ async function createSyntheticFixtures({ apiUrl, secretKey }) {
   requireSuccess(result.error, 'Assign synthetic cleaning staff')
 
   process.stdout.write('[Sensitive smoke] Synthetic fixtures ready\n')
-  return { today, users }
+  return { orderId, propertyId, today, users }
+}
+
+function requirePermissionDenied(error, label) {
+  if (!error || error.code !== '42501') {
+    throw new Error(`${label}: expected PostgreSQL 42501.`)
+  }
+}
+
+async function verifyDirectDataApiColumnBarrier(localStatus, fixture) {
+  process.stdout.write('[Sensitive smoke] Verify direct Data API column barrier for five roles\n')
+
+  for (const role of roleNames) {
+    const user = fixture.users.get(role)
+    const client = createClient(localStatus.apiUrl, localStatus.publishableKey, {
+      auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
+    })
+    const { error: signInError } = await client.auth.signInWithPassword({
+      email: user.email,
+      password: user.password,
+    })
+    requireSuccess(signInError, `Direct Data API sign-in for ${role}`)
+
+    let result = await client
+      .from('profiles')
+      .select('id, full_name, role, created_at')
+      .eq('id', user.id)
+      .single()
+    requireSuccess(result.error, `${role} safe profile columns`)
+
+    result = await client
+      .from('properties')
+      .select('id, name, client_type, address')
+      .eq('id', fixture.propertyId)
+      .single()
+    requireSuccess(result.error, `${role} safe property columns`)
+
+    result = await client
+      .from('service_orders')
+      .select('id, status, pricing_mode, property:properties(id, name)')
+      .eq('id', fixture.orderId)
+      .single()
+    requireSuccess(result.error, `${role} safe relational service-order columns`)
+
+    result = await client
+      .from('profiles')
+      .select('email, phone, birth_date, nationality, address, hourly_rate, monthly_salary, overtime_rate')
+      .eq('id', user.id)
+    requirePermissionDenied(result.error, `${role} restricted profile columns`)
+
+    result = await client
+      .from('properties')
+      .select('base_price, extra_per_person, avg_cleaning_hours')
+      .eq('id', fixture.propertyId)
+    requirePermissionDenied(result.error, `${role} restricted property columns`)
+
+    result = await client
+      .from('service_orders')
+      .select('total_price, extra_services_description, extra_services_price, consegna_fee')
+      .eq('id', fixture.orderId)
+    requirePermissionDenied(result.error, `${role} restricted service-order columns`)
+
+    result = await client.from('service_orders').select('*').eq('id', fixture.orderId)
+    requirePermissionDenied(result.error, `${role} wildcard service-order read`)
+
+    if (role === 'admin') {
+      result = await client
+        .from('profiles')
+        .update({ hourly_rate: 0 })
+        .eq('id', user.id)
+      requireSuccess(result.error, 'Admin restricted profile update remains allowed')
+
+      result = await client
+        .from('properties')
+        .update({ base_price: 731.25, extra_per_person: 19.75, avg_cleaning_hours: 6.75 })
+        .eq('id', fixture.propertyId)
+      requireSuccess(result.error, 'Admin restricted property update remains allowed')
+    }
+
+    if (role === 'admin' || role === 'secretaria') {
+      result = await client
+        .from('service_orders')
+        .update({
+          total_price: 812.5,
+          extra_services_description: 'Synthetic local-only extra',
+          extra_services_price: 63.25,
+          consegna_fee: 10,
+        })
+        .eq('id', fixture.orderId)
+      requireSuccess(result.error, `${role} restricted service-order update remains allowed`)
+    }
+
+    await client.auth.signOut({ scope: 'local' })
+    process.stdout.write(`[Sensitive smoke] ${role} direct Data API barrier: PASS\n`)
+  }
+
+  const privilegedClient = createClient(localStatus.apiUrl, localStatus.secretKey, {
+    auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
+  })
+  const [profiles, properties, orders] = await Promise.all([
+    privilegedClient.from('profiles').select('email, hourly_rate').limit(1),
+    privilegedClient.from('properties').select('base_price, avg_cleaning_hours').eq('id', fixture.propertyId),
+    privilegedClient.from('service_orders').select('total_price, extra_services_price, consegna_fee').eq('id', fixture.orderId),
+  ])
+  requireSuccess(profiles.error, 'Privileged profile adapter source')
+  requireSuccess(properties.error, 'Privileged property adapter source')
+  requireSuccess(orders.error, 'Privileged service-order adapter source')
+  process.stdout.write('[Sensitive smoke] Privileged adapter sources: PASS\n')
 }
 
 async function verifyLocalAuthPrerequisites(localStatus, fixture) {
@@ -491,10 +598,20 @@ async function main() {
     executeCli('Rebuild disposable database from migration baseline', [
       '--workdir', workdir, 'db', 'reset', '--local', '--no-seed',
     ])
+    const migrationList = executeCli('Verify local migration history', [
+      '--workdir', workdir, 'migration', 'list', '--local',
+    ])
+    const migrationOutput = `${migrationList.stdout ?? ''}${migrationList.stderr ?? ''}`
+    for (const expectedVersion of ['20260818031745', '20260819030134']) {
+      if (!migrationOutput.includes(expectedVersion)) {
+        throw new Error(`Local migration history omitted ${expectedVersion}.`)
+      }
+    }
 
     const localStatus = readLocalStatus(workdir)
     const fixture = await createSyntheticFixtures(localStatus)
     await verifyLocalAuthPrerequisites(localStatus, fixture)
+    await verifyDirectDataApiColumnBarrier(localStatus, fixture)
     appProcess = startApp(localStatus)
     await waitForApp(appProcess)
 

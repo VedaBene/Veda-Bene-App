@@ -5,11 +5,9 @@ SET search_path = public, extensions;
 
 SELECT plan(8);
 
--- These are the desired database guarantees for Sprints 04 and 05. They are
--- intentionally TODO while the current schema remains vulnerable. Keeping the
--- inverse assertions here makes the gap visible without redefining it as an
--- accepted behavior or weakening the current characterization suite.
-SELECT todo_start('Open authorization gap; must be made green by Sprint 04/05 before removing TODO');
+-- Database guarantees delivered by Sprints 04 and 05. The comprehensive
+-- column matrix lives in column_confidentiality_grants.test.sql; these original
+-- targets remain as a regression bridge for the audit baseline.
 
 SELECT ok(
   NOT has_column_privilege('authenticated', 'public.profiles', 'hourly_rate', 'SELECT'),
@@ -39,8 +37,6 @@ SELECT ok(
   NOT has_column_privilege('authenticated', 'public.service_orders', 'consegna_fee', 'SELECT'),
   '[TARGET][OPEN GAP][service_orders][select][consegna_fee] authenticated has no direct grant'
 );
-
-SELECT todo_end();
 
 INSERT INTO auth.users (id, email)
 VALUES ('55000000-0000-0000-0000-000000000001', 'target-limpeza@auth-matrix.example.invalid');

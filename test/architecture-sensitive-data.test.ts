@@ -12,17 +12,25 @@ const PRIVILEGED_MODULES = new Set([
   'utils/supabase/admin.ts',
 ])
 const SENSITIVE_TABLES = new Set(['profiles', 'properties', 'service_orders'])
-const SENSITIVE_COLUMNS = [
-  'hourly_rate',
-  'monthly_salary',
-  'overtime_rate',
-  'base_price',
-  'extra_per_person',
-  'avg_cleaning_hours',
-  'total_price',
-  'extra_services_price',
-  'consegna_fee',
-]
+const SENSITIVE_COLUMNS: ReadonlyMap<string, readonly string[]> = new Map([
+  ['profiles', [
+    'email',
+    'phone',
+    'birth_date',
+    'nationality',
+    'address',
+    'hourly_rate',
+    'monthly_salary',
+    'overtime_rate',
+  ]],
+  ['properties', ['base_price', 'extra_per_person', 'avg_cleaning_hours']],
+  ['service_orders', [
+    'total_price',
+    'extra_services_description',
+    'extra_services_price',
+    'consegna_fee',
+  ]],
+])
 
 function sourceFiles(): string[] {
   const files: string[] = []
@@ -98,7 +106,7 @@ describe('sensitive-data architecture boundaries', () => {
           const selection = literalText(node.arguments[0])
           if (table && SENSITIVE_TABLES.has(table) && selection) {
             if (selection.trim() === '*') violations.push(`${relative(file)}: select('*') em ${table}`)
-            const touchesSensitive = SENSITIVE_COLUMNS.some(column => selection.includes(column))
+            const touchesSensitive = SENSITIVE_COLUMNS.get(table)?.some(column => selection.includes(column))
             if (touchesSensitive && relative(file) !== 'lib/server/data-access/sensitive-data.ts') {
               violations.push(`${relative(file)}: select sensível em ${table}`)
             }

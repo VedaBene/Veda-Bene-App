@@ -21,7 +21,7 @@ Isso preserva o histórico de **por que** o sistema chegou no estado atual.
 | # | Decisão | Status |
 |---|---|---|
 | [001](001-rls-via-app-role-no-jwt.md) | RLS via `app_role` no JWT | Aceita |
-| [002](002-cls-via-filtro-select.md) | CLS via filtro de `select()` (após remoção das views) | Aceita |
+| [002](002-cls-via-filtro-select.md) | CLS via filtro de `select()` (após remoção das views) | Supersedida pelo ADR 018 |
 | [003](003-cliente-b2c-via-email-match.md) | Identificação de cliente B2C via match de email | Aceita |
 | [004](004-proxy-ts-em-vez-de-middleware-ts.md) | `proxy.ts` em vez de `middleware.ts` | Aceita |
 | [005](005-rls-helpers-em-schema-privado.md) | Helpers privilegiados de RLS em schema privado | Aceita |
@@ -36,7 +36,8 @@ Isso preserva o histórico de **por que** o sistema chegou no estado atual.
 | [014](014-fallback-jpeg-e-validacao-integral-de-fotos.md) | Fallback JPEG e validação integral das fotos de limpeza | Aceita |
 | [015](015-janela-visibilidade-equipe-operacional.md) | Janela de visibilidade das O.S. da equipe operacional | Supersedida pelo ADR 016 |
 | [016](016-visibilidade-equipe-operacional-somente-ate-hoje.md) | Visibilidade da equipe operacional somente até hoje | Aceita |
-| [017](017-guard-de-integridade-para-updates-de-service-orders.md) | Guard de integridade para updates de Ordens de Serviço | Proposta; implementação local pronta |
+| [017](017-guard-de-integridade-para-updates-de-service-orders.md) | Guard de integridade para updates de Ordens de Serviço | Aceita e implantada em 2026-08-18 |
+| [018](018-confidencialidade-de-colunas-via-grants-e-adapters.md) | Confidencialidade de colunas via grants e adapters server-only | Aceita e implantada em 2026-08-19 |
 
 
 

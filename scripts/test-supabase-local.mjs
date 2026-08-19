@@ -129,20 +129,139 @@ async function prepareDisposableProject() {
   const guardMigrationFile = '20260818031745_guard_service_order_updates.sql'
   const guardMigrationPath = join(migrationsDir, guardMigrationFile)
   const guardMigrationSql = await readFile(guardMigrationPath, 'utf8')
+  const confidentialityMigrationFile = '20260819030134_restrict_sensitive_column_grants.sql'
+  const confidentialityMigrationPath = join(migrationsDir, confidentialityMigrationFile)
+  const confidentialityMigrationSql = await readFile(confidentialityMigrationPath, 'utf8')
 
-  // Start from the preceding baseline so the exact Sprint 04 migration can be
-  // exercised between before/after fingerprints in one psql session.
-  await rename(
-    guardMigrationPath,
-    join(temporaryRoot, `${guardMigrationFile}.pending`),
-  )
+  // Start from the preceding baseline so the exact Sprint 04 and Sprint 05
+  // migrations can each be exercised between before/after fingerprints.
+  for (const [migrationPath, migrationFile] of [
+    [guardMigrationPath, guardMigrationFile],
+    [confidentialityMigrationPath, confidentialityMigrationFile],
+  ]) {
+    await rename(migrationPath, join(temporaryRoot, `${migrationFile}.pending`))
+  }
 
   return {
+    confidentialityMigrationFile,
+    confidentialityMigrationSql,
     guardMigrationFile,
     guardMigrationSql,
     projectId,
     temporaryRoot,
   }
+}
+
+function runColumnConfidentialityMigrationSmoke(
+  workdir,
+  projectId,
+  migrationFile,
+  migrationSql,
+) {
+  localDatabaseUrlFromStatus(workdir)
+  const containerName = `supabase_db_${projectId}`
+  const snapshotSql = String.raw`
+CREATE TEMP TABLE column_confidentiality_before AS
+SELECT
+  (SELECT count(*) FROM public.profiles) AS profile_count,
+  (SELECT md5(coalesce(string_agg(md5(to_jsonb(rows)::text), '' ORDER BY id), ''))
+   FROM public.profiles AS rows) AS profile_digest,
+  (SELECT count(*) FROM public.properties) AS property_count,
+  (SELECT md5(coalesce(string_agg(md5(to_jsonb(rows)::text), '' ORDER BY id), ''))
+   FROM public.properties AS rows) AS property_digest,
+  (SELECT count(*) FROM public.service_orders) AS order_count,
+  (SELECT md5(coalesce(string_agg(md5(to_jsonb(rows)::text), '' ORDER BY id), ''))
+   FROM public.service_orders AS rows) AS order_digest,
+  (SELECT md5(coalesce(string_agg(
+     schemaname || ':' || tablename || ':' || policyname || ':' || cmd || ':' ||
+     coalesce(qual, '') || ':' || coalesce(with_check, ''),
+     ',' ORDER BY schemaname, tablename, policyname
+   ), ''))
+   FROM pg_catalog.pg_policies
+   WHERE schemaname = 'public'
+     AND tablename IN ('profiles', 'properties', 'service_orders')) AS policy_digest,
+  (SELECT md5(coalesce(string_agg(
+     grantee || ':' || table_name || ':' || privilege_type || ':' || is_grantable,
+     ',' ORDER BY grantee, table_name, privilege_type, is_grantable
+   ), ''))
+   FROM information_schema.role_table_grants
+   WHERE table_schema = 'public'
+     AND table_name IN ('profiles', 'properties', 'service_orders')
+     AND NOT (
+       grantee = 'authenticated'
+       AND privilege_type IN ('SELECT', 'TRUNCATE', 'REFERENCES', 'TRIGGER', 'MAINTAIN')
+     )) AS other_table_grants_digest,
+  (SELECT md5(coalesce(string_agg(
+     grantee || ':' || table_name || ':' || column_name || ':' || privilege_type || ':' || is_grantable,
+     ',' ORDER BY grantee, table_name, column_name, privilege_type, is_grantable
+   ), ''))
+   FROM information_schema.role_column_grants
+   WHERE table_schema = 'public'
+     AND table_name IN ('profiles', 'properties', 'service_orders')
+     AND NOT (
+       grantee = 'authenticated'
+       AND privilege_type IN ('SELECT', 'REFERENCES')
+     )) AS other_column_grants_digest;
+`
+  const invariantSql = String.raw`
+DO $column_confidentiality_invariants$
+DECLARE
+  before_row pg_temp.column_confidentiality_before%ROWTYPE;
+  after_row pg_temp.column_confidentiality_before%ROWTYPE;
+BEGIN
+  SELECT * INTO before_row FROM pg_temp.column_confidentiality_before;
+  SELECT
+    (SELECT count(*) FROM public.profiles),
+    (SELECT md5(coalesce(string_agg(md5(to_jsonb(rows)::text), '' ORDER BY id), '')) FROM public.profiles AS rows),
+    (SELECT count(*) FROM public.properties),
+    (SELECT md5(coalesce(string_agg(md5(to_jsonb(rows)::text), '' ORDER BY id), '')) FROM public.properties AS rows),
+    (SELECT count(*) FROM public.service_orders),
+    (SELECT md5(coalesce(string_agg(md5(to_jsonb(rows)::text), '' ORDER BY id), '')) FROM public.service_orders AS rows),
+    (SELECT md5(coalesce(string_agg(
+       schemaname || ':' || tablename || ':' || policyname || ':' || cmd || ':' ||
+       coalesce(qual, '') || ':' || coalesce(with_check, ''),
+       ',' ORDER BY schemaname, tablename, policyname
+     ), ''))
+     FROM pg_catalog.pg_policies
+     WHERE schemaname = 'public'
+       AND tablename IN ('profiles', 'properties', 'service_orders')),
+    (SELECT md5(coalesce(string_agg(
+       grantee || ':' || table_name || ':' || privilege_type || ':' || is_grantable,
+       ',' ORDER BY grantee, table_name, privilege_type, is_grantable
+     ), ''))
+     FROM information_schema.role_table_grants
+     WHERE table_schema = 'public'
+       AND table_name IN ('profiles', 'properties', 'service_orders')
+       AND NOT (
+         grantee = 'authenticated'
+         AND privilege_type IN ('SELECT', 'TRUNCATE', 'REFERENCES', 'TRIGGER', 'MAINTAIN')
+       )),
+    (SELECT md5(coalesce(string_agg(
+       grantee || ':' || table_name || ':' || column_name || ':' || privilege_type || ':' || is_grantable,
+       ',' ORDER BY grantee, table_name, column_name, privilege_type, is_grantable
+     ), ''))
+     FROM information_schema.role_column_grants
+     WHERE table_schema = 'public'
+       AND table_name IN ('profiles', 'properties', 'service_orders')
+       AND NOT (
+         grantee = 'authenticated'
+         AND privilege_type IN ('SELECT', 'REFERENCES')
+       ))
+  INTO after_row;
+
+  IF before_row IS DISTINCT FROM after_row THEN
+    RAISE EXCEPTION 'Sprint 05 migration changed protected data, policies, or unrelated grants';
+  END IF;
+END
+$column_confidentiality_invariants$;
+`
+
+  executeSqlTextInContainer(
+    `Apply ${migrationFile} and compare data/policy/grant fingerprints`,
+    containerName,
+    'postgres',
+    `${snapshotSql}\n${migrationSql}\n${invariantSql}`,
+  )
 }
 
 async function removeDisposableProject(temporaryRoot) {
@@ -365,6 +484,8 @@ async function runPhotoMigrationSmoke(workdir, projectId) {
 
 async function main() {
   const {
+    confidentialityMigrationFile,
+    confidentialityMigrationSql,
     guardMigrationFile,
     guardMigrationSql,
     projectId,
@@ -391,6 +512,12 @@ async function main() {
       guardMigrationFile,
       guardMigrationSql,
     )
+    runColumnConfidentialityMigrationSmoke(
+      workdir,
+      projectId,
+      confidentialityMigrationFile,
+      confidentialityMigrationSql,
+    )
 
     executeCli('Run role × table × operation × column pgTAP matrix', [
       '--workdir', workdir,
@@ -414,6 +541,14 @@ async function main() {
       'db', 'lint', '--local',
       '--schema', 'public,private',
       '--level', 'warning',
+      '--fail-on', 'error',
+    ], { showOutput: true })
+
+    executeCli('Run local Supabase security advisor', [
+      '--workdir', workdir,
+      'db', 'advisors', '--local',
+      '--type', 'security',
+      '--level', 'warn',
       '--fail-on', 'error',
     ], { showOutput: true })
 

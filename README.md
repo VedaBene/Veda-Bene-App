@@ -87,7 +87,7 @@ npm run lint     # ESLint
 
 - **Integridade dos dados durante desenvolvimento/manutenção**: scripts, migrações e operações de manutenção em produção devem preservar integralmente os registros existentes. Migrações devem ser incrementais, aditivas, compatíveis e acompanhadas de análise de impacto e rollback não destrutivo. A regra não altera o CRUD autorizado nem ações previstas pelas regras de negócio. Operações técnicas como `DROP TABLE`, `DROP SCHEMA`, `TRUNCATE`, exclusão de dados por migration ou reset/recriação do banco são proibidas, salvo exceção extrema previamente aprovada e protegida por backup e restauração ensaiada. Consulte a [política de segurança dos dados de produção](docs/production-data-safety.md).
 - **RLS**: roles injetadas no JWT via `custom_access_token_hook` como `app_role`. A função `get_my_role()` lê o JWT como JSONB — retorna com aspas duplas embutidas (ex: `'"admin"'`), então policies usam `= '"admin"'`, **não** `= 'admin'`.
-- **Column Level Security**: RLS protege linhas no Supabase/Postgres, mas a proteção de colunas sensíveis hoje fica na aplicação. Server Components, Server Actions, filtros explícitos de `select()` e DTOs devem selecionar apenas os campos permitidos por role. As views `properties_public` e `profiles_public` foram removidas e **não** são o mecanismo ativo. Ver [ADR 002](docs/decisions/002-cls-via-filtro-select.md).
+- **Confidencialidade de colunas**: RLS protege linhas; grants por coluna protegem a leitura direta. A versão atual remove `SELECT`, `TRUNCATE`, `REFERENCES`, `TRIGGER` e `MAINTAIN` table-level de `authenticated` em `profiles`, `properties` e `service_orders`, preserva o CRUD necessário, concede `SELECT` somente em colunas seguras e encaminha PII/remuneração/preços/valores restritos por adapters server-only. Filtros explícitos e DTOs continuam como defesa adicional. Não há views; o cutover remoto da Sprint 05 foi aplicado e validado em 2026-08-19. Ver [ADR 018](docs/decisions/018-confidencialidade-de-colunas-via-grants-e-adapters.md).
 - **`is_urgent`** em `service_orders`: coluna `GENERATED ALWAYS AS STORED` — não pode ser inserida manualmente. É `true` quando `(checkin_at - checkout_at) <= 3h`.
 - **Supabase clients**: `utils/supabase/{client,server,middleware}.ts` para uso comum. `utils/supabase/admin.ts` é um adapter admin server-only; não exporta o client service-role bruto e expõe apenas operações administrativas explícitas.
 - **Preço da OS**: calculado no Server Action ao criar (busca `base_price` + `extra_per_person` do imóvel) e inclui a taxa fixa de Consegna de €10, nunca pelo cliente. Essa taxa é receita da empresa e não remunera funcionários.
@@ -102,7 +102,7 @@ Ao criar ou alterar qualquer acesso a `profiles`, `properties` ou `service_order
 - Selecione o conjunto mínimo de campos necessário para a tela, ação ou export.
 - Revise visibilidade por role antes de expor preço de imóvel, remuneração, dados financeiros ou dados pessoais.
 - Aplique DTO/view-model server-side antes de retornar dados para Client Components.
-- Consulte [ADR 002](docs/decisions/002-cls-via-filtro-select.md) quando o acesso envolver campos sensíveis.
+- Consulte [ADR 018](docs/decisions/018-confidencialidade-de-colunas-via-grants-e-adapters.md) e a [matriz de dados sensíveis](docs/sensitive-data-matrix.md) quando o acesso envolver campos sensíveis; a ADR 002 permanece apenas como histórico.
 
 ## Estrutura de pastas
 

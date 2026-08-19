@@ -141,40 +141,40 @@ SELECT results_eq($$UPDATE public.service_orders SET completion_notes = 'synthet
 SELECT pg_temp.authenticate_as('11000000-0000-0000-0000-000000000005', 'cliente');
 SELECT results_eq($$UPDATE public.service_orders SET completion_notes = 'synthetic cliente update' WHERE id = '44000000-0000-0000-0000-000000000002' RETURNING id$$, ARRAY[]::uuid[], '[CURRENT][cliente][service_orders][update][completion_notes] blocked by RLS');
 
--- Direct sensitive-column reads. Non-admin successes are explicitly known gaps,
--- not the desired security contract; the target suite below records the inverse.
+-- Direct sensitive-column reads are blocked for every business role, including
+-- admin. Authorized application flows use the narrow Sprint 03 adapter.
 SELECT pg_temp.authenticate_as('11000000-0000-0000-0000-000000000001', 'admin');
-SELECT results_eq($$SELECT base_price FROM public.properties WHERE id = '33000000-0000-0000-0000-000000000002'$$, ARRAY[222.22::numeric], '[CURRENT][admin][properties][select][base_price] allowed');
+SELECT throws_ok($$SELECT base_price FROM public.properties WHERE id = '33000000-0000-0000-0000-000000000002'$$, '42501', NULL, '[CURRENT][SPRINT 05][admin][properties][select][base_price] direct read blocked');
 SELECT pg_temp.authenticate_as('11000000-0000-0000-0000-000000000002', 'secretaria');
-SELECT results_eq($$SELECT base_price FROM public.properties WHERE id = '33000000-0000-0000-0000-000000000002'$$, ARRAY[222.22::numeric], '[CURRENT][KNOWN UNSAFE][secretaria][properties][select][base_price] directly readable');
+SELECT throws_ok($$SELECT base_price FROM public.properties WHERE id = '33000000-0000-0000-0000-000000000002'$$, '42501', NULL, '[CURRENT][SPRINT 05][secretaria][properties][select][base_price] direct read blocked');
 SELECT pg_temp.authenticate_as('11000000-0000-0000-0000-000000000003', 'limpeza');
-SELECT results_eq($$SELECT base_price FROM public.properties WHERE id = '33000000-0000-0000-0000-000000000002'$$, ARRAY[222.22::numeric], '[CURRENT][KNOWN UNSAFE][limpeza][properties][select][base_price] directly readable');
+SELECT throws_ok($$SELECT base_price FROM public.properties WHERE id = '33000000-0000-0000-0000-000000000002'$$, '42501', NULL, '[CURRENT][SPRINT 05][limpeza][properties][select][base_price] direct read blocked');
 SELECT pg_temp.authenticate_as('11000000-0000-0000-0000-000000000004', 'consegna');
-SELECT results_eq($$SELECT base_price FROM public.properties WHERE id = '33000000-0000-0000-0000-000000000002'$$, ARRAY[222.22::numeric], '[CURRENT][KNOWN UNSAFE][consegna][properties][select][base_price] directly readable');
+SELECT throws_ok($$SELECT base_price FROM public.properties WHERE id = '33000000-0000-0000-0000-000000000002'$$, '42501', NULL, '[CURRENT][SPRINT 05][consegna][properties][select][base_price] direct read blocked');
 SELECT pg_temp.authenticate_as('11000000-0000-0000-0000-000000000005', 'cliente');
-SELECT results_eq($$SELECT base_price FROM public.properties WHERE id = '33000000-0000-0000-0000-000000000001'$$, ARRAY[111.11::numeric], '[CURRENT][KNOWN UNSAFE][cliente][properties][select][base_price] directly readable');
+SELECT throws_ok($$SELECT base_price FROM public.properties WHERE id = '33000000-0000-0000-0000-000000000001'$$, '42501', NULL, '[CURRENT][SPRINT 05][cliente][properties][select][base_price] direct read blocked');
 
 SELECT pg_temp.authenticate_as('11000000-0000-0000-0000-000000000001', 'admin');
-SELECT results_eq($$SELECT hourly_rate FROM public.profiles WHERE id = '11000000-0000-0000-0000-000000000001'$$, ARRAY[101::numeric], '[CURRENT][admin][profiles][select][hourly_rate] allowed');
+SELECT throws_ok($$SELECT hourly_rate FROM public.profiles WHERE id = '11000000-0000-0000-0000-000000000001'$$, '42501', NULL, '[CURRENT][SPRINT 05][admin][profiles][select][hourly_rate] direct read blocked');
 SELECT pg_temp.authenticate_as('11000000-0000-0000-0000-000000000002', 'secretaria');
-SELECT results_eq($$SELECT hourly_rate FROM public.profiles WHERE id = '11000000-0000-0000-0000-000000000002'$$, ARRAY[102::numeric], '[CURRENT][KNOWN UNSAFE][secretaria][profiles][select][hourly_rate] directly readable');
+SELECT throws_ok($$SELECT hourly_rate FROM public.profiles WHERE id = '11000000-0000-0000-0000-000000000002'$$, '42501', NULL, '[CURRENT][SPRINT 05][secretaria][profiles][select][hourly_rate] direct read blocked');
 SELECT pg_temp.authenticate_as('11000000-0000-0000-0000-000000000003', 'limpeza');
-SELECT results_eq($$SELECT hourly_rate FROM public.profiles WHERE id = '11000000-0000-0000-0000-000000000003'$$, ARRAY[103::numeric], '[CURRENT][KNOWN UNSAFE][limpeza][profiles][select][hourly_rate] directly readable');
+SELECT throws_ok($$SELECT hourly_rate FROM public.profiles WHERE id = '11000000-0000-0000-0000-000000000003'$$, '42501', NULL, '[CURRENT][SPRINT 05][limpeza][profiles][select][hourly_rate] direct read blocked');
 SELECT pg_temp.authenticate_as('11000000-0000-0000-0000-000000000004', 'consegna');
-SELECT results_eq($$SELECT hourly_rate FROM public.profiles WHERE id = '11000000-0000-0000-0000-000000000004'$$, ARRAY[104::numeric], '[CURRENT][KNOWN UNSAFE][consegna][profiles][select][hourly_rate] directly readable');
+SELECT throws_ok($$SELECT hourly_rate FROM public.profiles WHERE id = '11000000-0000-0000-0000-000000000004'$$, '42501', NULL, '[CURRENT][SPRINT 05][consegna][profiles][select][hourly_rate] direct read blocked');
 SELECT pg_temp.authenticate_as('11000000-0000-0000-0000-000000000005', 'cliente');
-SELECT results_eq($$SELECT hourly_rate FROM public.profiles WHERE id = '11000000-0000-0000-0000-000000000005'$$, ARRAY[105::numeric], '[CURRENT][KNOWN UNSAFE][cliente][profiles][select][hourly_rate] directly readable');
+SELECT throws_ok($$SELECT hourly_rate FROM public.profiles WHERE id = '11000000-0000-0000-0000-000000000005'$$, '42501', NULL, '[CURRENT][SPRINT 05][cliente][profiles][select][hourly_rate] direct read blocked');
 
 SELECT pg_temp.authenticate_as('11000000-0000-0000-0000-000000000001', 'admin');
-SELECT results_eq($$SELECT total_price FROM public.service_orders WHERE id = '44000000-0000-0000-0000-000000000001'$$, ARRAY[500::numeric], '[CURRENT][admin][service_orders][select][total_price] allowed');
+SELECT throws_ok($$SELECT total_price FROM public.service_orders WHERE id = '44000000-0000-0000-0000-000000000001'$$, '42501', NULL, '[CURRENT][SPRINT 05][admin][service_orders][select][total_price] direct read blocked');
 SELECT pg_temp.authenticate_as('11000000-0000-0000-0000-000000000002', 'secretaria');
-SELECT results_eq($$SELECT total_price FROM public.service_orders WHERE id = '44000000-0000-0000-0000-000000000001'$$, ARRAY[500::numeric], '[CURRENT][KNOWN UNSAFE][secretaria][service_orders][select][total_price] directly readable');
+SELECT throws_ok($$SELECT total_price FROM public.service_orders WHERE id = '44000000-0000-0000-0000-000000000001'$$, '42501', NULL, '[CURRENT][SPRINT 05][secretaria][service_orders][select][total_price] direct read blocked');
 SELECT pg_temp.authenticate_as('11000000-0000-0000-0000-000000000003', 'limpeza');
-SELECT results_eq($$SELECT total_price FROM public.service_orders WHERE id = '44000000-0000-0000-0000-000000000001'$$, ARRAY[500::numeric], '[CURRENT][KNOWN UNSAFE][limpeza][service_orders][select][total_price] directly readable');
+SELECT throws_ok($$SELECT total_price FROM public.service_orders WHERE id = '44000000-0000-0000-0000-000000000001'$$, '42501', NULL, '[CURRENT][SPRINT 05][limpeza][service_orders][select][total_price] direct read blocked');
 SELECT pg_temp.authenticate_as('11000000-0000-0000-0000-000000000004', 'consegna');
-SELECT results_eq($$SELECT total_price FROM public.service_orders WHERE id = '44000000-0000-0000-0000-000000000001'$$, ARRAY[500::numeric], '[CURRENT][KNOWN UNSAFE][consegna][service_orders][select][total_price] directly readable');
+SELECT throws_ok($$SELECT total_price FROM public.service_orders WHERE id = '44000000-0000-0000-0000-000000000001'$$, '42501', NULL, '[CURRENT][SPRINT 05][consegna][service_orders][select][total_price] direct read blocked');
 SELECT pg_temp.authenticate_as('11000000-0000-0000-0000-000000000005', 'cliente');
-SELECT results_eq($$SELECT total_price FROM public.service_orders WHERE id = '44000000-0000-0000-0000-000000000002'$$, ARRAY[600::numeric], '[CURRENT][KNOWN UNSAFE][cliente][service_orders][select][total_price] directly readable');
+SELECT throws_ok($$SELECT total_price FROM public.service_orders WHERE id = '44000000-0000-0000-0000-000000000002'$$, '42501', NULL, '[CURRENT][SPRINT 05][cliente][service_orders][select][total_price] direct read blocked');
 
 SELECT pg_temp.authenticate_as('11000000-0000-0000-0000-000000000003', 'limpeza');
 SELECT throws_ok($$UPDATE public.service_orders SET total_price = 777 WHERE id = '44000000-0000-0000-0000-000000000001'$$, '42501', 'Aggiornamento O.L. non autorizzato.', '[CURRENT][SPRINT 04][limpeza][service_orders][update][total_price] blocked by database');
