@@ -25,7 +25,7 @@ type LoginAttemptUpdate = {
 
 type LoginAttemptStore = {
   get(emailKey: string, ipKey: string): Promise<LoginAttemptRecord | null>
-  upsert(update: LoginAttemptUpdate): Promise<void>
+  recordFailure(emailKey: string, ipKey: string): Promise<LoginAttemptRecord>
   clear(emailKey: string, ipKey: string): Promise<void>
 }
 
@@ -98,12 +98,17 @@ function createLoginAttemptStore(): LoginAttemptStore {
 
       return data as LoginAttemptRecord | null
     },
-    async upsert(update) {
-      const { error } = await supabase
-        .from('auth_login_attempts')
-        .upsert(update, { onConflict: 'email_key,ip_key' })
+    async recordFailure(emailKey, ipKey) {
+      const { data, error } = await supabase
+        .rpc('record_failed_login', {
+          p_email_key: emailKey,
+          p_ip_key: ipKey,
+        })
+        .single()
 
       if (error) throw error
+
+      return data as LoginAttemptRecord
     },
     async clear(emailKey, ipKey) {
       const { error } = await supabase
@@ -143,10 +148,7 @@ export async function isLoginAttemptBlocked(emailKey: string, ipKey: string) {
 
 export async function recordFailedLogin(emailKey: string, ipKey: string) {
   const store = createLoginAttemptStore()
-  const record = await store.get(emailKey, ipKey)
-  const update = getFailedLoginUpdate(emailKey, ipKey, record)
-
-  await store.upsert(update)
+  return await store.recordFailure(emailKey, ipKey)
 }
 
 export async function clearFailedLogin(emailKey: string, ipKey: string) {

@@ -76,6 +76,19 @@ describe('POST /api/auth/login', () => {
     expect(mocks.signInWithPassword).not.toHaveBeenCalled()
   })
 
+  it('returns generic 500 when LOGIN_LOCKOUT_SECRET is missing without leaking PII', async () => {
+    mocks.getLoginLockoutIdentity.mockImplementation(() => {
+      throw new Error('LOGIN_LOCKOUT_SECRET is required')
+    })
+
+    const response = await POST(loginRequest({ email: 'user@example.com', password: 'secret' }))
+    const body = await response.json()
+
+    expect(response.status).toBe(500)
+    expect(body).toEqual({ success: false, error: 'Não foi possível concluir o login.' })
+    expect(mocks.signInWithPassword).not.toHaveBeenCalled()
+  })
+
   it('does not call Supabase Auth when login is locked', async () => {
     mocks.isLoginAttemptBlocked.mockResolvedValue(true)
 

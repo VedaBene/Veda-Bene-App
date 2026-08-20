@@ -132,12 +132,16 @@ async function prepareDisposableProject() {
   const confidentialityMigrationFile = '20260819030134_restrict_sensitive_column_grants.sql'
   const confidentialityMigrationPath = join(migrationsDir, confidentialityMigrationFile)
   const confidentialityMigrationSql = await readFile(confidentialityMigrationPath, 'utf8')
+  const lockoutMigrationFile = '20260820035000_atomic_login_lockout.sql'
+  const lockoutMigrationPath = join(migrationsDir, lockoutMigrationFile)
+  const lockoutMigrationSql = await readFile(lockoutMigrationPath, 'utf8')
 
-  // Start from the preceding baseline so the exact Sprint 04 and Sprint 05
-  // migrations can each be exercised between before/after fingerprints.
+  // Start from the preceding baseline so the exact Sprint 04, Sprint 05 and
+  // Sprint 07 migrations can each be exercised between before/after fingerprints.
   for (const [migrationPath, migrationFile] of [
     [guardMigrationPath, guardMigrationFile],
     [confidentialityMigrationPath, confidentialityMigrationFile],
+    [lockoutMigrationPath, lockoutMigrationFile],
   ]) {
     await rename(migrationPath, join(temporaryRoot, `${migrationFile}.pending`))
   }
@@ -147,6 +151,8 @@ async function prepareDisposableProject() {
     confidentialityMigrationSql,
     guardMigrationFile,
     guardMigrationSql,
+    lockoutMigrationFile,
+    lockoutMigrationSql,
     projectId,
     temporaryRoot,
   }
@@ -258,6 +264,55 @@ $column_confidentiality_invariants$;
 
   executeSqlTextInContainer(
     `Apply ${migrationFile} and compare data/policy/grant fingerprints`,
+    containerName,
+    'postgres',
+    `${snapshotSql}\n${migrationSql}\n${invariantSql}`,
+  )
+}
+
+function runAtomicLoginLockoutMigrationSmoke(
+  workdir,
+  projectId,
+  migrationFile,
+  migrationSql,
+) {
+  localDatabaseUrlFromStatus(workdir)
+  const containerName = `supabase_db_${projectId}`
+  const snapshotSql = String.raw`
+CREATE TEMP TABLE lockout_migration_before AS
+SELECT
+  (SELECT count(*) FROM public.auth_login_attempts) AS attempt_count,
+  (SELECT count(*) FROM public.profiles) AS profile_count,
+  (SELECT count(*) FROM public.properties) AS property_count,
+  (SELECT count(*) FROM public.service_orders) AS order_count;
+`
+  const invariantSql = String.raw`
+DO $lockout_invariants$
+DECLARE
+  before_row pg_temp.lockout_migration_before%ROWTYPE;
+  after_row pg_temp.lockout_migration_before%ROWTYPE;
+BEGIN
+  SELECT * INTO before_row FROM pg_temp.lockout_migration_before;
+  SELECT
+    (SELECT count(*) FROM public.auth_login_attempts),
+    (SELECT count(*) FROM public.profiles),
+    (SELECT count(*) FROM public.properties),
+    (SELECT count(*) FROM public.service_orders)
+  INTO after_row;
+
+  IF before_row IS DISTINCT FROM after_row THEN
+    RAISE EXCEPTION 'Sprint 07 migration changed unexpected data counts';
+  END IF;
+
+  IF pg_catalog.to_regprocedure('public.record_failed_login(text,text)') IS NULL THEN
+    RAISE EXCEPTION 'Sprint 07 function record_failed_login was not created';
+  END IF;
+END
+$lockout_invariants$;
+`
+
+  executeSqlTextInContainer(
+    `Apply ${migrationFile} and compare invariants`,
     containerName,
     'postgres',
     `${snapshotSql}\n${migrationSql}\n${invariantSql}`,
@@ -488,6 +543,8 @@ async function main() {
     confidentialityMigrationSql,
     guardMigrationFile,
     guardMigrationSql,
+    lockoutMigrationFile,
+    lockoutMigrationSql,
     projectId,
     temporaryRoot: workdir,
   } = await prepareDisposableProject()
@@ -517,6 +574,12 @@ async function main() {
       projectId,
       confidentialityMigrationFile,
       confidentialityMigrationSql,
+    )
+    runAtomicLoginLockoutMigrationSmoke(
+      workdir,
+      projectId,
+      lockoutMigrationFile,
+      lockoutMigrationSql,
     )
 
     executeCli('Run role × table × operation × column pgTAP matrix', [
@@ -553,7 +616,7 @@ async function main() {
     ], { showOutput: true })
 
     await runPhotoMigrationSmoke(workdir, projectId)
-    process.stdout.write('\nSupabase authorization and Sprint 04 migration tests passed without a remote target.\n')
+    process.stdout.write('\nSupabase authorization and Sprint 07 migration tests passed without a remote target.\n')
   } finally {
     if (stackStarted) {
       executeCli('Stop and delete only the isolated local stack', [

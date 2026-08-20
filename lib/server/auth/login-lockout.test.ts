@@ -1,10 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   LOGIN_LOCKOUT_DURATION_MS,
   LOGIN_LOCKOUT_MAX_FAILURES,
   createLoginLockoutKey,
   getClientIp,
   getFailedLoginUpdate,
+  getLoginLockoutIdentity,
   isLoginLocked,
   normalizeLoginEmail,
   type LoginAttemptRecord,
@@ -12,6 +13,15 @@ import {
 
 describe('login lockout helpers', () => {
   const now = new Date('2026-06-11T12:00:00.000Z')
+  const originalSecret = process.env.LOGIN_LOCKOUT_SECRET
+
+  beforeEach(() => {
+    process.env.LOGIN_LOCKOUT_SECRET = 'test-lockout-secret'
+  })
+
+  afterEach(() => {
+    process.env.LOGIN_LOCKOUT_SECRET = originalSecret
+  })
 
   it('normalizes login emails', () => {
     expect(normalizeLoginEmail('  USER@Example.COM  ')).toBe('user@example.com')
@@ -23,6 +33,31 @@ describe('login lockout helpers', () => {
     expect(key).toHaveLength(64)
     expect(key).toBe(createLoginLockoutKey('user@example.com', 'test-secret'))
     expect(key).not.toContain('user@example.com')
+  })
+
+  it('fails safely when secret is missing in createLoginLockoutKey', () => {
+    expect(() => createLoginLockoutKey('user@example.com', '')).toThrow('LOGIN_LOCKOUT_SECRET is required')
+  })
+
+  it('fails safely when LOGIN_LOCKOUT_SECRET is unset in getLoginLockoutIdentity', () => {
+    delete process.env.LOGIN_LOCKOUT_SECRET
+
+    expect(() => getLoginLockoutIdentity('user@example.com', new Headers())).toThrow(
+      'LOGIN_LOCKOUT_SECRET is required',
+    )
+  })
+
+  it('derives valid lockout identity with headers and email', () => {
+    const headers = new Headers({
+      'x-forwarded-for': '198.51.100.55',
+    })
+    const identity = getLoginLockoutIdentity('Admin@VedaBene.IT', headers)
+
+    expect(identity.normalizedEmail).toBe('admin@vedabene.it')
+    expect(identity.emailKey).toHaveLength(64)
+    expect(identity.ipKey).toHaveLength(64)
+    expect(identity.emailKey).not.toContain('admin@vedabene.it')
+    expect(identity.ipKey).not.toContain('198.51.100.55')
   })
 
   it('reads the first forwarded IP when available', () => {

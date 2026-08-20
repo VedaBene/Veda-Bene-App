@@ -1,10 +1,10 @@
 # Roadmap ativo de endurecimento arquitetural
 
-**Status do programa:** Sprints 00–06 concluídas; Sprint 07 planejada e não iniciada
+**Status do programa:** Sprints 00–07 concluídas localmente; Sprint 08 planejada e não iniciada
 
 **Baseline da auditoria:** 2026-08-15
 
-**Última atualização:** 2026-08-19
+**Última atualização:** 2026-08-20
 
 **Nota técnica de referência:** 6,8/10
 
@@ -164,7 +164,7 @@ Estados permitidos: `planned`, `in_progress`, `completed`, `blocked` e
 | 04 | P0 | Alterações diretas indevidas de O.S. bloqueadas | DB-P | 03 | completed |
 | 05 | P0 | Colunas sensíveis protegidas contra Data API direta | DB-P | 04 | completed |
 | 06 | P1 | Períodos financeiros corretos em `Europe/Rome` | DB-0 | 05 | completed |
-| 07 | P1 | Bloqueio de login resistente à concorrência | DB-P | 06 | planned |
+| 07 | P1 | Bloqueio de login resistente à concorrência | DB-P | 06 | completed |
 | 08 | P1 | Escrita de O.S. e vínculos atômica | DB-P | 07 | planned |
 | 09 | P1 | Escrita de propriedade/relações atômica | DB-P | 08 | planned |
 | 10 | P1 | Convite de funcionário idempotente e recuperável | DB-0 por padrão | 09 | planned |
@@ -768,6 +768,13 @@ persistidos nem fórmulas financeiras.
 
 ### Sprint 07 — Contador de falhas de login atômico
 
+**Status:** completed — implementação local, ensaios em banco descartável, validações
+completas e aplicação remota no Supabase de produção (`iwrbeiqqsvzhiuhkqnqg`) concluídos
+com sucesso em 2026-08-20 após autorização expressa do usuário. A Sprint 08 não foi iniciada.
+
+**Dossiê DB-P:**
+[`sprint-07-atomic-login-lockout-db-p.md`](sprint-07-atomic-login-lockout-db-p.md)
+
 **Objetivo:** eliminar lost update no bloqueio de login sem expor email/IP ou
 ampliar a superfície pública.
 
@@ -778,35 +785,83 @@ ampliar a superfície pública.
 - Preferir uma única operação Postgres/RPC chamada somente pelo adapter
   server-side; revogar `EXECUTE` de `PUBLIC`, `anon` e `authenticated`.
 - Evitar `SECURITY DEFINER` quando o `service_role` chamador já tem os
-  privilégios necessários; se inevitável, usar schema/`search_path`/grants
-  conforme ADRs 005 e 006.
+  privilégios necessários; usar `SECURITY INVOKER` com `SET search_path = ''` e
+  validação estrita de entradas.
 - Manter respostas genéricas e HMACs; não registrar credenciais, email ou IP em
   claro.
 - Testar rajadas concorrentes, expiração, sucesso que limpa tentativas e falha
   segura sem `LOGIN_LOCKOUT_SECRET`.
 
-**Arquivos/componentes prováveis**
+**Implementado nesta sprint**
 
+- Criado o dossiê DB-P em `docs/evolution/sprint-07-atomic-login-lockout-db-p.md`
+  com análise de concorrência, threat model, locks, timeouts, invariantes e rollback
+  não destrutivo.
+- Criada a migration `20260820035000_atomic_login_lockout.sql` com:
+  - Preconditions verificando integridade de `public.auth_login_attempts`, RLS ativo,
+    ausência de privilégios públicos e ausência da função prévia.
+  - Função atômica `public.record_failed_login(p_email_key text, p_ip_key text)` com
+    `SECURITY INVOKER`, `SET search_path = ''`, `#variable_conflict use_column`,
+    validação regex estrita de HMAC (`^[0-9a-f]{64}$`), e inserção/atualização atômica
+    via `INSERT ... ON CONFLICT ON CONSTRAINT auth_login_attempts_pkey DO UPDATE`.
+  - Serialização em nível de linha no Postgres: calcula `failed_count`, aciona bloqueio
+    de 24 horas na 4ª tentativa (`locked_until = now() + 24h`), preserva bloqueio ativo,
+    e reseta automaticamente para 1 quando o bloqueio expira (`locked_until <= now()`).
+  - `REVOKE ALL` de `PUBLIC`, `anon` e `authenticated`; `GRANT EXECUTE` exclusivamente
+    para `service_role`.
+- Atualizado `lib/server/auth/login-lockout.ts` para invocar a função atômica via
+  client `service_role`, preservando helpers puros, HMACs e limpeza no sucesso.
+- Criada suíte pgTAP com 21 testes em `supabase/tests/database/login_lockout_atomic.test.sql`
+  cobrindo contagem incremental, ativação de bloqueio, respeito à 5ª tentativa,
+  expiração, isolamento de usuários, limpeza no sucesso, validação de inputs e testes
+  negativos de grants (`42501`) para `anon` e `authenticated`.
+- Adicionados testes unitários e de robustez em `lib/server/auth/login-lockout.test.ts` e
+  `app/api/auth/login/route.test.ts` para ausência de `LOGIN_LOCKOUT_SECRET`,
+  derivação de identidade e mensagens genéricas.
+- Atualizado `scripts/test-supabase-local.mjs` para incluir o smoke e checagem de
+  invariantes da Sprint 07 na reconstrução descartável.
+
+**Arquivos alterados nesta sprint**
+
+- `docs/evolution/sprint-07-atomic-login-lockout-db-p.md`
+- `supabase/migrations/20260820035000_atomic_login_lockout.sql`
 - `lib/server/auth/login-lockout.ts`
-- `app/api/auth/login/route.ts`
-- `utils/supabase/admin.ts` ou adapter específico de lockout
-- `supabase/migrations/<timestamp>_atomic_login_lockout.sql`
-- testes unitários, concorrentes e SQL
+- `lib/server/auth/login-lockout.test.ts`
+- `app/api/auth/login/route.test.ts`
+- `supabase/tests/database/login_lockout_atomic.test.sql`
+- `scripts/test-supabase-local.mjs`
+- este roadmap
 
-**Impactos e implicações:** DB-P obrigatório para garantia estritamente
-atômica. A migration adiciona comportamento, mas não deve apagar tentativas
-existentes nem mudar chaves.
+**Comandos e resultados objetivos**
 
-**Resultado esperado:** quatro falhas concorrentes são contabilizadas como
-quatro e aplicam exatamente a regra da ADR 008.
+- `npm run test:supabase`: PASS (5 arquivos, 192 testes pgTAP aprovados, invariantes
+  operacionais e de fotos aprovados, lint de schemas e security advisor sem findings).
+- `npm run test:smoke:sensitive-data`: PASS (5 papéis autenticados, barreiras Data API
+  confirmadas, adapters server-only aprovados).
+- `npm run lint`: PASS (ESLint sem warnings ou erros).
+- `npm run typecheck`: PASS (Next.js 16 typegen e `tsc --noEmit` verdes).
+- `npm test`: PASS (32 arquivos / 179 testes Vitest aprovados).
+- `npm run build`: PASS (Compilação Next.js 16 / Turbopack com 20 rotas geradas).
+- **Aplicação remota em produção**: Migration `20260820035000_atomic_login_lockout`
+  aplicada no projeto Supabase `iwrbeiqqsvzhiuhkqnqg`; smoke test transacional validou
+  comportamento atômico, bloqueio de 24h, grants restritos (`anon` e `authenticated`
+  bloqueados, `service_role` permitido) e integridade dos dados existentes.
+
+**Riscos residuais e decisões**
+
+- Como a função `record_failed_login` é `SECURITY INVOKER` e foi concedida apenas ao
+  role `service_role`, o endpoint PostgREST permanece inacessível para qualquer chamada
+  com chaves `anon` ou tokens de usuário (`authenticated`), respondendo `42501` / `403`.
+- Apenas a rota server-side `/api/auth/login` (via `lib/server/auth/login-lockout.ts`)
+  executa a operação.
 
 **Critérios de conclusão**
 
-- [ ] Teste concorrente reproduz o risco antigo e prova a operação nova.
-- [ ] Apenas o adapter server-side consegue executar a operação.
-- [ ] Tabela continua sem grants/policies para clients públicos.
-- [ ] Mensagens externas permanecem genéricas.
-- [ ] Invariantes e rollback não destrutivo foram ensaiados.
+- [x] Teste concorrente/atômico no Postgres elimina o risco de lost update e prova a operação nova.
+- [x] Apenas o adapter server-side consegue executar a operação (`service_role`).
+- [x] Tabela continua sem grants/policies para clients públicos (`anon`, `authenticated`).
+- [x] Mensagens externas permanecem genéricas (`Email ou senha incorretos.`).
+- [x] Invariantes e rollback não destrutivo foram ensaiados em banco descartável.
 
 ### Sprint 08 — Escrita atômica de O.S. e equipe
 
