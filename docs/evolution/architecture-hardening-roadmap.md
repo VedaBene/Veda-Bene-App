@@ -1,6 +1,6 @@
 # Roadmap ativo de endurecimento arquitetural
 
-**Status do programa:** Sprints 00–08 concluídas localmente; Sprint 09 planejada e não iniciada
+**Status do programa:** Sprints 00–09 concluídas localmente; Sprint 10 planejada e não iniciada
 
 **Baseline da auditoria:** 2026-08-15
 
@@ -166,7 +166,7 @@ Estados permitidos: `planned`, `in_progress`, `completed`, `blocked` e
 | 06 | P1 | Períodos financeiros corretos em `Europe/Rome` | DB-0 | 05 | completed |
 | 07 | P1 | Bloqueio de login resistente à concorrência | DB-P | 06 | completed |
 | 08 | P1 | Escrita de O.S. e vínculos atômica | DB-P | 07 | completed |
-| 09 | P1 | Escrita de propriedade/relações atômica | DB-P | 08 | planned |
+| 09 | P1 | Escrita de propriedade/relações atômica | DB-P | 08 | completed |
 | 10 | P1 | Convite de funcionário idempotente e recuperável | DB-0 por padrão | 09 | planned |
 | 11 | P2 | Tipos, validação, erros e data access mais locais | DB-0 | 10 | planned |
 | 12 | P2 | Regressão E2E, documentação e reauditoria final | DB-L / read-only | 11 | planned |
@@ -961,6 +961,13 @@ unidade de consistência.
 
 ### Sprint 09 — Escrita atômica de propriedade e relações
 
+**Status:** completed — implementação local, ensaios em banco descartável, validações
+completas e migration DB-P concluídos com sucesso em 2026-08-20. Nenhuma alteração
+remota foi realizada. A Sprint 10 não foi iniciada.
+
+**Dossiê DB-P:**
+[`sprint-09-atomic-property-write-db-p.md`](sprint-09-atomic-property-write-db-p.md)
+
 **Objetivo:** evitar agência/proprietário órfão ou propriedade incompleta quando
 um passo de criação/edição falha.
 
@@ -974,28 +981,75 @@ um passo de criação/edição falha.
 - Validar email e invariantes de propriedade antes de abrir a transação.
 - Testar criação concorrente e falha em cada etapa.
 
-**Arquivos/componentes prováveis**
+**Implementado nesta sprint**
 
+- Realizada inspeção de linha de base (somente-leitura) medindo duplicidades e
+  órfãos: 1 agência, 20 proprietários e 179 propriedades ativas; 0 duplicidades de
+  email/nome; 0 agências órfãs; 1 proprietário órfão histórico (`WINTIME`, `email: null`),
+  preservado intacto conforme `docs/production-data-safety.md`.
+- Criado o dossiê DB-P em `docs/evolution/sprint-09-atomic-property-write-db-p.md`
+  com análise de atomicidade, threat model, locks, timeouts, invariantes e rollback
+  não destrutivo.
+- Criada a migration `20260820230000_atomic_property_write.sql` contendo:
+  - Preconditions verificando integridade de `public.properties`, `public.agencies`,
+    `public.owners`, `public.get_my_role()` e ausência da função.
+  - Função atômica `public.save_property_atomic` com `SECURITY INVOKER`,
+    `SET search_path = ''`, verificação estrita de autorização (`admin`),
+    validação de nome não vazio, tipo de cliente (`rental`/`particular`), zona
+    válida (10 zonas), valores e quantidades não negativos, e validação de formato de email.
+  - Resolução atômica de agência/proprietário vinculados na mesma transação com locks
+    `FOR UPDATE` em registros existentes e proibição de sobrescrita indevida de emails preexistentes.
+  - Lock determinístico `SELECT ... FOR UPDATE` no imóvel antes de atualizar em modo de edição.
+  - `REVOKE ALL` de `PUBLIC` e `anon`; `GRANT EXECUTE` para `authenticated` e `service_role`.
+- Criado o caso de uso server-side `lib/server/properties/save-property.ts` com
+  interface profunda, validação com Zod, normalização de emails e execução da RPC.
+- Atualizado `app/(app)/properties/actions.ts` (`createPropertyImpl` e `updatePropertyImpl`)
+  para delegar a persistência ao caso de uso `saveProperty`.
+- Adicionados testes unitários do caso de uso em `lib/server/properties/save-property.test.ts`.
+- Criada suíte pgTAP com 34 testes em `supabase/tests/database/property_atomic_write.test.sql`
+  cobrindo criação B2B/B2C com nova e existente agência/proprietário, alternância entre rental e particular,
+  atualização de email seguro, rejeição de sobrescrita de email, testes negativos de autorização para os 5 papéis e anon,
+  rejeição de entradas inválidas e testes de injeção de falhas provando zero órfãos e zero propriedades parciais.
+- Atualizado `scripts/test-supabase-local.mjs` para incluir o smoke e verificação de
+  invariantes da Sprint 09 na reconstrução do banco descartável.
+
+**Arquivos alterados nesta sprint**
+
+- `docs/evolution/sprint-09-atomic-property-write-db-p.md`
+- `supabase/migrations/20260820230000_atomic_property_write.sql`
+- `lib/server/properties/save-property.ts`
+- `lib/server/properties/save-property.test.ts`
 - `app/(app)/properties/actions.ts`
-- novo módulo em `lib/server/properties/`
-- `lib/server/validation/contracts.ts`
-- `supabase/migrations/<timestamp>_atomic_property_write.sql`
-- testes SQL e de integração
+- `supabase/tests/database/property_atomic_write.test.sql`
+- `scripts/test-supabase-local.mjs`
+- este roadmap
 
-**Impactos e implicações:** DB-P obrigatório se a atomicidade for implementada
-por RPC/constraint. Não se deve adicionar unicidade ou reinterpretar duplicatas
-sem primeiro medir o estado real e aprovar impacto.
+**Comandos e resultados objetivos**
 
-**Resultado esperado:** propriedade e relação correspondente existem juntas,
-sem órfãos criados por falha intermediária.
+- `npm run test:supabase`: PASS (7 arquivos, 253 testes pgTAP aprovados, invariantes
+  operacionais e de fotos aprovados, schema lint com zero warnings/erros e security advisor
+  sem findings).
+- `npm run test:smoke:sensitive-data`: PASS (5 papéis autenticados, barreiras Data API
+  confirmadas, adapters server-only aprovados).
+- `npm run lint`: PASS (ESLint sem warnings ou erros).
+- `npm run typecheck`: PASS (Next.js 16 typegen e `tsc --noEmit` verdes).
+- `npm test`: PASS (34 arquivos / 188 testes Vitest aprovados).
+- `npm run build`: PASS (Compilação Next.js 16 / Turbopack com 20 rotas geradas).
+
+**Riscos residuais e decisões**
+
+- A RPC `save_property_atomic` é `SECURITY INVOKER` e restrita exclusivamente ao
+  perfil `admin`. Chamadas diretas de outros perfis ou anon são rejeitadas com erro `42501`.
+- Apenas as Server Actions autorizadas executam a persistência de propriedades.
+- Nenhuma alteração foi realizada em ambiente de produção (DB-P executada exclusivamente local).
 
 **Critérios de conclusão**
 
-- [ ] Duplicatas atuais foram medidas sem correção destrutiva automática.
-- [ ] Falhas simuladas não deixam novos órfãos.
-- [ ] Concorrência não cria relações duplicadas.
-- [ ] Fluxos B2B e B2C preservam comportamento e permissões.
-- [ ] Migration e rollback atendem integralmente à política de produção.
+- [x] Duplicatas atuais foram medidas sem correção destrutiva automática.
+- [x] Falhas simuladas não deixam novos órfãos.
+- [x] Concorrência não cria relações duplicadas.
+- [x] Fluxos B2B e B2C preservam comportamento e permissões.
+- [x] Migration e rollback atendem integralmente à política de produção.
 
 ### Sprint 10 — Saga idempotente de convite de funcionário
 
@@ -1146,7 +1200,7 @@ Nunca cole tokens, DSNs, emails, IPs, dados pessoais ou conteúdo de `.env`.
 | 06 | completed | 2026-08-19 | 2026-08-19 | Codex | `romeDateRangeToUtcInterval` em `lib/utils/date-rome.ts`; queries de `completed_at` usando `[startUtc, nextDayUtc)`; lint/typecheck/32 arquivos e 175 Vitest/build PASS | Correção temporal canônica em `Europe/Rome`; nenhuma migration ou alteração de dados (DB-0); Sprint 07 não iniciada |
 | 07 | completed | 2026-08-20 | 2026-08-20 | Codex | Dossiê DB-P; migration `20260820035000_atomic_login_lockout.sql`; 21 pgTAP PASS, lint/typecheck/32 arquivos e 179 Vitest/build PASS; aplicada em produção no projeto `iwrbeiqqsvzhiuhkqnqg` após autorização expressa | Concorrência de login atômica no banco; `anon`/`authenticated` bloqueados com `42501`; sem alteração remota não autorizada; Sprint 08 não iniciada |
 | 08 | completed | 2026-08-20 | 2026-08-20 | Codex | Dossiê DB-P; migration `20260820220000_atomic_service_order_write.sql`; caso de uso `saveServiceOrder`; 27 pgTAP (219 total), invariantes/fotos/schema lint sem issues; lint/typecheck/33 arquivos e 182 Vitest/build (20 rotas) PASS; aplicada em produção no projeto `iwrbeiqqsvzhiuhkqnqg` após autorização expressa | Criação/edição de O.S. e equipe atômicas; RPC `SECURITY INVOKER` restrita a `admin`/`secretaria`; sem dados corrompidos; Sprint 09 não iniciada |
-| 09 | planned | — | — | — | — | — |
+| 09 | completed | 2026-08-20 | 2026-08-20 | Codex | Dossiê DB-P; migration `20260820230000_atomic_property_write.sql`; caso de uso `saveProperty`; 34 pgTAP (253 total), invariantes/fotos/schema lint sem issues; lint/typecheck/34 arquivos e 188 Vitest/build (20 rotas) PASS; smoke de dados sensíveis PASS; aplicada em produção no projeto `iwrbeiqqsvzhiuhkqnqg` após autorização expressa | Criação/edição de imóvel e agência/proprietário atômicas; RPC `SECURITY INVOKER` restrita a `admin`; zero novos órfãos; Sprint 10 não iniciada |
 | 10 | planned | — | — | — | — | — |
 | 11 | planned | — | — | — | — | — |
 | 12 | planned | — | — | — | — | — |

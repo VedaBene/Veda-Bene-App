@@ -138,14 +138,18 @@ async function prepareDisposableProject() {
   const atomicOrderWriteMigrationFile = '20260820220000_atomic_service_order_write.sql'
   const atomicOrderWriteMigrationPath = join(migrationsDir, atomicOrderWriteMigrationFile)
   const atomicOrderWriteMigrationSql = await readFile(atomicOrderWriteMigrationPath, 'utf8')
+  const atomicPropertyWriteMigrationFile = '20260820230000_atomic_property_write.sql'
+  const atomicPropertyWriteMigrationPath = join(migrationsDir, atomicPropertyWriteMigrationFile)
+  const atomicPropertyWriteMigrationSql = await readFile(atomicPropertyWriteMigrationPath, 'utf8')
 
   // Start from the preceding baseline so the exact Sprint 04, Sprint 05,
-  // Sprint 07 and Sprint 08 migrations can each be exercised between before/after fingerprints.
+  // Sprint 07, Sprint 08 and Sprint 09 migrations can each be exercised between before/after fingerprints.
   for (const [migrationPath, migrationFile] of [
     [guardMigrationPath, guardMigrationFile],
     [confidentialityMigrationPath, confidentialityMigrationFile],
     [lockoutMigrationPath, lockoutMigrationFile],
     [atomicOrderWriteMigrationPath, atomicOrderWriteMigrationFile],
+    [atomicPropertyWriteMigrationPath, atomicPropertyWriteMigrationFile],
   ]) {
     await rename(migrationPath, join(temporaryRoot, `${migrationFile}.pending`))
   }
@@ -153,6 +157,8 @@ async function prepareDisposableProject() {
   return {
     atomicOrderWriteMigrationFile,
     atomicOrderWriteMigrationSql,
+    atomicPropertyWriteMigrationFile,
+    atomicPropertyWriteMigrationSql,
     confidentialityMigrationFile,
     confidentialityMigrationSql,
     guardMigrationFile,
@@ -366,6 +372,61 @@ BEGIN
   END IF;
 END
 $atomic_so_invariants$;
+`
+
+  executeSqlTextInContainer(
+    `Apply ${migrationFile} and compare invariants`,
+    containerName,
+    'postgres',
+    `${snapshotSql}\n${migrationSql}\n${invariantSql}`,
+  )
+}
+
+function runAtomicPropertyWriteMigrationSmoke(
+  workdir,
+  projectId,
+  migrationFile,
+  migrationSql,
+) {
+  localDatabaseUrlFromStatus(workdir)
+  const containerName = `supabase_db_${projectId}`
+  const snapshotSql = String.raw`
+CREATE TEMP TABLE atomic_prop_migration_before AS
+SELECT
+  (SELECT count(*) FROM public.auth_login_attempts) AS attempt_count,
+  (SELECT count(*) FROM public.profiles) AS profile_count,
+  (SELECT count(*) FROM public.properties) AS property_count,
+  (SELECT count(*) FROM public.agencies) AS agency_count,
+  (SELECT count(*) FROM public.owners) AS owner_count,
+  (SELECT count(*) FROM public.service_orders) AS order_count,
+  (SELECT count(*) FROM public.service_order_cleaning_staff) AS staff_link_count;
+`
+  const invariantSql = String.raw`
+DO $atomic_prop_invariants$
+DECLARE
+  before_row pg_temp.atomic_prop_migration_before%ROWTYPE;
+  after_row pg_temp.atomic_prop_migration_before%ROWTYPE;
+BEGIN
+  SELECT * INTO before_row FROM pg_temp.atomic_prop_migration_before;
+  SELECT
+    (SELECT count(*) FROM public.auth_login_attempts),
+    (SELECT count(*) FROM public.profiles),
+    (SELECT count(*) FROM public.properties),
+    (SELECT count(*) FROM public.agencies),
+    (SELECT count(*) FROM public.owners),
+    (SELECT count(*) FROM public.service_orders),
+    (SELECT count(*) FROM public.service_order_cleaning_staff)
+  INTO after_row;
+
+  IF before_row IS DISTINCT FROM after_row THEN
+    RAISE EXCEPTION 'Sprint 09 migration changed unexpected data counts';
+  END IF;
+
+  IF pg_catalog.to_regprocedure('public.save_property_atomic(uuid,text,text,text,text,text,text,text,uuid,text,text,text,uuid,text,text,text,numeric,numeric,numeric,integer,integer,integer,integer,integer,integer,integer,integer,integer,integer,numeric,numeric,numeric,text)') IS NULL THEN
+    RAISE EXCEPTION 'Sprint 09 function save_property_atomic was not created';
+  END IF;
+END
+$atomic_prop_invariants$;
 `
 
   executeSqlTextInContainer(
@@ -598,6 +659,8 @@ async function main() {
   const {
     atomicOrderWriteMigrationFile,
     atomicOrderWriteMigrationSql,
+    atomicPropertyWriteMigrationFile,
+    atomicPropertyWriteMigrationSql,
     confidentialityMigrationFile,
     confidentialityMigrationSql,
     guardMigrationFile,
@@ -646,6 +709,12 @@ async function main() {
       atomicOrderWriteMigrationFile,
       atomicOrderWriteMigrationSql,
     )
+    runAtomicPropertyWriteMigrationSmoke(
+      workdir,
+      projectId,
+      atomicPropertyWriteMigrationFile,
+      atomicPropertyWriteMigrationSql,
+    )
 
     executeCli('Run role × table × operation × column pgTAP matrix', [
       '--workdir', workdir,
@@ -681,7 +750,7 @@ async function main() {
     ], { showOutput: true })
 
     await runPhotoMigrationSmoke(workdir, projectId)
-    process.stdout.write('\nSupabase authorization and Sprint 08 atomic write tests passed without a remote target.\n')
+    process.stdout.write('\nSupabase authorization and Sprint 09 atomic property write tests passed without a remote target.\n')
   } finally {
     if (stackStarted) {
       executeCli('Stop and delete only the isolated local stack', [
