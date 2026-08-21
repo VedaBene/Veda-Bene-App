@@ -180,18 +180,26 @@ export function ServiceOrderListTable({
                     </div>
                   )}
 
-                  {!isCliente && os.status === 'done' && (os.completed_at || os.worked_minutes != null) && (
+                  {os.status === 'done' && (os.completed_at || (!isCliente && os.worked_minutes != null)) && (
                     <div className="col-span-2">
-                      <span className="block text-[10px] font-bold uppercase tracking-wider mb-0.5 text-muted-foreground/60">
-                        Conclusa
-                      </span>
-                      <span className="font-semibold text-foreground/80">{formatDateTime(os.completed_at)}</span>
-                      <span className="block text-[10px] font-bold uppercase tracking-wider mt-2 mb-0.5 text-muted-foreground/60">
-                        Tempo pulizia
-                      </span>
-                      <span className="font-semibold text-foreground/80">
-                        {os.worked_minutes != null ? formatWorkedTime(os.worked_minutes) : '—'}
-                      </span>
+                      {os.completed_at && (
+                        <>
+                          <span className="block text-[10px] font-bold uppercase tracking-wider mb-0.5 text-muted-foreground/60">
+                            Conclusa
+                          </span>
+                          <span className="font-semibold text-foreground/80">{formatDateTime(os.completed_at)}</span>
+                        </>
+                      )}
+                      {!isCliente && os.worked_minutes != null && (
+                        <>
+                          <span className="block text-[10px] font-bold uppercase tracking-wider mt-2 mb-0.5 text-muted-foreground/60">
+                            Tempo pulizia
+                          </span>
+                          <span className="font-semibold text-foreground/80">
+                            {formatWorkedTime(os.worked_minutes)}
+                          </span>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
@@ -260,10 +268,14 @@ export function ServiceOrderListTable({
                           <LiveTimer key={`live-timer-desktop-${os.id}-${os.status}-${os.started_at}`} startedAt={os.started_at} />
                         </div>
                       )}
-                      {!isCliente && os.status === 'done' && (os.completed_at || os.worked_minutes != null) && (
+                      {os.status === 'done' && (os.completed_at || (!isCliente && os.worked_minutes != null)) && (
                         <span className="text-[11px] leading-4 text-muted-foreground text-left whitespace-nowrap">
-                          <span className="block"><span className="font-medium">Conclusa:</span> {formatDateTime(os.completed_at)}</span>
-                          <span className="block"><span className="font-medium">Tempo:</span> {os.worked_minutes != null ? formatWorkedTime(os.worked_minutes) : '—'}</span>
+                          {os.completed_at && (
+                            <span className="block"><span className="font-medium">Conclusa:</span> {formatDateTime(os.completed_at)}</span>
+                          )}
+                          {!isCliente && os.worked_minutes != null && (
+                            <span className="block"><span className="font-medium">Tempo:</span> {formatWorkedTime(os.worked_minutes)}</span>
+                          )}
                         </span>
                       )}
                     </div>

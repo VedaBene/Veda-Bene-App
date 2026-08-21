@@ -167,4 +167,48 @@ describe('service-order operational visibility in the DAL', () => {
 
     expect(result?.id).toBe('future')
   })
+
+  it('filters active and done orders by checkinDate in Rome timezone and retrieves past completed orders', async () => {
+    // 2026-08-21 Rome timezone: CEST (UTC+2) -> [2026-08-20T22:00:00.000Z, 2026-08-21T22:00:00.000Z)
+    const fake = new FakeSupabase({
+      service_orders: [
+        // Completed earlier (cleaning on 2026-08-15) with check-in on 2026-08-21 15:00 Rome (13:00 UTC)
+        order({
+          id: 'done-earlier',
+          cleaning_date: '2026-08-15',
+          status: 'done',
+          checkin_at: '2026-08-21T13:00:00Z',
+          completed_at: '2026-08-15T12:00:00Z',
+          order_number: 10,
+        }),
+        // In progress with check-in on 2026-08-21 11:00 Rome (09:00 UTC)
+        order({
+          id: 'active-today-checkin',
+          cleaning_date: '2026-08-21',
+          status: 'in_progress',
+          checkin_at: '2026-08-21T09:00:00Z',
+          order_number: 11,
+        }),
+        // Done but check-in is on different date (2026-08-25)
+        order({
+          id: 'done-other-checkin',
+          cleaning_date: '2026-08-21',
+          status: 'done',
+          checkin_at: '2026-08-25T13:00:00Z',
+          order_number: 12,
+        }),
+      ],
+    })
+
+    const result = await getServiceOrderList(
+      asSupabase(fake),
+      viewer('cliente'),
+      { ...FILTERS, checkinDate: '2026-08-21' },
+      VISIBILITY,
+    )
+
+    expect(result.active.map(item => item.id)).toEqual(['active-today-checkin'])
+    expect(result.done.map(item => item.id)).toEqual(['done-earlier'])
+    expect(result.doneForExport.map(item => item.id)).toEqual(['done-earlier'])
+  })
 })

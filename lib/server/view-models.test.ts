@@ -118,7 +118,7 @@ describe('view-model role visibility', () => {
     expect(toPropertyFormData(property, 'cliente')).not.toHaveProperty('client_type')
   })
 
-  it('hides responsible staff names from cliente service-order list DTOs', () => {
+  it('hides responsible staff names and worked_minutes from cliente service-order list DTOs', () => {
     const listOrder: ServiceOrderListItem = {
       ...order,
       property: { id: 'property-1', name: 'Campo', avg_cleaning_hours: 3 },
@@ -135,6 +135,8 @@ describe('view-model role visibility', () => {
     expect(toServiceOrderListItem(listOrder, 'cliente')).toMatchObject({
       cleaning_staff: [],
       consegna_staff: null,
+      completed_at: '2026-01-10T12:00:00Z',
+      worked_minutes: null,
     })
   })
 

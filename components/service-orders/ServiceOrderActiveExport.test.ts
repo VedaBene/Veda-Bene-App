@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { ServiceOrderListItem } from '@/lib/types/view-models'
-import { buildServiceOrdersPdfHtml } from './ServiceOrderActiveExport'
+import {
+  buildCheckinReportPdfHtml,
+  buildServiceOrdersPdfHtml,
+} from './ServiceOrderActiveExport'
 
 function order(overrides: Partial<ServiceOrderListItem> = {}): ServiceOrderListItem {
   return {
@@ -178,5 +181,90 @@ describe('service-order PDF staff columns', () => {
 
     expect(html).toContain('Data: Fino al 07/08/2026 (Oggi)')
     expect(html).not.toContain('Data: Tutte le date')
+  })
+
+  it('omits worked time from completed orders when isCliente is true', () => {
+    const doneOrder = order({
+      status: 'done',
+      completed_at: '2026-08-05T12:48:00Z',
+      worked_minutes: 106,
+    })
+
+    const clientHtml = buildServiceOrdersPdfHtml([doneOrder], '2026-08-05', 'done', undefined, true)
+    expect(clientHtml).toContain('Conclusa:')
+    expect(clientHtml).not.toContain('Tempo:')
+    expect(clientHtml).toContain('<th>Conclusione</th>')
+    expect(clientHtml).not.toContain('<th>Conclusione / Tempo</th>')
+
+    const adminHtml = buildServiceOrdersPdfHtml([doneOrder], '2026-08-05', 'done', undefined, false)
+    expect(adminHtml).toContain('Conclusa:')
+    expect(adminHtml).toContain('Tempo:')
+    expect(adminHtml).toContain('1h 46min')
+  })
+})
+
+describe('buildCheckinReportPdfHtml', () => {
+  it('generates a unified check-in PDF with all statuses, badges, and totals', () => {
+    const inProgressOrder = order({
+      id: 'o-1',
+      order_number: 1252,
+      property: { id: 'p-1', name: 'Frattina Exclusive Apartment', avg_cleaning_hours: 2 },
+      status: 'in_progress',
+      checkin_at: '2026-08-21T13:00:00Z',
+      real_guests: 4,
+      double_beds: 2,
+    })
+
+    const openOrder = order({
+      id: 'o-2',
+      order_number: 1263,
+      property: { id: 'p-2', name: 'Colosseo View Luxury', avg_cleaning_hours: 3 },
+      status: 'open',
+      checkin_at: '2026-08-21T09:30:00Z',
+      real_guests: 6,
+      double_beds: 2,
+    })
+
+    const doneOrder = order({
+      id: 'o-3',
+      order_number: 1260,
+      property: { id: 'p-3', name: 'San Trifone Collection', avg_cleaning_hours: 2 },
+      status: 'done',
+      checkin_at: '2026-08-21T13:00:00Z',
+      completed_at: '2026-08-21T11:16:00Z',
+      worked_minutes: 159,
+      real_guests: 3,
+      double_beds: 1,
+    })
+
+    const html = buildCheckinReportPdfHtml([inProgressOrder, openOrder, doneOrder], '2026-08-21', true)
+
+    expect(html).toContain('Veda Bene — Report Check-in')
+    expect(html).toContain('Data Check-in: 21/08/2026')
+    expect(html).toContain('Totale Immobili: 3')
+    expect(html).toContain('In corso: 1')
+    expect(html).toContain('Aperti: 1')
+    expect(html).toContain('Completati: 1')
+
+    // Chronological ordering: Colosseo (09:30 UTC -> 11:30 Rome) before Frattina / San Trifone (13:00 UTC -> 15:00 Rome)
+    const colosseoPos = html.indexOf('Colosseo View Luxury')
+    const frattinaPos = html.indexOf('Frattina Exclusive Apartment')
+    expect(colosseoPos).toBeLessThan(frattinaPos)
+
+    // Status badges
+    expect(html).toContain('IN CORSO')
+    expect(html).toContain('APERTO')
+    expect(html).toContain('COMPLETATO')
+    expect(html).toContain('Conclusa: 21/08/2026, 13:16')
+
+    // Worked time should NEVER appear for cliente
+    expect(html).not.toContain('Tempo:')
+    expect(html).not.toContain('1h 46min')
+    expect(html).not.toContain('2h 39min')
+
+    // Totals
+    expect(html).toContain('<h2>Totali occupazione</h2>')
+    expect(html).toContain('<td class="highlight">13</td>') // 4 + 6 + 3 = 13 guests
+    expect(html).toContain('<td class="highlight">5</td>') // 2 + 2 + 1 = 5 double beds
   })
 })

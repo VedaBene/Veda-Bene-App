@@ -18,7 +18,7 @@ export default async function ServiceOrdersPage(props: PageProps<never>) {
   const parsedFilters = serviceOrderListSearchParamsSchema.safeParse(await props.searchParams)
   const filters = parsedFilters.success
     ? parsedFilters.data
-    : { donePage: 1, q: undefined, propertyId: undefined, cleaningStaffId: undefined, consegnaStaffId: undefined, startDate: undefined, endDate: undefined }
+    : { donePage: 1, q: undefined, propertyId: undefined, cleaningStaffId: undefined, consegnaStaffId: undefined, startDate: undefined, endDate: undefined, checkinDate: undefined }
 
   const { supabase, viewer } = await getCurrentViewer()
   const operationalVisibility = isOperationalStaffRole(viewer.role)
@@ -42,6 +42,7 @@ export default async function ServiceOrdersPage(props: PageProps<never>) {
       consegnaStaffId: operationalVisibility ? undefined : filters.consegnaStaffId,
       startDate: effectiveStartDate,
       endDate: effectiveEndDate,
+      checkinDate: filters.checkinDate,
     }, operationalVisibility ?? undefined),
     operationalVisibility
       ? Promise.resolve({ properties: [], staff: [] })
@@ -75,6 +76,7 @@ export default async function ServiceOrdersPage(props: PageProps<never>) {
         initialConsegnaStaffId={operationalVisibility ? '' : (filters.consegnaStaffId ?? '')}
         initialStartDate={effectiveStartDate ?? ''}
         initialEndDate={effectiveEndDate ?? ''}
+        initialCheckinDate={filters.checkinDate ?? ''}
         staff={viewer.role === 'cliente' || operationalVisibility ? [] : staff}
         operationalVisibility={operationalVisibility}
         cleaningPhotosEnabled={isCleaningPhotosEnabled()}

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, useTransition, type ReactNode } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
-import { Timer } from 'lucide-react'
+import { Timer, CalendarCheck } from 'lucide-react'
 import { finishCleaning, startCleaning } from '@/app/(app)/service-orders/actions'
 import { Card } from '@/components/ui/Card'
 import { Pagination } from '@/components/ui/Pagination'
@@ -10,7 +10,7 @@ import type { Role } from '@/lib/types/database'
 import type { ServiceOrderListItem } from '@/lib/types/view-models'
 import type { OperationalServiceOrderVisibility } from '@/lib/service-order-visibility'
 import { getRomeDateOnly } from '@/lib/utils/date-rome'
-import { OrdersPdfButton } from './ServiceOrderActiveExport'
+import { OrdersPdfButton, CheckinReportPdfButton } from './ServiceOrderActiveExport'
 import { ServiceOrderFilters } from './ServiceOrderFilters'
 import { ServiceOrderListTable } from './ServiceOrderListTable'
 import { FinishCleaningModal, StartCleaningModal } from './ServiceOrderTimeControls'
@@ -36,6 +36,7 @@ export function ServiceOrderList({
   initialConsegnaStaffId,
   initialStartDate,
   initialEndDate,
+  initialCheckinDate = '',
   staff,
   operationalVisibility,
   cleaningPhotosEnabled = false,
@@ -53,6 +54,7 @@ export function ServiceOrderList({
   initialConsegnaStaffId: string
   initialStartDate: string
   initialEndDate: string
+  initialCheckinDate?: string
   staff: StaffOption[]
   operationalVisibility: OperationalServiceOrderVisibility | null
   cleaningPhotosEnabled?: boolean
@@ -65,6 +67,7 @@ export function ServiceOrderList({
   const [consegnaStaffId, setConsegnaStaffId] = useState(initialConsegnaStaffId)
   const [startDate, setStartDate] = useState(initialStartDate)
   const [endDate, setEndDate] = useState(initialEndDate)
+  const [checkinDate, setCheckinDate] = useState(initialCheckinDate)
   const [startModalOrder, setStartModalOrder] = useState<ServiceOrderListItem | null>(null)
   const [finishModalOrder, setFinishModalOrder] = useState<ServiceOrderListItem | null>(null)
   const [finishNotes, setFinishNotes] = useState('')
@@ -78,6 +81,7 @@ export function ServiceOrderList({
     consegnaStaffId: initialConsegnaStaffId,
     startDate: initialStartDate,
     endDate: initialEndDate,
+    checkinDate: initialCheckinDate,
   })
 
   if (
@@ -85,7 +89,8 @@ export function ServiceOrderList({
     prevInitial.cleaningStaffId !== initialCleaningStaffId ||
     prevInitial.consegnaStaffId !== initialConsegnaStaffId ||
     prevInitial.startDate !== initialStartDate ||
-    prevInitial.endDate !== initialEndDate
+    prevInitial.endDate !== initialEndDate ||
+    prevInitial.checkinDate !== initialCheckinDate
   ) {
     setPrevInitial({
       q: initialQ,
@@ -93,22 +98,25 @@ export function ServiceOrderList({
       consegnaStaffId: initialConsegnaStaffId,
       startDate: initialStartDate,
       endDate: initialEndDate,
+      checkinDate: initialCheckinDate,
     })
     setSearch(initialQ)
     setCleaningStaffId(initialCleaningStaffId)
     setConsegnaStaffId(initialConsegnaStaffId)
     setStartDate(initialStartDate)
     setEndDate(initialEndDate)
+    setCheckinDate(initialCheckinDate)
   }
 
   const pushFilters = useCallback(
-    (q: string, cleaningId: string, consegnaId: string, startD: string, endD: string) => {
+    (q: string, cleaningId: string, consegnaId: string, startD: string, endD: string, checkinD: string) => {
       const params = new URLSearchParams()
       if (q) params.set('q', q)
       if (cleaningId) params.set('cleaningStaffId', cleaningId)
       if (consegnaId) params.set('consegnaStaffId', consegnaId)
       if (startD) params.set('startDate', startD)
       if (endD) params.set('endDate', endD)
+      if (checkinD) params.set('checkinDate', checkinD)
       params.set('donePage', '1')
       startTransition(() => {
         router.replace(`${pathname}?${params.toString()}`)
@@ -123,15 +131,16 @@ export function ServiceOrderList({
       cleaningStaffId !== initialCleaningStaffId ||
       consegnaStaffId !== initialConsegnaStaffId ||
       startDate !== initialStartDate ||
-      endDate !== initialEndDate
+      endDate !== initialEndDate ||
+      checkinDate !== initialCheckinDate
 
     if (!isDirty) return
 
     const t = setTimeout(() => {
-      pushFilters(search, cleaningStaffId, consegnaStaffId, startDate, endDate)
+      pushFilters(search, cleaningStaffId, consegnaStaffId, startDate, endDate, checkinDate)
     }, 300)
     return () => clearTimeout(t)
-  }, [search, cleaningStaffId, consegnaStaffId, startDate, endDate, initialQ, initialCleaningStaffId, initialConsegnaStaffId, initialStartDate, initialEndDate, pushFilters])
+  }, [search, cleaningStaffId, consegnaStaffId, startDate, endDate, checkinDate, initialQ, initialCleaningStaffId, initialConsegnaStaffId, initialStartDate, initialEndDate, initialCheckinDate, pushFilters])
 
   useEffect(() => {
     if (!operationalVisibility) return
@@ -167,14 +176,15 @@ export function ServiceOrderList({
   const open = allActive.filter(o => o.status === 'open')
   const sortedOpen = [...open].sort(compareServiceOrderPriority)
   
-  const hasFilter = search !== '' || cleaningStaffId !== '' || consegnaStaffId !== '' || startDate !== '' || endDate !== ''
+  const hasFilter = search !== '' || cleaningStaffId !== '' || consegnaStaffId !== '' || startDate !== '' || endDate !== '' || checkinDate !== ''
   
   const isFiltersDirty =
     search !== initialQ ||
     cleaningStaffId !== initialCleaningStaffId ||
     consegnaStaffId !== initialConsegnaStaffId ||
     startDate !== initialStartDate ||
-    endDate !== initialEndDate
+    endDate !== initialEndDate ||
+    checkinDate !== initialCheckinDate
 
   const isSyncing = isFiltersDirty || isPending
   const selectedRangeLabel = startDate && endDate && startDate !== endDate
@@ -192,6 +202,9 @@ export function ServiceOrderList({
   if (consegnaStaffId) doneSearchParams.consegnaStaffId = consegnaStaffId
   if (startDate) doneSearchParams.startDate = startDate
   if (endDate) doneSearchParams.endDate = endDate
+  if (checkinDate) doneSearchParams.checkinDate = checkinDate
+
+  const isCliente = role === 'cliente'
 
   async function handleStartCleaning() {
     if (!startModalOrder) return
@@ -277,6 +290,7 @@ export function ServiceOrderList({
         consegnaStaffId={consegnaStaffId}
         startDate={startDate}
         endDate={endDate}
+        checkinDate={checkinDate}
         staff={staff}
         maxDate={operationalVisibility?.maxVisibleDate}
         hasFilter={hasFilter}
@@ -285,14 +299,40 @@ export function ServiceOrderList({
         onConsegnaStaffChange={setConsegnaStaffId}
         onStartDateChange={setStartDate}
         onEndDateChange={setEndDate}
+        onCheckinDateChange={setCheckinDate}
         onClear={() => {
           setSearch('')
           setCleaningStaffId('')
           setConsegnaStaffId('')
           setStartDate('')
           setEndDate('')
+          setCheckinDate('')
         }}
       />
+
+      {checkinDate && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-card border border-border/80 rounded-xl px-5 py-3.5 shadow-sm">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center text-accent">
+              <CalendarCheck size={18} />
+            </div>
+            <div>
+              <span className="text-sm font-bold text-foreground block">
+                Check-in previsti per il {formatDate(checkinDate)}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                Totale di {allActive.length + doneTotalCount} {allActive.length + doneTotalCount === 1 ? 'immobile' : 'immobili'} identificati
+              </span>
+            </div>
+          </div>
+          <CheckinReportPdfButton
+            orders={[...allActive, ...doneForExport]}
+            checkinDate={checkinDate}
+            isCliente={isCliente}
+            disabled={isSyncing}
+          />
+        </div>
+      )}
 
       {inProgress.length > 0 && (
         <Card>
@@ -300,7 +340,7 @@ export function ServiceOrderList({
             title="In corso"
             count={inProgress.length}
             countClassName="bg-info/10 text-info"
-            action={<OrdersPdfButton orders={inProgress} date={startDate || endDate || ''} dateLabel={activePdfDateLabel} status="in_progress" disabled={isSyncing} />}
+            action={<OrdersPdfButton orders={inProgress} date={startDate || endDate || ''} dateLabel={activePdfDateLabel} status="in_progress" isCliente={isCliente} disabled={isSyncing} />}
           />
           <ServiceOrderListTable
             orders={inProgress}
@@ -317,7 +357,7 @@ export function ServiceOrderList({
           title="Aperti"
           count={open.length}
           countClassName="bg-warning-bg text-warning"
-          action={<OrdersPdfButton orders={sortedOpen} date={startDate || endDate || ''} dateLabel={activePdfDateLabel} status="open" disabled={isSyncing} />}
+          action={<OrdersPdfButton orders={sortedOpen} date={startDate || endDate || ''} dateLabel={activePdfDateLabel} status="open" isCliente={isCliente} disabled={isSyncing} />}
         />
         <ServiceOrderListTable
           orders={sortedOpen}
@@ -333,7 +373,7 @@ export function ServiceOrderList({
           title="Completati"
           count={doneTotalCount}
           countClassName="bg-success-bg text-success"
-          action={<OrdersPdfButton orders={doneForExport} date={startDate || endDate || ''} dateLabel={selectedRangeLabel} status="done" disabled={isSyncing} />}
+          action={<OrdersPdfButton orders={doneForExport} date={startDate || endDate || ''} dateLabel={selectedRangeLabel} status="done" isCliente={isCliente} disabled={isSyncing} />}
         />
         <ServiceOrderListTable
           orders={done}

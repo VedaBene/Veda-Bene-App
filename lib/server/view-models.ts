@@ -132,7 +132,7 @@ export function toServiceOrderListItem(order: RawServiceOrderList, role: Role): 
     is_urgent: order.is_urgent,
     started_at: order.started_at ?? null,
     completed_at: order.completed_at ?? null,
-    worked_minutes: order.worked_minutes ?? null,
+    worked_minutes: role === 'cliente' ? null : (order.worked_minutes ?? null),
     pricing_mode: order.pricing_mode,
     cleaning_notes: order.cleaning_notes ?? null,
   }

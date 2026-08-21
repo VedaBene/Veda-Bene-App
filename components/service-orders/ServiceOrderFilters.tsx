@@ -11,6 +11,7 @@ export function ServiceOrderFilters({
   consegnaStaffId,
   startDate,
   endDate,
+  checkinDate = '',
   staff,
   maxDate,
   hasFilter,
@@ -19,6 +20,7 @@ export function ServiceOrderFilters({
   onConsegnaStaffChange,
   onStartDateChange,
   onEndDateChange,
+  onCheckinDateChange,
   onClear,
 }: {
   search: string
@@ -26,6 +28,7 @@ export function ServiceOrderFilters({
   consegnaStaffId: string
   startDate: string
   endDate: string
+  checkinDate?: string
   staff: StaffOption[]
   maxDate?: string
   hasFilter: boolean
@@ -34,6 +37,7 @@ export function ServiceOrderFilters({
   onConsegnaStaffChange: (value: string) => void
   onStartDateChange: (value: string) => void
   onEndDateChange: (value: string) => void
+  onCheckinDateChange?: (value: string) => void
   onClear: () => void
 }) {
   const cleaningOptions = [
@@ -44,6 +48,30 @@ export function ServiceOrderFilters({
     { value: '', label: 'Tutti — Consegna' },
     ...staff.filter((person) => person.role === 'consegna').map((person) => ({ value: person.id, label: person.full_name })),
   ]
+
+  const handleStartDateChange = (val: string) => {
+    if (val && onCheckinDateChange) {
+      onCheckinDateChange('')
+    }
+    onStartDateChange(val)
+  }
+
+  const handleEndDateChange = (val: string) => {
+    if (val && onCheckinDateChange) {
+      onCheckinDateChange('')
+    }
+    onEndDateChange(val)
+  }
+
+  const handleCheckinDateChange = (val: string) => {
+    if (val) {
+      onStartDateChange('')
+      onEndDateChange('')
+    }
+    if (onCheckinDateChange) {
+      onCheckinDateChange(val)
+    }
+  }
 
   return (
     <div className="flex flex-wrap items-center gap-3 w-full">
@@ -82,7 +110,7 @@ export function ServiceOrderFilters({
           type="date"
           value={startDate}
           max={maxDate}
-          onChange={(e) => onStartDateChange(e.target.value)}
+          onChange={(e) => handleStartDateChange(e.target.value)}
           className="max-w-[150px] w-full"
         />
         <span className="text-xs font-medium text-muted-foreground">Al:</span>
@@ -90,11 +118,24 @@ export function ServiceOrderFilters({
           type="date"
           value={endDate}
           max={maxDate}
-          onChange={(e) => onEndDateChange(e.target.value)}
+          onChange={(e) => handleEndDateChange(e.target.value)}
           className="max-w-[150px] w-full"
           min={startDate || undefined}
         />
       </div>
+
+      {onCheckinDateChange && (
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">Check-in:</span>
+          <Input
+            type="date"
+            value={checkinDate}
+            onChange={(e) => handleCheckinDateChange(e.target.value)}
+            className="max-w-[150px] w-full"
+            aria-label="Filtra per data di check-in"
+          />
+        </div>
+      )}
 
       {hasFilter && (
         <button

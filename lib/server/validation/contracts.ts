@@ -212,6 +212,7 @@ export const serviceOrderListSearchParamsSchema = z.object({
   consegnaStaffId: optionalUuidSchema,
   startDate: optionalDateOnlySchema,
   endDate: optionalDateOnlySchema,
+  checkinDate: optionalDateOnlySchema,
 })
 
 const dateRangeSchema = z

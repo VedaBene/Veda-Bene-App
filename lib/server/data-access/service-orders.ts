@@ -19,6 +19,7 @@ import {
   loadAuthorizedServiceOrderOperationalFinancialFields,
   loadAverageHoursForVisibleServiceOrders,
 } from './sensitive-data'
+import { romeDateRangeToUtcInterval } from '@/lib/utils/date-rome'
 
 export type ServiceOrderListResult = {
   active: ServiceOrderListItem[]
@@ -112,8 +113,13 @@ export async function getServiceOrderList(
   const isOperationalStaff = isOperationalStaffRole(viewer.role)
   const isFilterActive = !!(
     filters.propertyId || filters.cleaningStaffId || filters.consegnaStaffId ||
-    filters.startDate || filters.endDate || filters.q
+    filters.startDate || filters.endDate || filters.checkinDate || filters.q
   )
+
+  let checkinUtcInterval: { startUtc: string; nextDayUtc: string } | null = null
+  if (filters.checkinDate) {
+    checkinUtcInterval = romeDateRangeToUtcInterval(filters.checkinDate, filters.checkinDate)
+  }
 
   let cleaningOrderIds: string[] | null = null
   if (filters.cleaningStaffId) {
@@ -129,23 +135,26 @@ export async function getServiceOrderList(
     : null
   const noMatchesId = '00000000-0000-0000-0000-000000000000'
 
+  const orderColumn = checkinUtcInterval ? 'checkin_at' : 'cleaning_date'
+  const orderAscending = !!checkinUtcInterval
+
   let activeQuery = supabase
     .from('service_orders')
     .select(SERVICE_ORDER_LIST_SELECT)
     .in('status', ['open', 'in_progress'])
-    .order('cleaning_date', { ascending: false, nullsFirst: false })
+    .order(orderColumn, { ascending: orderAscending, nullsFirst: false })
 
   let doneQuery = supabase
     .from('service_orders')
     .select(SERVICE_ORDER_LIST_SELECT, { count: 'exact' })
     .eq('status', 'done')
-    .order('cleaning_date', { ascending: false, nullsFirst: false })
+    .order(orderColumn, { ascending: orderAscending, nullsFirst: false })
 
   let doneExportQuery = supabase
     .from('service_orders')
     .select(SERVICE_ORDER_LIST_SELECT)
     .eq('status', 'done')
-    .order('cleaning_date', { ascending: false, nullsFirst: false })
+    .order(orderColumn, { ascending: orderAscending, nullsFirst: false })
 
   for (const queryName of ['active', 'done', 'doneExport'] as const) {
     let query = queryName === 'active' ? activeQuery : queryName === 'done' ? doneQuery : doneExportQuery
@@ -158,8 +167,14 @@ export async function getServiceOrderList(
     if (filters.q) {
       query = query.in('property_id', matchingPropertyIds?.length ? matchingPropertyIds : [noMatchesId])
     }
-    if (filters.startDate) query = query.gte('cleaning_date', filters.startDate)
-    if (filters.endDate) query = query.lte('cleaning_date', filters.endDate)
+    if (checkinUtcInterval) {
+      query = query
+        .gte('checkin_at', checkinUtcInterval.startUtc)
+        .lt('checkin_at', checkinUtcInterval.nextDayUtc)
+    } else {
+      if (filters.startDate) query = query.gte('cleaning_date', filters.startDate)
+      if (filters.endDate) query = query.lte('cleaning_date', filters.endDate)
+    }
 
     if (queryName === 'active') activeQuery = query
     else if (queryName === 'done') doneQuery = query

@@ -126,4 +126,29 @@ describe('contracts validation hardening', () => {
       expect(optionalNotesSchema.safeParse('N'.repeat(2000)).success).toBe(true)
     })
   })
+
+  describe('serviceOrderListSearchParamsSchema', () => {
+    it('accepts and parses valid checkinDate parameter', async () => {
+      const { serviceOrderListSearchParamsSchema } = await import('@/lib/server/validation/contracts')
+      const result = serviceOrderListSearchParamsSchema.parse({
+        checkinDate: '2026-08-21',
+        donePage: '2',
+      })
+      expect(result.checkinDate).toBe('2026-08-21')
+      expect(result.donePage).toBe(2)
+    })
+
+    it('handles empty or invalid checkinDate cleanly', async () => {
+      const { serviceOrderListSearchParamsSchema } = await import('@/lib/server/validation/contracts')
+      const result = serviceOrderListSearchParamsSchema.parse({
+        checkinDate: '',
+      })
+      expect(result.checkinDate).toBeUndefined()
+
+      const invalid = serviceOrderListSearchParamsSchema.safeParse({
+        checkinDate: '21/08/2026',
+      })
+      expect(invalid.success).toBe(false)
+    })
+  })
 })
