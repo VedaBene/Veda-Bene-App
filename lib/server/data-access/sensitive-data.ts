@@ -117,7 +117,7 @@ export async function loadPropertyListForAdministration(
   const { data, count, error } = await query
   if (error) throw new Error('Não foi possível carregar os imóveis.', { cause: error })
 
-  return { rows: (data ?? []) as unknown as PropertyListItem[], count: count ?? 0 }
+  return { rows: (data ?? []) as PropertyListItem[], count: count ?? 0 }
 }
 
 export async function loadPropertyDetailForAdministration(
@@ -132,7 +132,7 @@ export async function loadPropertyDetailForAdministration(
     .maybeSingle()
 
   if (error) throw new Error('Não foi possível carregar o imóvel.', { cause: error })
-  return data as unknown as PropertyFormData | null
+  return (data ?? null) as PropertyFormData | null
 }
 
 const SERVICE_ORDER_PROPERTY_COMMON_SELECT =
@@ -152,19 +152,17 @@ export async function loadAuthorizedServiceOrderPropertyOptions(): Promise<{
   const visible = visibleRows ?? []
   const ids = idBatchSchema.parse(visible.map(row => row.id))
   if (ids.length === 0 || viewer.role === 'cliente') {
-    return { role: viewer.role, rows: visible as unknown as ServiceOrderPropertyOption[] }
+    return { role: viewer.role, rows: visible as ServiceOrderPropertyOption[] }
   }
 
-  const sensitiveSelect = viewer.role === 'admin'
-    ? 'id, avg_cleaning_hours, base_price'
-    : 'id, avg_cleaning_hours'
-  const { data: sensitiveRows, error: sensitiveError } = await privilegedClient
-    .from('properties')
-    .select(sensitiveSelect)
-    .in('id', ids)
+  const sensitiveQuery = viewer.role === 'admin'
+    ? privilegedClient.from('properties').select('id, avg_cleaning_hours, base_price').in('id', ids)
+    : privilegedClient.from('properties').select('id, avg_cleaning_hours').in('id', ids)
+
+  const { data: sensitiveRows, error: sensitiveError } = await sensitiveQuery
 
   if (sensitiveError) throw new Error('Não foi possível carregar o contexto operacional.', { cause: sensitiveError })
-  const typedSensitiveRows = (sensitiveRows ?? []) as unknown as Array<{
+  const typedSensitiveRows = (sensitiveRows ?? []) as Array<{
     id: string
     avg_cleaning_hours: number | null
     base_price?: number | null
@@ -179,7 +177,7 @@ export async function loadAuthorizedServiceOrderPropertyOptions(): Promise<{
         ...row,
         avg_cleaning_hours: sensitive?.avg_cleaning_hours ?? null,
         ...(viewer.role === 'admin' ? { base_price: sensitive?.base_price ?? null } : {}),
-      } as unknown as ServiceOrderPropertyOption
+      } as ServiceOrderPropertyOption
     }),
   }
 }
@@ -242,7 +240,7 @@ export async function loadEmployeeListForAdministration(): Promise<EmployeeListI
     .in('role', ['admin', 'secretaria', 'limpeza', 'consegna'])
     .order('full_name')
   if (error) throw new Error('Não foi possível carregar os funcionários.', { cause: error })
-  return (data ?? []) as unknown as EmployeeListItem[]
+  return (data ?? []) as EmployeeListItem[]
 }
 
 export async function loadEmployeeDetailForAdministration(id: string): Promise<EmployeeFormData | null> {
@@ -254,7 +252,7 @@ export async function loadEmployeeDetailForAdministration(id: string): Promise<E
     .eq('id', employeeId)
     .maybeSingle()
   if (error) throw new Error('Não foi possível carregar o funcionário.', { cause: error })
-  return data as unknown as EmployeeFormData | null
+  return (data ?? null) as EmployeeFormData | null
 }
 
 export type OrderPricingContext = {
@@ -412,7 +410,22 @@ export async function loadPayableFinancialSource(
 
   const { data: orders, error: ordersError } = await query
   if (ordersError) throw new Error('Não foi possível carregar o extrato a pagar.', { cause: ordersError })
-  const typedOrders = (orders ?? []) as unknown as PayableOrderSource[]
+  const rawOrders = (orders ?? []) as Array<Record<string, any>>
+  const typedOrders: PayableOrderSource[] = rawOrders.map(row => {
+    const rawProperty = Array.isArray(row.property) ? row.property[0] : row.property
+    return {
+      id: row.id,
+      order_number: row.order_number,
+      completed_at: row.completed_at ?? null,
+      cleaning_staff: (row.cleaning_staff ?? []) as { id: string }[],
+      property: rawProperty
+        ? {
+            name: rawProperty.name ?? null,
+            avg_cleaning_hours: rawProperty.avg_cleaning_hours ?? null,
+          }
+        : null,
+    }
+  })
   const staffIds = [...new Set(typedOrders.flatMap(order => (order.cleaning_staff ?? []).map(staff => staff.id)))]
   if (staffIds.length === 0) return { orders: typedOrders, profiles: [] }
 
@@ -477,9 +490,42 @@ export async function loadReceivableFinancialSource(
       .order('id', { ascending: true })
       .range(from, from + MAX_ID_BATCH - 1)
     if (error) throw new Error('Não foi possível carregar o relatório a receber.', { cause: error })
-    const page = (data ?? []) as unknown as ReceivableOrderSource[]
+    const rawRows = (data ?? []) as Array<Record<string, any>>
+    const page: ReceivableOrderSource[] = rawRows.map(row => {
+      const rawProperty = Array.isArray(row.property) ? row.property[0] : row.property
+      const rawAgency = rawProperty && Array.isArray(rawProperty.agency) ? rawProperty.agency[0] : rawProperty?.agency
+      const rawOwner = rawProperty && Array.isArray(rawProperty.owner) ? rawProperty.owner[0] : rawProperty?.owner
+
+      return {
+        id: row.id,
+        order_number: row.order_number,
+        cleaning_date: row.cleaning_date ?? null,
+        pricing_mode: row.pricing_mode ?? null,
+        real_guests: row.real_guests ?? null,
+        double_beds: row.double_beds ?? 0,
+        single_beds: row.single_beds ?? 0,
+        sofa_beds: row.sofa_beds ?? 0,
+        bathrooms: row.bathrooms ?? 0,
+        bidets: row.bidets ?? 0,
+        cribs: row.cribs ?? 0,
+        extra_services_description: row.extra_services_description ?? null,
+        extra_services_price: row.extra_services_price ?? null,
+        consegna_fee: row.consegna_fee ?? null,
+        total_price: row.total_price ?? null,
+        property: rawProperty
+          ? {
+              id: rawProperty.id,
+              name: rawProperty.name,
+              client_type: rawProperty.client_type,
+              base_price: rawProperty.base_price ?? null,
+              agency: rawAgency ? { id: rawAgency.id, name: rawAgency.name } : null,
+              owner: rawOwner ? { id: rawOwner.id, name: rawOwner.name } : null,
+            }
+          : null,
+      }
+    })
     rows.push(...page)
-    if (page.length < MAX_ID_BATCH) break
+    if (rawRows.length < MAX_ID_BATCH) break
   }
 
   return rows

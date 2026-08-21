@@ -1,10 +1,10 @@
 # Roadmap ativo de endurecimento arquitetural
 
-**Status do programa:** Sprints 00–10 concluídas localmente; Sprint 11 planejada e não iniciada
+**Status do programa:** Sprints 00–11 concluídas localmente; Sprint 12 planejada e não iniciada
 
 **Baseline da auditoria:** 2026-08-15
 
-**Última atualização:** 2026-08-20
+**Última atualização:** 2026-08-21
 
 **Nota técnica de referência:** 6,8/10
 
@@ -1161,13 +1161,13 @@ são rejeitadas cedo e mensagens internas não atravessam a fronteira de UI.
 
 **Critérios de conclusão**
 
-- [ ] Geração de tipos é reproduzível e não contém dados/segredos.
-- [ ] Clients principais usam `Database`.
-- [ ] Não restam casts inseguros nos módulos tocados; nenhum novo cast foi
+- [x] Geração de tipos é reproduzível e não contém dados/segredos (`scripts/generate-database-types.mjs` via stack isolada e `npm run typegen:supabase`).
+- [x] Clients principais usam `Database` (`utils/supabase/{client,server,middleware,admin}.ts`).
+- [x] Não restam casts inseguros nos módulos tocados; nenhum novo cast foi
   introduzido para silenciar erro real.
-- [ ] Datas, intervalos, emails e comprimentos críticos têm testes negativos.
-- [ ] Erros do Supabase não são retornados crus nos entrypoints tocados.
-- [ ] Toda extração nova passa no Deletion Test e melhora localidade.
+- [x] Datas, intervalos, emails e comprimentos críticos têm testes negativos (`contracts.test.ts`).
+- [x] Erros do Supabase não são retornados crus nos entrypoints tocados (`lib/server/errors.ts` e handlers).
+- [x] Toda extração nova passa no Deletion Test e melhora localidade (`getCurrentViewer` e `getApiViewer`).
 
 ### Sprint 12 — E2E crítico, documentação e reauditoria
 

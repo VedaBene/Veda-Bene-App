@@ -35,3 +35,27 @@ export async function getCurrentViewer(): Promise<{
     },
   }
 }
+
+export async function getApiViewer(): Promise<{
+  supabase: SupabaseServerClient
+  viewer: Viewer | null
+}> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { supabase, viewer: null }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+  const parsedRole = roleSchema.safeParse(profile?.role)
+
+  return {
+    supabase,
+    viewer: {
+      userId: user.id,
+      role: parsedRole.success ? parsedRole.data : 'cliente',
+    },
+  }
+}

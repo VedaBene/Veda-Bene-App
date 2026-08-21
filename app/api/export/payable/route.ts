@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/utils/supabase/server'
+import { getApiViewer } from '@/lib/server/data-access/viewer'
 import { getPayableDetailRows } from '@/lib/server/reporting/financial'
 import { formatPayableCSV } from '@/lib/utils/export-csv'
 import {
@@ -9,17 +9,10 @@ import {
 } from '@/lib/server/validation/contracts'
 
 export async function GET(request: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+  const { viewer } = await getApiViewer()
+  if (!viewer) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  if (profile?.role !== 'admin') {
+  if (viewer.role !== 'admin') {
     return NextResponse.json({ error: 'Sem permissão' }, { status: 403 })
   }
 

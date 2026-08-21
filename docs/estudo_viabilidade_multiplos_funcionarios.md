@@ -93,7 +93,7 @@ O perfil de acesso `limpeza` só tem permissão para visualizar e atualizar suas
    ```
 
 2. **Helper de Segurança Privado `private.staff_property_ids(uid)`**:
-   Esta função (definida na [ADR 005](file:///c:/ANTIGRAVITY/Veda%20Bene%20definitivo/docs/decisions/005-rls-helpers-em-schema-privado.md)) deve ser adaptada para incluir os imóveis vinculados a todas as OSs em que o prestador atuou:
+   Esta função (definida na [ADR 005](./decisions/005-rls-helpers-em-schema-privado.md)) deve ser adaptada para incluir os imóveis vinculados a todas as OSs em que o prestador atuou:
    ```sql
    CREATE OR REPLACE FUNCTION private.staff_property_ids(uid UUID)
    RETURNS SETOF UUID
@@ -205,8 +205,8 @@ A estimativa do custo operacional mensal de pessoal no dashboard (`staffCostByMo
 Recomendamos fortemente documentar este desenvolvimento para garantir que a equipe mantenha o alinhamento arquitetural do ERP.
 
 1. **Architecture Decision Record (ADR)**:
-   - A decisão de design arquitetural do banco de dados (tabela intermediária N-N) e o impacto nas políticas de RLS e cálculos financeiros foram formalizados na [ADR 009](file:///c:/ANTIGRAVITY/Veda%20Bene%20definitivo/docs/decisions/009-multiplos-funcionarios-limpeza-na-os.md).
-   - O índice de ADRs foi atualizado em [decisions/README.md](file:///c:/ANTIGRAVITY/Veda%20Bene%20definitivo/docs/decisions/README.md).
+   - A decisão de design arquitetural do banco de dados (tabela intermediária N-N) e o impacto nas políticas de RLS e cálculos financeiros foram formalizados na [ADR 009](./decisions/009-multiplos-funcionarios-limpeza-na-os.md).
+   - O índice de ADRs foi atualizado em [decisions/README.md](./decisions/README.md).
 
 2. **Wiki Funcional / Especificação de Regras de Negócio**:
    - É recomendável detalhar a regra de divisão de pagamento na documentação de operações financeiras da empresa, exemplificando a proporção de rateio de tempo versus o valor da hora de cada colaborador (`hourly_rate`).

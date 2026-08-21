@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { getAuthorizedClient } from '@/lib/server/authz'
+import { handleDatabaseError } from '@/lib/server/errors'
 import { withLogging } from '@/lib/server/logger'
 import { saveProperty } from '@/lib/server/properties/save-property'
 import { uuidSchema, validationMessage } from '@/lib/server/validation/contracts'
@@ -49,7 +50,7 @@ async function deletePropertyImpl(id: string) {
   const { supabase } = await getAuthorizedClient(['admin'])
 
   const { error } = await supabase.from('properties').delete().eq('id', parsedId.data)
-  if (error) return { success: false as const, error: error.message }
+  if (error) return { success: false as const, error: handleDatabaseError('properties', 'delete', error) }
 
   revalidatePath('/properties')
   redirect('/properties')

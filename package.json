@@ -14,6 +14,7 @@
     "test": "vitest run",
     "test:supabase": "node scripts/test-supabase-local.mjs",
     "test:smoke:sensitive-data": "node scripts/test-sensitive-data-smoke-local.mjs",
+    "typegen:supabase": "node scripts/generate-database-types.mjs",
     "local:seed:photos": "node --env-file=.env.development.local scripts/setup-local-photo-test.mjs"
   },
   "dependencies": {

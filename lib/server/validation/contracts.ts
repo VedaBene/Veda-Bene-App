@@ -2,13 +2,19 @@ import 'server-only'
 
 import { z } from 'zod'
 import type { ClientType, OSStatus, PricingMode, Role } from '@/lib/types/database'
+import { toRomeIsoString } from '@/lib/timezone'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const MAX_DATE_RANGE_DAYS = 366
 const MAX_PAGE = 1000
 const MAX_PAGE_SIZE = 100
-const MAX_SEARCH_LENGTH = 100
-const MAX_NOTES_LENGTH = 2000
+export const MAX_SEARCH_LENGTH = 100
+export const MAX_NOTES_LENGTH = 2000
+export const MAX_NAME_LENGTH = 255
+export const MAX_EMAIL_LENGTH = 255
+export const MAX_PHONE_LENGTH = 50
+export const MAX_ADDRESS_LENGTH = 255
+export const MAX_ZIP_CODE_LENGTH = 20
 
 type SearchParamsRecord = Record<string, string | string[] | undefined>
 
@@ -16,8 +22,10 @@ function firstSearchParam(value: unknown): unknown {
   return Array.isArray(value) ? value[0] : value
 }
 
-function emptyToUndefined(value: unknown): unknown {
+export function emptyToUndefined(value: unknown): unknown {
+  if (value == null) return undefined
   const first = firstSearchParam(value)
+  if (first == null) return undefined
   if (typeof first !== 'string') return first
   const trimmed = first.trim()
   return trimmed === '' || trimmed === 'all' ? undefined : trimmed
@@ -65,6 +73,25 @@ function addDateRangeIssues(
   }
 }
 
+export function addServiceOrderTemporalIssues(
+  checkoutAt: string | undefined | null,
+  checkinAt: string | undefined | null,
+  ctx: z.RefinementCtx,
+) {
+  if (checkoutAt && checkinAt) {
+    const checkoutTime = new Date(checkoutAt).getTime()
+    const checkinTime = new Date(checkinAt).getTime()
+
+    if (!isNaN(checkoutTime) && !isNaN(checkinTime) && checkinTime < checkoutTime) {
+      ctx.addIssue({
+        code: 'custom',
+        message: "L'orario di check-in deve essere successivo o uguale al check-out",
+        path: ['checkin_at'],
+      })
+    }
+  }
+}
+
 export const uuidSchema = z.string().uuid('ID inválido')
 
 export const optionalUuidSchema = z.preprocess(
@@ -79,6 +106,56 @@ export const dateOnlySchema = z
 export const optionalDateOnlySchema = z.preprocess(
   emptyToUndefined,
   dateOnlySchema.optional(),
+)
+
+export const optRomeIsoDateTimeSchema = z.preprocess(
+  emptyToUndefined,
+  z.string()
+    .transform((val, ctx) => {
+      const iso = toRomeIsoString(val)
+      if (!iso) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Data/orario non valido',
+        })
+        return z.NEVER
+      }
+      return iso
+    })
+    .optional(),
+)
+
+export const emailSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .max(MAX_EMAIL_LENGTH, 'Email troppo lungo')
+  .email('Formato email non valido')
+
+export const optionalEmailSchema = z.preprocess(
+  emptyToUndefined,
+  emailSchema.optional(),
+)
+
+export const nameSchema = z
+  .string()
+  .trim()
+  .min(1, 'Nome obbligatorio')
+  .max(MAX_NAME_LENGTH, 'Nome troppo lungo')
+
+export const optionalPhoneSchema = z.preprocess(
+  emptyToUndefined,
+  z.string().trim().max(MAX_PHONE_LENGTH, 'Telefono troppo lungo').optional(),
+)
+
+export const optionalAddressSchema = z.preprocess(
+  emptyToUndefined,
+  z.string().trim().max(MAX_ADDRESS_LENGTH, 'Indirizzo troppo lungo').optional(),
+)
+
+export const optionalZipCodeSchema = z.preprocess(
+  emptyToUndefined,
+  z.string().trim().max(MAX_ZIP_CODE_LENGTH, 'CAP troppo lungo').optional(),
 )
 
 export const clientTypeSchema = z.enum(['rental', 'particular']) satisfies z.ZodType<ClientType>

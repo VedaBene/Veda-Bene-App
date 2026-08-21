@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 import { uuidSchema } from '@/lib/server/validation/contracts'
 import { getCurrentViewer } from '@/lib/server/data-access/viewer'
+import type { Database } from '@/lib/types/database'
 
 const inviteEmployeeByEmailSchema = z.object({
   email: z.string().email('Email inválido'),
@@ -89,7 +90,7 @@ function createServiceRoleClient() {
     throw new Error('Configuração administrativa indisponível')
   }
 
-  return createClient(
+  return createClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     secret,
     { auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false } },

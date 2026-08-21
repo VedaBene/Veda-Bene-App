@@ -2,7 +2,18 @@ import 'server-only'
 
 import { z } from 'zod'
 import { getAuthorizedClient } from '@/lib/server/authz'
-import { clientTypeSchema, optionalUuidSchema, validationMessage } from '@/lib/server/validation/contracts'
+import { handleDatabaseError } from '@/lib/server/errors'
+import {
+  clientTypeSchema,
+  nameSchema,
+  optionalAddressSchema,
+  optionalEmailSchema,
+  optionalNotesSchema,
+  optionalPhoneSchema,
+  optionalUuidSchema,
+  optionalZipCodeSchema,
+  validationMessage,
+} from '@/lib/server/validation/contracts'
 
 export const ZONES = [
   'Saint Peter', 'Piazza Navona', 'Trastevere Area', 'Colosseum',
@@ -10,49 +21,42 @@ export const ZONES = [
   'Termini Station', 'Other areas',
 ] as const
 
-const optTrimmedStr = z.preprocess(
-  v => (typeof v === 'string' ? (v.trim() === '' ? undefined : v.trim()) : v == null ? undefined : v),
-  z.string().optional()
-)
-
-const optEmailStr = z.preprocess(
-  v => (typeof v === 'string' ? (v.trim() === '' ? undefined : v.trim().toLowerCase()) : v == null ? undefined : v),
-  z.string().email('Formato email non valido').optional()
-)
-
 const optNum = z.preprocess(
   v => (v === '' || v == null ? undefined : Number(v)),
-  z.number().min(0, 'Il valore non può essere negativo').optional()
+  z.number().min(0, 'Il valore non può essere negativo').optional(),
 )
 
 const intDef = (def = 0) =>
   z.preprocess(
     v => (v === '' || v == null ? def : Number(v)),
-    z.number().int('Deve essere un numero intero').min(0, 'Non può essere negativo').default(def)
+    z.number().int('Deve essere un numero intero').min(0, 'Non pode ser negativo').default(def),
   )
 
 export const savePropertySchema = z.object({
   id: optionalUuidSchema,
-  name: z.preprocess(
-    v => (typeof v === 'string' ? v.trim() : v),
-    z.string().min(1, 'Nome obbligatorio')
-  ),
+  name: nameSchema,
   client_type: clientTypeSchema,
   zone: z.enum(ZONES, { message: 'Zona non valida' }),
-  phone: optTrimmedStr,
-  email: optEmailStr,
-  address: optTrimmedStr,
-  zip_code: optTrimmedStr,
+  phone: optionalPhoneSchema,
+  email: optionalEmailSchema,
+  address: optionalAddressSchema,
+  zip_code: optionalZipCodeSchema,
   // rental
   agency_id: optionalUuidSchema,
-  new_agency_name: optTrimmedStr,
-  new_agency_email: optEmailStr,
-  existing_agency_email: optEmailStr,
+  new_agency_name: z.preprocess(
+    v => (typeof v === 'string' && v.trim() === '' ? undefined : v),
+    nameSchema.optional(),
+  ),
+  new_agency_email: optionalEmailSchema,
+  existing_agency_email: optionalEmailSchema,
   // particular
   owner_id: optionalUuidSchema,
-  new_owner_name: optTrimmedStr,
-  new_owner_email: optEmailStr,
-  existing_owner_email: optEmailStr,
+  new_owner_name: z.preprocess(
+    v => (typeof v === 'string' && v.trim() === '' ? undefined : v),
+    nameSchema.optional(),
+  ),
+  new_owner_email: optionalEmailSchema,
+  existing_owner_email: optionalEmailSchema,
   // metragem
   sqm_interior: optNum,
   sqm_exterior: optNum,
@@ -73,7 +77,7 @@ export const savePropertySchema = z.object({
   extra_per_person: optNum,
   avg_cleaning_hours: optNum,
   // notas
-  notes: optTrimmedStr,
+  notes: optionalNotesSchema.optional(),
 })
 
 export type SavePropertyInput = z.infer<typeof savePropertySchema>
@@ -94,31 +98,31 @@ export async function saveProperty(
   const { supabase } = await getAuthorizedClient(['admin'])
 
   const { data: resultId, error } = await supabase.rpc('save_property_atomic', {
-    p_property_id: data.id ?? null,
+    p_property_id: data.id ?? undefined,
     p_name: data.name,
     p_client_type: data.client_type,
     p_zone: data.zone,
-    p_phone: data.phone ?? null,
-    p_email: data.email ?? null,
-    p_address: data.address ?? null,
-    p_zip_code: data.zip_code ?? null,
+    p_phone: data.phone ?? undefined,
+    p_email: data.email ?? undefined,
+    p_address: data.address ?? undefined,
+    p_zip_code: data.zip_code ?? undefined,
     // rental
-    p_agency_id: data.client_type === 'rental' ? (data.agency_id ?? null) : null,
-    p_new_agency_name: data.client_type === 'rental' ? (data.new_agency_name ?? null) : null,
-    p_new_agency_email: data.client_type === 'rental' ? (data.new_agency_email ?? null) : null,
-    p_existing_agency_email: data.client_type === 'rental' ? (data.existing_agency_email ?? null) : null,
+    p_agency_id: data.client_type === 'rental' ? (data.agency_id ?? undefined) : undefined,
+    p_new_agency_name: data.client_type === 'rental' ? (data.new_agency_name ?? undefined) : undefined,
+    p_new_agency_email: data.client_type === 'rental' ? (data.new_agency_email ?? undefined) : undefined,
+    p_existing_agency_email: data.client_type === 'rental' ? (data.existing_agency_email ?? undefined) : undefined,
     // particular
-    p_owner_id: data.client_type === 'particular' ? (data.owner_id ?? null) : null,
-    p_new_owner_name: data.client_type === 'particular' ? (data.new_owner_name ?? null) : null,
-    p_new_owner_email: data.client_type === 'particular' ? (data.new_owner_email ?? null) : null,
-    p_existing_owner_email: data.client_type === 'particular' ? (data.existing_owner_email ?? null) : null,
+    p_owner_id: data.client_type === 'particular' ? (data.owner_id ?? undefined) : undefined,
+    p_new_owner_name: data.client_type === 'particular' ? (data.new_owner_name ?? undefined) : undefined,
+    p_new_owner_email: data.client_type === 'particular' ? (data.new_owner_email ?? undefined) : undefined,
+    p_existing_owner_email: data.client_type === 'particular' ? (data.existing_owner_email ?? undefined) : undefined,
     // sqm
-    p_sqm_interior: data.sqm_interior ?? null,
-    p_sqm_exterior: data.sqm_exterior ?? null,
-    p_sqm_total: data.sqm_total ?? null,
+    p_sqm_interior: data.sqm_interior ?? undefined,
+    p_sqm_exterior: data.sqm_exterior ?? undefined,
+    p_sqm_total: data.sqm_total ?? undefined,
     // capacity
-    p_min_guests: data.min_guests ?? null,
-    p_max_guests: data.max_guests ?? null,
+    p_min_guests: data.min_guests ?? undefined,
+    p_max_guests: data.max_guests ?? undefined,
     p_double_beds: data.double_beds ?? 0,
     p_single_beds: data.single_beds ?? 0,
     p_sofa_beds: data.sofa_beds ?? 0,
@@ -128,15 +132,15 @@ export async function saveProperty(
     p_bidets: data.bidets ?? 0,
     p_cribs: data.cribs ?? 0,
     // pricing
-    p_base_price: data.base_price ?? null,
-    p_extra_per_person: data.extra_per_person ?? null,
-    p_avg_cleaning_hours: data.avg_cleaning_hours ?? null,
+    p_base_price: data.base_price ?? undefined,
+    p_extra_per_person: data.extra_per_person ?? undefined,
+    p_avg_cleaning_hours: data.avg_cleaning_hours ?? undefined,
     // notes
-    p_notes: data.notes ?? null,
+    p_notes: data.notes ?? undefined,
   })
 
   if (error) {
-    return { success: false, error: error.message }
+    return { success: false, error: handleDatabaseError('properties', 'save_property_atomic', error) }
   }
 
   if (!resultId) {

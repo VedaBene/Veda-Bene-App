@@ -8,23 +8,32 @@ import { deleteEmployeeAuthUser } from '@/utils/supabase/admin'
 import { getSiteOrigin } from '@/utils/site-url'
 import { getAssignableEmployeeRoles } from '@/lib/employee-permissions'
 import { getAuthorizedClient } from '@/lib/server/authz'
+import { handleDatabaseError } from '@/lib/server/errors'
 import { withLogging } from '@/lib/server/logger'
-import { employeeRoleSchema, optionalDateOnlySchema, uuidSchema, validationMessage } from '@/lib/server/validation/contracts'
+import {
+  emailSchema,
+  employeeRoleSchema,
+  nameSchema,
+  optionalAddressSchema,
+  optionalDateOnlySchema,
+  optionalPhoneSchema,
+  uuidSchema,
+  validationMessage,
+} from '@/lib/server/validation/contracts'
 import { inviteEmployee } from '@/lib/server/employees/invite-employee'
 
-const optStr = z.preprocess(v => (v === '' ? undefined : v), z.string().optional())
 const optNum = z.preprocess(
   v => (v === '' || v == null ? undefined : Number(v)),
-  z.number().min(0).optional(),
+  z.number().min(0, 'Il valore non può essere negativo').optional(),
 )
 
 const employeeSchema = z.object({
-  full_name: z.string().min(1, 'Nome obrigatório'),
-  email: z.string().email('Email inválido'),
-  phone: optStr,
+  full_name: nameSchema,
+  email: emailSchema,
+  phone: optionalPhoneSchema,
   birth_date: optionalDateOnlySchema,
-  nationality: optStr,
-  address: optStr,
+  nationality: z.preprocess(v => (v === '' ? undefined : v), z.string().trim().max(100, 'Nazionalità troppo lunga').optional()),
+  address: optionalAddressSchema,
   role: employeeRoleSchema,
   // remuneração — opcionais, só admin envia
   hourly_rate: optNum,
@@ -63,7 +72,7 @@ async function updateEmployeeImpl(id: string, formData: FormData) {
 
   const raw = Object.fromEntries(formData)
   const parsed = employeeSchema.safeParse(raw)
-  if (!parsed.success) return { success: false as const, error: parsed.error.issues[0].message }
+  if (!parsed.success) return { success: false as const, error: validationMessage(parsed.error) }
 
   const { data } = parsed
   const assignableRoles = getAssignableEmployeeRoles(role)
@@ -86,7 +95,7 @@ async function updateEmployeeImpl(id: string, formData: FormData) {
     })
     .eq('id', parsedId.data)
 
-  if (error) return { success: false as const, error: error.message }
+  if (error) return { success: false as const, error: handleDatabaseError('employees', 'updateProfile', error) }
 
   revalidatePath('/employees')
   revalidatePath(`/employees/${parsedId.data}`)
@@ -100,7 +109,7 @@ async function deleteEmployeeImpl(id: string) {
   await getAuthorizedClient(['admin'])
 
   const { error } = await deleteEmployeeAuthUser(parsedId.data)
-  if (error) return { success: false as const, error: error.message }
+  if (error) return { success: false as const, error: handleDatabaseError('employees', 'deleteAuthUser', error) }
 
   revalidatePath('/employees')
   redirect('/employees')

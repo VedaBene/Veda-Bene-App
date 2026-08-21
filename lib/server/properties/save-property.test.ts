@@ -132,7 +132,7 @@ describe('saveProperty use case', () => {
   it('returns failure when the atomic RPC returns an error', async () => {
     const mockRpc = vi.fn().mockResolvedValue({
       data: null,
-      error: { message: 'Agência não encontrada.' },
+      error: { code: '23503', message: 'violates foreign key constraint' },
     })
     vi.spyOn(authz, 'getAuthorizedClient').mockResolvedValue({
       supabase: { rpc: mockRpc } as unknown as Awaited<ReturnType<typeof authz.getAuthorizedClient>>['supabase'],
@@ -147,6 +147,6 @@ describe('saveProperty use case', () => {
       agency_id: '750e8400-e29b-41d4-a716-446655440002',
     })
 
-    expect(result).toEqual({ success: false, error: 'Agência não encontrada.' })
+    expect(result).toEqual({ success: false, error: 'Elemento correlato non trovato o non valido.' })
   })
 })

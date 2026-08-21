@@ -25,37 +25,34 @@ export type PropertyFormOptions = {
   owners: ClientDirectoryOption[]
 }
 
-function getPropertyListSelect(viewer: Viewer): string {
-  if (viewer.role === 'admin' || viewer.role === 'secretaria') return 'id, name, zone, address, client_type'
-  return 'id, name, zone, address'
-}
+const PROPERTY_LIST_ADMIN_SELECT = 'id, name, zone, address, client_type'
+const PROPERTY_LIST_STAFF_SELECT = 'id, name, zone, address'
 
-function getPropertyDetailSelect(viewer: Viewer): string {
-  return [
-    'id',
-    'name',
-    'zone',
-    'address',
-    'zip_code',
-    'sqm_interior',
-    'sqm_exterior',
-    'sqm_total',
-    'min_guests',
-    'max_guests',
-    'double_beds',
-    'single_beds',
-    'sofa_beds',
-    'armchair_beds',
-    'bathrooms',
-    'bidets',
-    'cribs',
-    'bedrooms',
-    'notes',
-    ...(viewer.role === 'admin' || viewer.role === 'secretaria'
-      ? ['client_type', 'agency_id', 'owner_id', 'phone']
-      : []),
-  ].join(', ')
-}
+const PROPERTY_DETAIL_STAFF_SELECT = `
+  id,
+  name,
+  zone,
+  address,
+  zip_code,
+  sqm_interior,
+  sqm_exterior,
+  sqm_total,
+  min_guests,
+  max_guests,
+  double_beds,
+  single_beds,
+  sofa_beds,
+  armchair_beds,
+  bathrooms,
+  bidets,
+  cribs,
+  bedrooms,
+  notes,
+  client_type,
+  agency_id,
+  owner_id,
+  phone
+`
 
 export async function getPropertyList(
   supabase: SupabaseServerClient,
@@ -74,9 +71,11 @@ export async function getPropertyList(
   const from = (page - 1) * filters.pageSize
   const to = from + filters.pageSize - 1
 
-  let query = supabase
-    .from('properties')
-    .select(getPropertyListSelect(viewer), { count: 'exact' })
+  let query = (
+    viewer.role === 'secretaria'
+      ? supabase.from('properties').select('id, name, zone, address, client_type', { count: 'exact' })
+      : supabase.from('properties').select('id, name, zone, address', { count: 'exact' })
+  )
     .order('created_at', { ascending: false })
     .range(from, to)
 
@@ -87,8 +86,8 @@ export async function getPropertyList(
   const { data, count } = await query
 
   return {
-    items: ((data ?? []) as unknown as PropertyFormData[]).map(property =>
-      toPropertyListItem(property, viewer.role),
+    items: ((data ?? []) as Array<Pick<PropertyFormData, 'id' | 'name' | 'zone' | 'address' | 'client_type'>>).map(
+      property => toPropertyListItem(property, viewer.role),
     ),
     totalPages: Math.ceil((count ?? 0) / filters.pageSize),
   }
@@ -106,13 +105,13 @@ export async function getPropertyDetail(
 
   const { data } = await supabase
     .from('properties')
-    .select(getPropertyDetailSelect(viewer))
+    .select(PROPERTY_DETAIL_STAFF_SELECT)
     .eq('id', id)
     .single()
 
   if (!data) return null
 
-  return toPropertyFormData(data as unknown as PropertyFormData, viewer.role)
+  return toPropertyFormData(data as PropertyFormData, viewer.role)
 }
 
 export async function getPropertyFormOptions(

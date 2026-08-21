@@ -2,6 +2,7 @@ import 'server-only'
 
 import { getAuthorizedClient } from '@/lib/server/authz'
 import { loadAuthorizedPropertyPricingContext } from '@/lib/server/data-access/sensitive-data'
+import { handleDatabaseError } from '@/lib/server/errors'
 import { calculateTotalPrice, loadOrderPricingContext } from '@/lib/server/pricing'
 import type { PricingMode } from '@/lib/types/database'
 
@@ -69,14 +70,14 @@ export async function saveServiceOrder(
   }
 
   const { data, error } = await supabase.rpc('save_service_order_atomic', {
-    p_order_id: input.id ?? null,
+    p_order_id: input.id ?? undefined,
     p_property_id: input.property_id,
     p_cleaning_staff_ids: input.cleaning_staff_ids ?? [],
-    p_consegna_staff_id: input.consegna_staff_id ?? null,
-    p_cleaning_date: input.cleaning_date ?? null,
-    p_checkout_at: input.checkout_at ?? null,
-    p_checkin_at: input.checkin_at ?? null,
-    p_real_guests: input.real_guests ?? null,
+    p_consegna_staff_id: input.consegna_staff_id ?? undefined,
+    p_cleaning_date: input.cleaning_date ?? undefined,
+    p_checkout_at: input.checkout_at ?? undefined,
+    p_checkin_at: input.checkin_at ?? undefined,
+    p_real_guests: input.real_guests ?? undefined,
     p_double_beds: input.double_beds ?? 0,
     p_single_beds: input.single_beds ?? 0,
     p_sofa_beds: input.sofa_beds ?? 0,
@@ -85,15 +86,15 @@ export async function saveServiceOrder(
     p_bathrooms: input.bathrooms ?? 0,
     p_bidets: input.bidets ?? 0,
     p_cribs: input.cribs ?? 0,
-    p_cleaning_notes: input.cleaning_notes ?? null,
-    p_extra_services_description: input.extra_services_description ?? null,
+    p_cleaning_notes: input.cleaning_notes ?? undefined,
+    p_extra_services_description: input.extra_services_description ?? undefined,
     p_extra_services_price: input.extra_services_price ?? 0,
     p_pricing_mode: pricingMode,
-    p_total_price: total_price,
+    p_total_price: total_price ?? undefined,
   })
 
   if (error) {
-    return { success: false, error: error.message }
+    return { success: false, error: handleDatabaseError('service-orders', 'save_service_order_atomic', error) }
   }
 
   if (!data) {

@@ -1,3 +1,10 @@
+export type { Database, Json } from './database.generated'
+import type { Database } from './database.generated'
+
+export type Tables<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Row']
+export type TablesInsert<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Insert']
+export type TablesUpdate<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Update']
+
 export type Role = 'admin' | 'secretaria' | 'limpeza' | 'consegna' | 'cliente'
 export type ClientType = 'rental' | 'particular'
 export type OSStatus = 'open' | 'in_progress' | 'done'
@@ -113,7 +120,6 @@ export type ServiceOrderCleaningStaff = {
   profile_id: string
   created_at: string
 }
-
 
 // Tipo para o JWT payload com o app_role injetado pelo hook
 export type JwtWithRole = {

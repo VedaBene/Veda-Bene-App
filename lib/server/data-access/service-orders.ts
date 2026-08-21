@@ -61,34 +61,32 @@ const SERVICE_ORDER_LIST_SELECT = `
   consegna_staff:profiles!consegna_staff_id(id, full_name)
 `
 
-function getServiceOrderDetailSelect(): string {
-  return [
-    'id',
-    'property_id',
-    'cleaning_staff_id',
-    'consegna_staff_id',
-    'cleaning_date',
-    'checkout_at',
-    'checkin_at',
-    'status',
-    'real_guests',
-    'double_beds',
-    'single_beds',
-    'sofa_beds',
-    'armchair_beds',
-    'bathrooms',
-    'bidets',
-    'cribs',
-    'order_number',
-    'is_urgent',
-    'started_at',
-    'completed_at',
-    'completion_notes',
-    'worked_minutes',
-    'pricing_mode',
-    'cleaning_notes',
-  ].join(', ')
-}
+const SERVICE_ORDER_DETAIL_SELECT = `
+  id,
+  property_id,
+  cleaning_staff_id,
+  consegna_staff_id,
+  cleaning_date,
+  checkout_at,
+  checkin_at,
+  status,
+  real_guests,
+  double_beds,
+  single_beds,
+  sofa_beds,
+  armchair_beds,
+  bathrooms,
+  bidets,
+  cribs,
+  order_number,
+  is_urgent,
+  started_at,
+  completed_at,
+  completion_notes,
+  worked_minutes,
+  pricing_mode,
+  cleaning_notes
+`
 
 async function getMatchingPropertyIds(
   supabase: SupabaseServerClient,
@@ -188,7 +186,7 @@ export async function getServiceOrderList(
 
   const allOrders = [...(activeOrders ?? []), ...(doneOrders ?? []), ...(doneExportOrders ?? [])]
   const propertyIds = allOrders.flatMap(order => {
-    const property = order.property as unknown as { id?: string } | null
+    const property = (order as { property?: { id?: string } | null }).property
     return property?.id ? [property.id] : []
   })
   const averageHoursByProperty = await loadAverageHoursForVisibleServiceOrders(propertyIds)
@@ -209,13 +207,13 @@ export async function getServiceOrderList(
     : 1
 
   return {
-    active: (withAuthorizedHours(activeOrders ?? []) as unknown as ServiceOrderListItem[]).map(order =>
+    active: (withAuthorizedHours(activeOrders ?? []) as ServiceOrderListItem[]).map(order =>
       toServiceOrderListItem(order, viewer.role),
     ),
-    done: (withAuthorizedHours(doneOrders ?? []) as unknown as ServiceOrderListItem[]).map(order =>
+    done: (withAuthorizedHours(doneOrders ?? []) as ServiceOrderListItem[]).map(order =>
       toServiceOrderListItem(order, viewer.role),
     ),
-    doneForExport: (withAuthorizedHours(doneExportOrders ?? []) as unknown as ServiceOrderListItem[]).map(order =>
+    doneForExport: (withAuthorizedHours(doneExportOrders ?? []) as ServiceOrderListItem[]).map(order =>
       toServiceOrderListItem(order, viewer.role),
     ),
     doneTotalPages,
@@ -232,7 +230,7 @@ export async function getServiceOrderDetail(
   const isAdminOrSecretaria = viewer.role === 'admin' || viewer.role === 'secretaria'
   let orderQuery = supabase
     .from('service_orders')
-    .select(getServiceOrderDetailSelect())
+    .select(SERVICE_ORDER_DETAIL_SELECT)
     .eq('id', id)
 
   if (isOperationalStaffRole(viewer.role)) {
@@ -256,7 +254,7 @@ export async function getServiceOrderDetail(
 
   return toServiceOrderFormData(
     {
-      ...(data as unknown as ServiceOrderFormData),
+      ...(data as ServiceOrderFormData),
       ...(operationalFinancialFields ?? {}),
       cleaning_staff_ids,
     },

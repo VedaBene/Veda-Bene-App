@@ -64,6 +64,17 @@ export function toRomeIsoString(value: string | null | undefined): string | null
   const second = secStr ? parseInt(secStr, 10) : 0
 
   const initialUtcMs = Date.UTC(year, month - 1, day, hour, minute, second)
+  const checkDate = new Date(initialUtcMs)
+  if (
+    checkDate.getUTCFullYear() !== year ||
+    checkDate.getUTCMonth() !== month - 1 ||
+    checkDate.getUTCDate() !== day ||
+    checkDate.getUTCHours() !== hour ||
+    checkDate.getUTCMinutes() !== minute ||
+    checkDate.getUTCSeconds() !== second
+  ) {
+    return null
+  }
 
   // Obtém o horário que o instante inicial representa em Europe/Rome
   const dtf = new Intl.DateTimeFormat('en-US', {

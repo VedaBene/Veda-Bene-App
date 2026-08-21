@@ -1,26 +1,14 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/utils/supabase/server'
+import { getCurrentViewer } from '@/lib/server/data-access/viewer'
 import { ReceivableStatement } from '@/components/statements/ReceivableStatement'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { fetchReceivableReport, fetchAgencies, fetchOwners } from '../actions'
-import type { Role } from '@/lib/types/database'
 import { getRomeDateOnly, getRomeMonthStartDateOnly } from '@/lib/utils/date-rome'
 
 export default async function ReceivablePage() {
-  const supabase = await createClient()
+  const { viewer } = await getCurrentViewer()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  const role = (profile?.role ?? 'cliente') as Role
-
-  if (role !== 'admin') redirect('/service-orders')
+  if (viewer.role !== 'admin') redirect('/service-orders')
 
   const now = new Date()
   const startDate = getRomeMonthStartDateOnly(now)

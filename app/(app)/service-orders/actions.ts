@@ -7,6 +7,7 @@ import { getAuthorizedClient } from '@/lib/server/authz'
 import { calculateTotalPrice, loadOrderPricingContext, recalculateOrderPricing } from '@/lib/server/pricing'
 import { saveServiceOrder } from '@/lib/server/service-orders/save-service-order'
 import { captureQueryError, withLogging } from '@/lib/server/logger'
+import { handleDatabaseError } from '@/lib/server/errors'
 import { validateCleaningTrackingTransition } from '@/lib/service-order-tracking'
 import { isCleaningPhotosEnabled } from '@/lib/server/features'
 import { validateReadyPhotosForTransition } from '@/lib/server/service-order-photos'
@@ -15,7 +16,9 @@ import {
   listPhotoRecordsForOrder,
 } from '@/lib/server/storage/service-order-photo-storage'
 import {
+  addServiceOrderTemporalIssues,
   nonNegativeMoneySchema,
+  optRomeIsoDateTimeSchema,
   optionalDateOnlySchema,
   optionalNotesSchema,
   optionalUuidSchema,
@@ -23,45 +26,39 @@ import {
   uuidSchema,
   validationMessage,
 } from '@/lib/server/validation/contracts'
-import type { PricingMode } from '@/lib/types/database'
-import { toRomeIsoString } from '@/lib/timezone'
+import type { OSStatus, PricingMode } from '@/lib/types/database'
 
-const optStr = z.preprocess(v => (v === '' ? undefined : v), z.string().optional())
-const optIsoDateStr = z.preprocess(
-  v => {
-    if (v === '' || v == null) return undefined
-    const iso = toRomeIsoString(String(v))
-    return iso ?? undefined
-  },
-  z.string().optional(),
-)
 const optNum = z.preprocess(
   v => (v === '' || v == null ? undefined : Number(v)),
-  z.number().min(0).optional(),
+  z.number().min(0, 'Il valore non può essere negativo').optional(),
 )
 const intDef = (def = 0) =>
   z.preprocess(v => (v === '' || v == null ? def : Number(v)), z.number().int().min(0).default(def))
 
-const serviceOrderSchema = z.object({
-  property_id: z.string().min(1, 'Immobile obbligatorio').pipe(uuidSchema),
-  cleaning_staff_ids: z.array(uuidSchema).max(3, 'Massimo 3 responsabili').default([]),
-  consegna_staff_id: optionalUuidSchema,
-  cleaning_date: optionalDateOnlySchema,
-  checkout_at: optIsoDateStr,
-  checkin_at: optIsoDateStr,
-  real_guests: optNum,
-  double_beds: intDef(0),
-  single_beds: intDef(0),
-  sofa_beds: intDef(0),
-  armchair_beds: intDef(0),
-  bathrooms: intDef(0),
-  bidets: intDef(0),
-  cribs: intDef(0),
-  cleaning_notes: optStr,
-  extra_services_description: optStr,
-  extra_services_price: optNum,
-  pricing_mode: pricingModeSchema.default('standard'),
-})
+const serviceOrderSchema = z
+  .object({
+    property_id: z.string().min(1, 'Immobile obbligatorio').pipe(uuidSchema),
+    cleaning_staff_ids: z.array(uuidSchema).max(3, 'Massimo 3 responsabili').default([]),
+    consegna_staff_id: optionalUuidSchema,
+    cleaning_date: optionalDateOnlySchema,
+    checkout_at: optRomeIsoDateTimeSchema,
+    checkin_at: optRomeIsoDateTimeSchema,
+    real_guests: optNum,
+    double_beds: intDef(0),
+    single_beds: intDef(0),
+    sofa_beds: intDef(0),
+    armchair_beds: intDef(0),
+    bathrooms: intDef(0),
+    bidets: intDef(0),
+    cribs: intDef(0),
+    cleaning_notes: optionalNotesSchema.optional(),
+    extra_services_description: optionalNotesSchema.optional(),
+    extra_services_price: optNum,
+    pricing_mode: pricingModeSchema.default('standard'),
+  })
+  .superRefine((data, ctx) => {
+    addServiceOrderTemporalIssues(data.checkout_at, data.checkin_at, ctx)
+  })
 
 const extraServicesActionSchema = z.object({
   id: uuidSchema,
@@ -78,7 +75,7 @@ async function createServiceOrderImpl(formData: FormData) {
     ...rawData,
     cleaning_staff_ids,
   })
-  if (!parsed.success) return { success: false as const, error: parsed.error.issues[0].message }
+  if (!parsed.success) return { success: false as const, error: validationMessage(parsed.error) }
 
   const result = await saveServiceOrder(parsed.data)
   if (!result.success) return { success: false as const, error: result.error }
@@ -98,7 +95,7 @@ async function updateServiceOrderImpl(id: string, formData: FormData) {
     ...rawData,
     cleaning_staff_ids,
   })
-  if (!parsed.success) return { success: false as const, error: parsed.error.issues[0].message }
+  if (!parsed.success) return { success: false as const, error: validationMessage(parsed.error) }
 
   const result = await saveServiceOrder({
     ...parsed.data,
@@ -123,7 +120,7 @@ async function reopenServiceOrderImpl(id: string) {
     .eq('id', parsedId.data)
     .maybeSingle()
 
-  if (loadError) return { success: false as const, error: loadError.message }
+  if (loadError) return { success: false as const, error: handleDatabaseError('service-orders', 'reopen:load', loadError) }
   if (!order) return { success: false as const, error: 'O.L. non trovato o non autorizzato.' }
   if (order.status !== 'done') return { success: false as const, error: 'Solo una pulizia completata può essere riaperta.' }
 
@@ -142,7 +139,7 @@ async function reopenServiceOrderImpl(id: string) {
     .select('id')
     .maybeSingle()
 
-  if (error) return { success: false as const, error: error.message }
+  if (error) return { success: false as const, error: handleDatabaseError('service-orders', 'reopen:update', error) }
   if (!reopenedOrder) return { success: false as const, error: 'La O.L. è già stata riaperta da un altro operatore.' }
 
   await recalculateOrderPricing(parsedId.data)
@@ -167,10 +164,13 @@ async function startCleaningImpl(id: string, photoIds: string[] = []) {
     .eq('id', parsedId.data)
     .maybeSingle()
 
-  if (loadError) return { success: false as const, error: loadError.message }
+  if (loadError) return { success: false as const, error: handleDatabaseError('service-orders', 'start:load', loadError) }
   if (!order) return { success: false as const, error: 'O.L. non trovato o non autorizzato.' }
 
-  const transitionError = validateCleaningTrackingTransition('start', order)
+  const transitionError = validateCleaningTrackingTransition('start', {
+    ...order,
+    status: order.status as OSStatus,
+  })
   if (transitionError) return { success: false as const, error: transitionError }
 
   if (photoIds.length > 0 && !isCleaningPhotosEnabled()) {
@@ -202,7 +202,7 @@ async function startCleaningImpl(id: string, photoIds: string[] = []) {
     .select('id')
     .maybeSingle()
 
-  if (error) return { success: false as const, error: error.message }
+  if (error) return { success: false as const, error: handleDatabaseError('service-orders', 'start:update', error) }
   if (!updatedOrder) return { success: false as const, error: 'La pulizia è già stata avviata da un altro operatore.' }
 
   revalidatePath('/service-orders')
@@ -225,10 +225,13 @@ async function finishCleaningImpl(id: string, notes: string, photoIds: string[] 
     .eq('id', parsedId.data)
     .maybeSingle()
 
-  if (loadError) return { success: false as const, error: loadError.message }
+  if (loadError) return { success: false as const, error: handleDatabaseError('service-orders', 'finish:load', loadError) }
   if (!order) return { success: false as const, error: 'O.L. non trovato o non autorizzato.' }
 
-  const transitionError = validateCleaningTrackingTransition('finish', order)
+  const transitionError = validateCleaningTrackingTransition('finish', {
+    ...order,
+    status: order.status as OSStatus,
+  })
   if (transitionError) return { success: false as const, error: transitionError }
 
   if (photoIds.length > 0 && !isCleaningPhotosEnabled()) {
@@ -261,7 +264,7 @@ async function finishCleaningImpl(id: string, notes: string, photoIds: string[] 
     .select('id')
     .maybeSingle()
 
-  if (error) return { success: false as const, error: error.message }
+  if (error) return { success: false as const, error: handleDatabaseError('service-orders', 'finish:update', error) }
   if (!updatedOrder) return { success: false as const, error: 'La pulizia è già stata completata da un altro operatore.' }
 
   await recalculateOrderPricing(parsedId.data)
@@ -310,7 +313,7 @@ async function updateExtraServicesImpl(
     })
     .eq('id', parsed.data.id)
 
-  if (error) return { success: false as const, error: error.message }
+  if (error) return { success: false as const, error: handleDatabaseError('service-orders', 'extra-services:update', error) }
 
   revalidatePath('/service-orders')
   revalidatePath(`/service-orders/${parsed.data.id}`)
@@ -332,7 +335,7 @@ async function deleteServiceOrderImpl(id: string) {
   }
 
   const { error } = await supabase.from('service_orders').delete().eq('id', parsedId.data)
-  if (error) return { success: false as const, error: error.message }
+  if (error) return { success: false as const, error: handleDatabaseError('service-orders', 'delete', error) }
 
   try {
     await deletePhotoObjects(photoRecords)
@@ -408,10 +411,10 @@ async function getLastCleaningForPropertyImpl(propertyId: string) {
       ? [data.cleaning_staff]
       : []
 
-  const staffNames = (staffArr as unknown as { full_name: string }[]).map(s => s.full_name).join(', ')
+  const staffNames = (staffArr as Array<{ full_name: string }>).map(s => s.full_name).join(', ')
 
   return {
-    orderNumber: data.order_number,
+    orderNumber: data.order_number ?? 0,
     date: data.cleaning_date || data.completed_at?.split('T')[0] || '',
     staffName: staffNames || 'Non assegnato'
   }
@@ -420,4 +423,3 @@ async function getLastCleaningForPropertyImpl(propertyId: string) {
 export async function getLastCleaningForProperty(propertyId: string) {
   return withLogging('getLastCleaningForProperty', () => getLastCleaningForPropertyImpl(propertyId))
 }
-
