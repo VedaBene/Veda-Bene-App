@@ -1,6 +1,6 @@
 # Roadmap ativo de endurecimento arquitetural
 
-**Status do programa:** Sprints 00–09 concluídas localmente; Sprint 10 planejada e não iniciada
+**Status do programa:** Sprints 00–10 concluídas localmente; Sprint 11 planejada e não iniciada
 
 **Baseline da auditoria:** 2026-08-15
 
@@ -167,7 +167,7 @@ Estados permitidos: `planned`, `in_progress`, `completed`, `blocked` e
 | 07 | P1 | Bloqueio de login resistente à concorrência | DB-P | 06 | completed |
 | 08 | P1 | Escrita de O.S. e vínculos atômica | DB-P | 07 | completed |
 | 09 | P1 | Escrita de propriedade/relações atômica | DB-P | 08 | completed |
-| 10 | P1 | Convite de funcionário idempotente e recuperável | DB-0 por padrão | 09 | planned |
+| 10 | P1 | Convite de funcionário idempotente e recuperável | DB-0 por padrão | 09 | completed |
 | 11 | P2 | Tipos, validação, erros e data access mais locais | DB-0 | 10 | planned |
 | 12 | P2 | Regressão E2E, documentação e reauditoria final | DB-L / read-only | 11 | planned |
 
@@ -1053,44 +1053,73 @@ um passo de criação/edição falha.
 
 ### Sprint 10 — Saga idempotente de convite de funcionário
 
+**Status:** completed — implementação local, adapter administrativo estreito, caso de uso
+server-only, logging higienizado sem PII e suíte abrangente de 12 testes de idempotência e
+fault injection concluídos com sucesso em 2026-08-20. Nenhuma alteração de banco de dados,
+schema ou migration (DB-0). Nenhum usuário ou convite remoto foi alterado. A Sprint 11 não foi iniciada.
+
 **Objetivo:** tratar Supabase Auth + perfil como workflow distribuído recuperável,
 sem fingir que os dois sistemas participam da mesma transação.
 
-**O que implementar**
+**O que foi implementado nesta sprint**
 
-- Criar um caso de uso server-only com estados e resultados explícitos para
-  convite, atualização do perfil, retry e compensação segura.
-- Definir chave de idempotência e comportamento quando o usuário já foi
-  convidado, o perfil já existe ou um retry ocorre após timeout.
-- Encapsular todas as operações administrativas em adapter estreito.
-- Usar compensação somente quando for segura e autorizada; não apagar
-  silenciosamente um usuário preexistente.
-- Emitir logs estruturados/Sentry sem PII ou tokens e documentar procedimento de
-  reconciliação manual.
+- **Máquina de estados e resultados explícitos (`InviteEmployeeOutcome`)**:
+  - `created`: usuário novo criado no Auth e perfil atualizado com sucesso.
+  - `reconciled`: reconciliação de retry após sucesso ou de perfil pendente/incompleto após falha prévia, sem duplicar envio de email de convite.
+  - `already_exists`: detecção amigável de conflito quando o email já pertence a um usuário ativo/divergente, sem expor mensagens cruas de erro.
+  - `failed`: falha estruturada com indicação do passo (`auth`, `profile`, `authorization`, `validation`) e flag `reconciliationRequired: true` para retries posteriores.
+- **Adapter administrativo estreito (`utils/supabase/admin.ts`)**:
+  - Definida a interface `EmployeeAdminAdapter` com métodos específicos: `inviteAuthUser`, `getAuthUserByEmail`, `getProfileByEmail`, `updateProfile`, `createProfileIfMissing`, `deleteEmployeeAuthUser`.
+  - Client `service_role` mantido estritamente privado, sem exportação de client bruto.
+  - Todas as operações exigem autorização do visualizador autenticado como `admin` (`requireAdministrativeViewer`).
+  - Suporte completo a injeção de dependência para fakes nos testes unitários e de integração.
+- **Caso de uso server-only (`lib/server/employees/invite-employee.ts`)**:
+  - Validação estrita de esquema com Zod e normalização de email (`email.trim().toLowerCase()`).
+  - Validação no servidor de papéis atribuíveis (`admin`, `secretaria`, `limpeza`, `consegna`).
+  - Orquestração da saga com tratamento determinístico para todos os cenários.
+  - Higienização e mascaramento de emails em logs (`[invite-employee]`), sem vazamento de PII, senhas ou tokens.
+- **Server Action atualizada (`app/(app)/employees/actions.ts`)**:
+  - `createEmployeeImpl` delega a criação ao caso de uso `inviteEmployee`, revalidando rotas e redirecionando em `created`/`reconciled` e retornando mensagens controladas de erro.
+- **Garantias reais de idempotência**:
+  - Chave de idempotência baseada na unicidade canônica de `auth.users(email) UNIQUE`.
+  - Retries após falha de resposta ou requisições duplicadas identificam que o perfil já possui os dados correspondentes e retornam `reconciled` sem reenviar emails de convite.
+  - Retries após falha no passo de perfil (`profile_pending`) aplicam a reconciliação segura e atualizam o perfil.
+  - Chamadas concorrentes são serializadas pelo Auth e convergem deterministicamente para o mesmo ID sem criar perfis duplicados.
+- **Política de compensação não-destrutiva**:
+  - Falhas no passo de atualização do perfil **nunca** executam exclusão automática de usuários Auth preexistentes.
+  - O estado incompleto permanece seguro (`role: 'cliente'`) para ser reconciliado no próximo retry do administrador.
+  - A exclusão de usuários permanece restrita à ação explícita e autorizada `deleteEmployee`.
+- **Suíte de testes de idempotência e robustez (`lib/server/employees/invite-employee.test.ts`)**:
+  - 12 testes cobrindo: convite novo, conflito com usuário ativo divergente, idempotência de retry com dados correspondentes, recuperação após timeout no Auth, fault injection na atualização do perfil provando que o usuário não é deletado, reconciliação em retry subsequente, resposta perdida após update, chamadas concorrentes com mesmo email, falha de adapter/rede, validação de schema, rejeição de autorização não-admin e criação de perfil faltante caso o trigger falhe.
 
-**Arquivos/componentes prováveis**
+**Arquivos alterados nesta sprint**
 
-- `app/(app)/employees/actions.ts`
 - `utils/supabase/admin.ts`
-- novo módulo em `lib/server/employees/`
-- `lib/server/logger.ts`
-- testes de idempotência e fault injection
+- `lib/server/employees/invite-employee.ts`
+- `lib/server/employees/invite-employee.test.ts`
+- `app/(app)/employees/actions.ts`
+- este roadmap
 
-**Impactos e implicações:** DB-0 por padrão. Se surgir necessidade comprovada de
-persistir estado de saga, reclassificar para DB-P, criar dossiê e não expandir a
-sprint sem aprovação.
+**Comandos e resultados objetivos**
 
-**Resultado esperado:** retry não duplica convites nem deixa o sistema em estado
-desconhecido; falhas informam ação de recuperação segura.
+- `npm test`: PASS (35 arquivos / 200 testes Vitest aprovados, incluindo os 12 testes da saga de funcionários e 3 testes de arquitetura de dados sensíveis).
+- `npm run lint`: PASS (ESLint sem warnings ou erros).
+- `npm run typecheck`: PASS (Next.js 16 typegen e `tsc --noEmit` verdes).
+- `npm run build`: PASS (Compilação Next.js 16 / Turbopack com 20 rotas geradas).
+
+**Riscos residuais e decisões**
+
+- O fluxo de convite e reconciliação não depende de tabela externa de saga no banco (DB-0), utilizando a unicidade nativa do Supabase Auth e o gatilho `handle_new_user` de `public.profiles`.
+- Se um usuário for convidado e o update de perfil falhar, o status permanecerá pendente de perfil até o próximo envio pelo administrador (reconciliação transparente no retry).
+- Nenhuma migration foi criada e nenhum dado ou usuário remoto foi criado, convidado ou excluído.
 
 **Critérios de conclusão**
 
-- [ ] Cenários “novo”, “já convidado”, “perfil existente”, timeout e retry são
-  determinísticos.
-- [ ] Nenhum client privilegiado bruto é exportado.
-- [ ] Compensação nunca remove usuário preexistente.
-- [ ] Logs não contêm email completo, token ou payload sensível.
-- [ ] Fluxo atual de criação/edição/exclusão autorizada continua funcional.
+- [x] Cenários “novo”, “já convidado”, “perfil existente”, timeout e retry são determinísticos.
+- [x] Nenhum client privilegiado bruto é exportado.
+- [x] Compensação nunca remove usuário preexistente.
+- [x] Logs não contêm email completo, token ou payload sensível.
+- [x] Fluxo atual de criação/edição/exclusão autorizada continua funcional.
 
 ### Sprint 11 — Tipos, validação, erros e limites de data access
 
@@ -1201,7 +1230,7 @@ Nunca cole tokens, DSNs, emails, IPs, dados pessoais ou conteúdo de `.env`.
 | 07 | completed | 2026-08-20 | 2026-08-20 | Codex | Dossiê DB-P; migration `20260820035000_atomic_login_lockout.sql`; 21 pgTAP PASS, lint/typecheck/32 arquivos e 179 Vitest/build PASS; aplicada em produção no projeto `iwrbeiqqsvzhiuhkqnqg` após autorização expressa | Concorrência de login atômica no banco; `anon`/`authenticated` bloqueados com `42501`; sem alteração remota não autorizada; Sprint 08 não iniciada |
 | 08 | completed | 2026-08-20 | 2026-08-20 | Codex | Dossiê DB-P; migration `20260820220000_atomic_service_order_write.sql`; caso de uso `saveServiceOrder`; 27 pgTAP (219 total), invariantes/fotos/schema lint sem issues; lint/typecheck/33 arquivos e 182 Vitest/build (20 rotas) PASS; aplicada em produção no projeto `iwrbeiqqsvzhiuhkqnqg` após autorização expressa | Criação/edição de O.S. e equipe atômicas; RPC `SECURITY INVOKER` restrita a `admin`/`secretaria`; sem dados corrompidos; Sprint 09 não iniciada |
 | 09 | completed | 2026-08-20 | 2026-08-20 | Codex | Dossiê DB-P; migration `20260820230000_atomic_property_write.sql`; caso de uso `saveProperty`; 34 pgTAP (253 total), invariantes/fotos/schema lint sem issues; lint/typecheck/34 arquivos e 188 Vitest/build (20 rotas) PASS; smoke de dados sensíveis PASS; aplicada em produção no projeto `iwrbeiqqsvzhiuhkqnqg` após autorização expressa | Criação/edição de imóvel e agência/proprietário atômicas; RPC `SECURITY INVOKER` restrita a `admin`; zero novos órfãos; Sprint 10 não iniciada |
-| 10 | planned | — | — | — | — | — |
+| 10 | completed | 2026-08-20 | 2026-08-20 | Codex | Adapter EmployeeAdminAdapter; caso de uso inviteEmployee; 12 testes Vitest de saga/idempotência/fault injection PASS; lint/typecheck/35 arquivos e 200 Vitest/build (20 rotas) PASS | Saga de convite recuperável e determinística; compensação não-destrutiva sem exclusão de usuários; nenhuma migration ou dado alterado (DB-0); Sprint 11 não iniciada |
 | 11 | planned | — | — | — | — | — |
 | 12 | planned | — | — | — | — | — |
 

@@ -4,12 +4,13 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { z } from 'zod'
-import { deleteEmployeeAuthUser, inviteEmployeeByEmail } from '@/utils/supabase/admin'
+import { deleteEmployeeAuthUser } from '@/utils/supabase/admin'
 import { getSiteOrigin } from '@/utils/site-url'
 import { getAssignableEmployeeRoles } from '@/lib/employee-permissions'
 import { getAuthorizedClient } from '@/lib/server/authz'
 import { withLogging } from '@/lib/server/logger'
 import { employeeRoleSchema, optionalDateOnlySchema, uuidSchema, validationMessage } from '@/lib/server/validation/contracts'
+import { inviteEmployee } from '@/lib/server/employees/invite-employee'
 
 const optStr = z.preprocess(v => (v === '' ? undefined : v), z.string().optional())
 const optNum = z.preprocess(
@@ -33,54 +34,25 @@ const employeeSchema = z.object({
 })
 
 async function createEmployeeImpl(formData: FormData) {
-  const { supabase, role } = await getAuthorizedClient(['admin'])
-
-  const raw = Object.fromEntries(formData)
-  const parsed = employeeSchema.safeParse(raw)
-  if (!parsed.success) return { success: false as const, error: parsed.error.issues[0].message }
-
-  const { data } = parsed
-  const assignableRoles = getAssignableEmployeeRoles(role)
-  if (!assignableRoles.includes(data.role)) {
-    return { success: false as const, error: 'Sem permissão' }
-  }
-
   const headersList = await headers()
   const origin = getSiteOrigin(headersList)
+  const raw = Object.fromEntries(formData)
 
-  // Convida o funcionário por email — o Supabase cria o usuário e envia
-  // um link para ele definir a própria senha no primeiro acesso.
-  // redirectTo aponta para uma página client-side para preservar também
-  // fluxos implícitos, que chegam ao browser como fragmento de URL.
-  const { data: authUser, error: authError } = await inviteEmployeeByEmail({
-    email: data.email,
-    fullName: data.full_name,
+  const result = await inviteEmployee({
+    ...raw,
     redirectTo: `${origin}/auth/callback`,
   })
 
-  if (authError) return { success: false as const, error: authError.message }
+  if (result.status === 'created' || result.status === 'reconciled') {
+    revalidatePath('/employees')
+    redirect(`/employees/${result.employeeId}`)
+  }
 
-  // O trigger `handle_new_user` já cria o perfil; aqui o admin autenticado
-  // atualiza o perfil via RLS normal em vez de usar service_role.
-  const { error: profileError } = await supabase
-    .from('profiles')
-    .update({
-      full_name: data.full_name,
-      phone: data.phone ?? null,
-      birth_date: data.birth_date ?? null,
-      nationality: data.nationality ?? null,
-      address: data.address ?? null,
-      role: data.role,
-      hourly_rate: data.hourly_rate ?? null,
-      monthly_salary: data.has_fixed_salary ? (data.monthly_salary ?? null) : null,
-      overtime_rate: data.has_fixed_salary ? (data.overtime_rate ?? null) : null,
-    })
-    .eq('id', authUser.user.id)
+  if (result.status === 'already_exists') {
+    return { success: false as const, error: result.error }
+  }
 
-  if (profileError) return { success: false as const, error: profileError.message }
-
-  revalidatePath('/employees')
-  redirect(`/employees/${authUser.user.id}`)
+  return { success: false as const, error: result.error }
 }
 
 async function updateEmployeeImpl(id: string, formData: FormData) {
