@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { getAuthorizedClient } from '@/lib/server/authz'
 import { calculateTotalPrice, loadOrderPricingContext, recalculateOrderPricing } from '@/lib/server/pricing'
-import { loadAuthorizedPropertyPricingContext } from '@/lib/server/data-access/sensitive-data'
+import { saveServiceOrder } from '@/lib/server/service-orders/save-service-order'
 import { captureQueryError, withLogging } from '@/lib/server/logger'
 import { validateCleaningTrackingTransition } from '@/lib/service-order-tracking'
 import { isCleaningPhotosEnabled } from '@/lib/server/features'
@@ -71,8 +71,6 @@ const extraServicesActionSchema = z.object({
 })
 
 async function createServiceOrderImpl(formData: FormData) {
-  const { supabase } = await getAuthorizedClient()
-
   const rawData = Object.fromEntries(formData)
   const cleaning_staff_ids = formData.getAll('cleaning_staff_ids').map(v => v.toString()).filter(Boolean)
 
@@ -82,61 +80,8 @@ async function createServiceOrderImpl(formData: FormData) {
   })
   if (!parsed.success) return { success: false as const, error: parsed.error.issues[0].message }
 
-  const { data } = parsed
-
-  const property = await loadAuthorizedPropertyPricingContext(data.property_id)
-
-  const total_price = property
-    ? calculateTotalPrice(
-        data.pricing_mode,
-        property.base_price,
-        property.extra_per_person,
-        data.real_guests ?? null,
-        property.min_guests,
-        data.extra_services_price ?? null,
-        null,
-      )
-    : null
-
-  const { data: createdOrder, error } = await supabase
-    .from('service_orders')
-    .insert({
-      property_id: data.property_id,
-      consegna_staff_id: data.consegna_staff_id ?? null,
-      cleaning_date: data.cleaning_date ?? null,
-      checkout_at: data.checkout_at ?? null,
-      checkin_at: data.checkin_at ?? null,
-      status: 'open',
-      real_guests: data.real_guests ?? null,
-      double_beds: data.double_beds,
-      single_beds: data.single_beds,
-      sofa_beds: data.sofa_beds,
-      armchair_beds: data.armchair_beds,
-      bathrooms: data.bathrooms,
-      bidets: data.bidets,
-      cribs: data.cribs,
-      cleaning_notes: data.cleaning_notes ?? null,
-      extra_services_description: data.extra_services_description ?? null,
-      extra_services_price: data.extra_services_price ?? 0,
-      pricing_mode: data.pricing_mode,
-      total_price,
-    })
-    .select('id')
-    .single()
-
-  if (error) return { success: false as const, error: error.message }
-
-  if (data.cleaning_staff_ids.length > 0 && createdOrder) {
-    const relations = data.cleaning_staff_ids.map(profileId => ({
-      service_order_id: createdOrder.id,
-      profile_id: profileId,
-    }))
-    const { error: relError } = await supabase
-      .from('service_order_cleaning_staff')
-      .insert(relations)
-    
-    if (relError) return { success: false as const, error: relError.message }
-  }
+  const result = await saveServiceOrder(parsed.data)
+  if (!result.success) return { success: false as const, error: result.error }
 
   revalidatePath('/service-orders')
   redirect('/service-orders')
@@ -146,8 +91,6 @@ async function updateServiceOrderImpl(id: string, formData: FormData) {
   const parsedId = uuidSchema.safeParse(id)
   if (!parsedId.success) return { success: false as const, error: validationMessage(parsedId.error) }
 
-  const { supabase } = await getAuthorizedClient()
-
   const rawData = Object.fromEntries(formData)
   const cleaning_staff_ids = formData.getAll('cleaning_staff_ids').map(v => v.toString()).filter(Boolean)
 
@@ -157,65 +100,11 @@ async function updateServiceOrderImpl(id: string, formData: FormData) {
   })
   if (!parsed.success) return { success: false as const, error: parsed.error.issues[0].message }
 
-  const { data } = parsed
-
-  const ctx = await loadOrderPricingContext(parsedId.data, data.property_id)
-  const total_price = ctx?.property
-    ? calculateTotalPrice(
-        data.pricing_mode,
-        ctx.property.base_price,
-        ctx.property.extra_per_person,
-        data.real_guests ?? null,
-        ctx.property.min_guests,
-        data.extra_services_price ?? null,
-        ctx.workedMinutes,
-      )
-    : null
-
-  const { error } = await supabase
-    .from('service_orders')
-    .update({
-      property_id: data.property_id,
-      consegna_staff_id: data.consegna_staff_id ?? null,
-      cleaning_date: data.cleaning_date ?? null,
-      checkout_at: data.checkout_at ?? null,
-      checkin_at: data.checkin_at ?? null,
-      real_guests: data.real_guests ?? null,
-      double_beds: data.double_beds,
-      single_beds: data.single_beds,
-      sofa_beds: data.sofa_beds,
-      armchair_beds: data.armchair_beds,
-      bathrooms: data.bathrooms,
-      bidets: data.bidets,
-      cribs: data.cribs,
-      cleaning_notes: data.cleaning_notes ?? null,
-      extra_services_description: data.extra_services_description ?? null,
-      extra_services_price: data.extra_services_price ?? 0,
-      pricing_mode: data.pricing_mode,
-      total_price,
-    })
-    .eq('id', parsedId.data)
-
-  if (error) return { success: false as const, error: error.message }
-
-  const { error: delError } = await supabase
-    .from('service_order_cleaning_staff')
-    .delete()
-    .eq('service_order_id', parsedId.data)
-
-  if (delError) return { success: false as const, error: delError.message }
-
-  if (data.cleaning_staff_ids.length > 0) {
-    const relations = data.cleaning_staff_ids.map(profileId => ({
-      service_order_id: parsedId.data,
-      profile_id: profileId,
-    }))
-    const { error: relError } = await supabase
-      .from('service_order_cleaning_staff')
-      .insert(relations)
-    
-    if (relError) return { success: false as const, error: relError.message }
-  }
+  const result = await saveServiceOrder({
+    ...parsed.data,
+    id: parsedId.data,
+  })
+  if (!result.success) return { success: false as const, error: result.error }
 
   revalidatePath('/service-orders')
   revalidatePath(`/service-orders/${parsedId.data}`)

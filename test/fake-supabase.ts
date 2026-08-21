@@ -18,6 +18,7 @@ export type SupabaseSelectCall = {
 export class FakeSupabase {
   readonly selectCalls: SupabaseSelectCall[] = []
   readonly updates: { table: string; values: Row; filters: QueryFilter[] }[] = []
+  readonly rpcCalls: { fn: string; args?: Record<string, unknown> }[] = []
 
   constructor(private readonly tableData: Record<string, Row[]>) {}
 
@@ -27,6 +28,11 @@ export class FakeSupabase {
 
   from(table: string): FakeQuery {
     return new FakeQuery(this, table, this.tableData[table] ?? [])
+  }
+
+  async rpc(fn: string, args?: Record<string, unknown>): Promise<{ data: unknown; error: unknown }> {
+    this.rpcCalls.push({ fn, args })
+    return { data: null, error: null }
   }
 }
 

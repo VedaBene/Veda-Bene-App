@@ -135,18 +135,24 @@ async function prepareDisposableProject() {
   const lockoutMigrationFile = '20260820035000_atomic_login_lockout.sql'
   const lockoutMigrationPath = join(migrationsDir, lockoutMigrationFile)
   const lockoutMigrationSql = await readFile(lockoutMigrationPath, 'utf8')
+  const atomicOrderWriteMigrationFile = '20260820220000_atomic_service_order_write.sql'
+  const atomicOrderWriteMigrationPath = join(migrationsDir, atomicOrderWriteMigrationFile)
+  const atomicOrderWriteMigrationSql = await readFile(atomicOrderWriteMigrationPath, 'utf8')
 
-  // Start from the preceding baseline so the exact Sprint 04, Sprint 05 and
-  // Sprint 07 migrations can each be exercised between before/after fingerprints.
+  // Start from the preceding baseline so the exact Sprint 04, Sprint 05,
+  // Sprint 07 and Sprint 08 migrations can each be exercised between before/after fingerprints.
   for (const [migrationPath, migrationFile] of [
     [guardMigrationPath, guardMigrationFile],
     [confidentialityMigrationPath, confidentialityMigrationFile],
     [lockoutMigrationPath, lockoutMigrationFile],
+    [atomicOrderWriteMigrationPath, atomicOrderWriteMigrationFile],
   ]) {
     await rename(migrationPath, join(temporaryRoot, `${migrationFile}.pending`))
   }
 
   return {
+    atomicOrderWriteMigrationFile,
+    atomicOrderWriteMigrationSql,
     confidentialityMigrationFile,
     confidentialityMigrationSql,
     guardMigrationFile,
@@ -319,6 +325,57 @@ $lockout_invariants$;
   )
 }
 
+function runAtomicServiceOrderWriteMigrationSmoke(
+  workdir,
+  projectId,
+  migrationFile,
+  migrationSql,
+) {
+  localDatabaseUrlFromStatus(workdir)
+  const containerName = `supabase_db_${projectId}`
+  const snapshotSql = String.raw`
+CREATE TEMP TABLE atomic_so_migration_before AS
+SELECT
+  (SELECT count(*) FROM public.auth_login_attempts) AS attempt_count,
+  (SELECT count(*) FROM public.profiles) AS profile_count,
+  (SELECT count(*) FROM public.properties) AS property_count,
+  (SELECT count(*) FROM public.service_orders) AS order_count,
+  (SELECT count(*) FROM public.service_order_cleaning_staff) AS staff_link_count;
+`
+  const invariantSql = String.raw`
+DO $atomic_so_invariants$
+DECLARE
+  before_row pg_temp.atomic_so_migration_before%ROWTYPE;
+  after_row pg_temp.atomic_so_migration_before%ROWTYPE;
+BEGIN
+  SELECT * INTO before_row FROM pg_temp.atomic_so_migration_before;
+  SELECT
+    (SELECT count(*) FROM public.auth_login_attempts),
+    (SELECT count(*) FROM public.profiles),
+    (SELECT count(*) FROM public.properties),
+    (SELECT count(*) FROM public.service_orders),
+    (SELECT count(*) FROM public.service_order_cleaning_staff)
+  INTO after_row;
+
+  IF before_row IS DISTINCT FROM after_row THEN
+    RAISE EXCEPTION 'Sprint 08 migration changed unexpected data counts';
+  END IF;
+
+  IF pg_catalog.to_regprocedure('public.save_service_order_atomic(uuid,uuid,uuid[],uuid,date,timestamptz,timestamptz,integer,integer,integer,integer,integer,integer,integer,integer,integer,text,text,numeric,text,numeric)') IS NULL THEN
+    RAISE EXCEPTION 'Sprint 08 function save_service_order_atomic was not created';
+  END IF;
+END
+$atomic_so_invariants$;
+`
+
+  executeSqlTextInContainer(
+    `Apply ${migrationFile} and compare invariants`,
+    containerName,
+    'postgres',
+    `${snapshotSql}\n${migrationSql}\n${invariantSql}`,
+  )
+}
+
 async function removeDisposableProject(temporaryRoot) {
   const resolvedTemporaryRoot = resolve(temporaryRoot)
   if (
@@ -449,8 +506,8 @@ SELECT
   (SELECT md5(coalesce(string_agg(grantee || ':' || privilege_type || ':' || is_grantable, ',' ORDER BY grantee, privilege_type), ''))
    FROM information_schema.role_table_grants
    WHERE table_schema = 'public'
-     AND table_name = 'service_orders'
-     AND privilege_type = 'SELECT') AS select_grant_digest;
+      AND table_name = 'service_orders'
+      AND privilege_type = 'SELECT') AS select_grant_digest;
 `
   const invariantSql = String.raw`
 DO $guard_invariants$
@@ -539,6 +596,8 @@ async function runPhotoMigrationSmoke(workdir, projectId) {
 
 async function main() {
   const {
+    atomicOrderWriteMigrationFile,
+    atomicOrderWriteMigrationSql,
     confidentialityMigrationFile,
     confidentialityMigrationSql,
     guardMigrationFile,
@@ -581,6 +640,12 @@ async function main() {
       lockoutMigrationFile,
       lockoutMigrationSql,
     )
+    runAtomicServiceOrderWriteMigrationSmoke(
+      workdir,
+      projectId,
+      atomicOrderWriteMigrationFile,
+      atomicOrderWriteMigrationSql,
+    )
 
     executeCli('Run role × table × operation × column pgTAP matrix', [
       '--workdir', workdir,
@@ -616,7 +681,7 @@ async function main() {
     ], { showOutput: true })
 
     await runPhotoMigrationSmoke(workdir, projectId)
-    process.stdout.write('\nSupabase authorization and Sprint 07 migration tests passed without a remote target.\n')
+    process.stdout.write('\nSupabase authorization and Sprint 08 atomic write tests passed without a remote target.\n')
   } finally {
     if (stackStarted) {
       executeCli('Stop and delete only the isolated local stack', [

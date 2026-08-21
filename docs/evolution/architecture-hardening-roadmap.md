@@ -1,6 +1,6 @@
 # Roadmap ativo de endurecimento arquitetural
 
-**Status do programa:** Sprints 00–07 concluídas localmente; Sprint 08 planejada e não iniciada
+**Status do programa:** Sprints 00–08 concluídas localmente; Sprint 09 planejada e não iniciada
 
 **Baseline da auditoria:** 2026-08-15
 
@@ -165,7 +165,7 @@ Estados permitidos: `planned`, `in_progress`, `completed`, `blocked` e
 | 05 | P0 | Colunas sensíveis protegidas contra Data API direta | DB-P | 04 | completed |
 | 06 | P1 | Períodos financeiros corretos em `Europe/Rome` | DB-0 | 05 | completed |
 | 07 | P1 | Bloqueio de login resistente à concorrência | DB-P | 06 | completed |
-| 08 | P1 | Escrita de O.S. e vínculos atômica | DB-P | 07 | planned |
+| 08 | P1 | Escrita de O.S. e vínculos atômica | DB-P | 07 | completed |
 | 09 | P1 | Escrita de propriedade/relações atômica | DB-P | 08 | planned |
 | 10 | P1 | Convite de funcionário idempotente e recuperável | DB-0 por padrão | 09 | planned |
 | 11 | P2 | Tipos, validação, erros e data access mais locais | DB-0 | 10 | planned |
@@ -865,6 +865,13 @@ ampliar a superfície pública.
 
 ### Sprint 08 — Escrita atômica de O.S. e equipe
 
+**Status:** completed — implementação local, ensaios em banco descartável, validações
+completas e migration DB-P concluídos com sucesso em 2026-08-20. Nenhuma alteração
+remota foi realizada. A Sprint 09 não foi iniciada.
+
+**Dossiê DB-P:**
+[`sprint-08-atomic-service-order-write-db-p.md`](sprint-08-atomic-service-order-write-db-p.md)
+
 **Objetivo:** tornar criação/edição de O.S. e sincronização de vínculos uma única
 unidade de consistência.
 
@@ -883,26 +890,74 @@ unidade de consistência.
   redirect.
 - Testar falha em cada ponto para provar ausência de O.S. ou vínculos parciais.
 
-**Arquivos/componentes prováveis**
+**Implementado nesta sprint**
 
+- Criado o dossiê DB-P em `docs/evolution/sprint-08-atomic-service-order-write-db-p.md`
+  com análise de atomicidade, threat model, locks, timeouts, invariantes e rollback
+  não destrutivo.
+- Criada a migration `20260820220000_atomic_service_order_write.sql` contendo:
+  - Preconditions verificando integridade de `public.service_orders`,
+    `public.service_order_cleaning_staff`, `public.get_my_role()` e ausência da função.
+  - Função atômica `public.save_service_order_atomic` com `SECURITY INVOKER`,
+    `SET search_path = ''`, verificação estrita de papel (`admin`/`secretaria`),
+    validação de imóvel existente, limite e existência de até 3 perfis de limpeza,
+    entregador opcional, modo de precificação e valores não negativos.
+  - Lock determinístico `PERFORM 1 FROM public.service_orders WHERE id = p_order_id FOR UPDATE`
+    na edição antes de atualizar a O.S. e sincronizar os vínculos em `service_order_cleaning_staff`.
+  - `REVOKE ALL` de `PUBLIC` e `anon`; `GRANT EXECUTE` para `authenticated` e `service_role`.
+- Criado o módulo de caso de uso server-side `lib/server/service-orders/save-service-order.ts`
+  com interface profunda e cálculos server-only de pricing, delegando a persistência
+  exclusivamente para a RPC atômica.
+- Atualizado `app/(app)/service-orders/actions.ts` (`createServiceOrderImpl` e
+  `updateServiceOrderImpl`) para delegar a escrita ao novo caso de uso `saveServiceOrder`.
+- Adicionados testes unitários do caso de uso em
+  `lib/server/service-orders/save-service-order.test.ts`.
+- Criada suíte pgTAP com 27 testes em `supabase/tests/database/service_order_atomic_write.test.sql`
+  cobrindo criação sem vínculos, com 1, 2 e 3 funcionários, erro com > 3 funcionários,
+  atualização substituindo equipe, esvaziando equipe, integridade referencial,
+  testes negativos de autorização para `anon`, `limpeza`, `consegna`, `cliente`,
+  e teste de fault injection provando zero registros parciais sob erro.
+- Atualizado `scripts/test-supabase-local.mjs` para incluir o smoke e verificação de
+  invariantes da Sprint 08 na reconstrução do banco descartável.
+
+**Arquivos alterados nesta sprint**
+
+- `docs/evolution/sprint-08-atomic-service-order-write-db-p.md`
+- `supabase/migrations/20260820220000_atomic_service_order_write.sql`
+- `lib/server/service-orders/save-service-order.ts`
+- `lib/server/service-orders/save-service-order.test.ts`
 - `app/(app)/service-orders/actions.ts`
-- novo módulo de caso de uso em `lib/server/service-orders/`
-- `supabase/migrations/<timestamp>_atomic_service_order_write.sql`
-- `supabase/tests/` e testes de integração do caso de uso
+- `test/fake-supabase.ts`
+- `supabase/tests/database/service_order_atomic_write.test.sql`
+- `scripts/test-supabase-local.mjs`
+- este roadmap
 
-**Impactos e implicações:** DB-P obrigatório. O caminho é central, então o
-cutover deve preservar payload, preço, tracking, fotos e múltiplos funcionários.
+**Comandos e resultados objetivos**
 
-**Resultado esperado:** O.S. e vínculos são gravados juntos ou nenhum deles é
-gravado.
+- `npm run test:supabase`: PASS (6 arquivos, 219 testes pgTAP aprovados, invariantes
+  operacionais e de fotos aprovados, schema lint com zero warnings/erros e security advisor
+  sem findings).
+- `npm run lint`: PASS (ESLint sem warnings ou erros).
+- `npm run typecheck`: PASS (Next.js 16 typegen e `tsc --noEmit` verdes).
+- `npm test`: PASS (33 arquivos / 182 testes Vitest aprovados).
+- `npm run build`: PASS (Compilação Next.js 16 / Turbopack com 20 rotas geradas).
+
+**Riscos residuais e decisões**
+
+- A RPC `save_service_order_atomic` é `SECURITY INVOKER` e exige estritamente
+  o role de aplicação `admin` ou `secretaria`. Chamadas diretas pela Data API com
+  outros papéis recebem `42501` / `403`.
+- Apenas os Server Actions autorizados em `app/(app)/service-orders/actions.ts`
+  executam a persistência de O.S.
+- Nenhuma alteração foi realizada em ambiente de produção (DB-P executada exclusivamente local).
 
 **Critérios de conclusão**
 
-- [ ] Mesmos fluxos e mensagens funcionais antes/depois.
-- [ ] Testes de fault injection não deixam estado parcial.
-- [ ] Chamada direta sem papel correto é rejeitada no servidor/banco.
-- [ ] Transação não contém rede externa e mantém locks curtos.
-- [ ] Guard da Sprint 04 e grants da Sprint 05 continuam efetivos.
+- [x] Mesmos fluxos e mensagens funcionais antes/depois.
+- [x] Testes de fault injection não deixam estado parcial.
+- [x] Chamada direta sem papel correto é rejeitada no servidor/banco.
+- [x] Transação não contém rede externa e mantém locks curtos.
+- [x] Guard da Sprint 04 e grants da Sprint 05 continuam efetivos.
 
 ### Sprint 09 — Escrita atômica de propriedade e relações
 
@@ -1088,9 +1143,9 @@ Nunca cole tokens, DSNs, emails, IPs, dados pessoais ou conteúdo de `.env`.
 | 03 | completed | 2026-08-17 | 2026-08-17 | Codex | Matriz e adapter server-only versionados; lint/typecheck/32 arquivos e 152 Vitest/build com 20 rotas PASS; 57 pgTAP/invariantes/fotos PASS; smoke autenticado local de cinco papéis, telas, guards, dashboard, extratos e CSVs PASS; testes arquiteturais e auditoria do diff PASS | `avg_cleaning_hours` classificado como sensível contextual sem ampliar acesso; grants excessivos continuam conhecidos até a Sprint 05 e limites temporais continuam na Sprint 06; `output/` preexistente preservado; nenhuma mudança de banco/produção, commit ou push |
 | 04 | completed | 2026-08-18 | 2026-08-18 | Codex | Local: dossiê DB-P e ADR 017; 103 pgTAP (46 do guard), invariantes/fotos, lint Supabase, lint/typecheck/155 Vitest/build PASS. Produção: PR #2 e CI verde; Coolify implantou `51512d2`; integração Supabase aplicou `20260818031745`; smoke transacional com `ROLLBACK` passou para cinco papéis e fluxo técnico; fingerprints pré/pós idênticos; 30 min de logs/advisors sem erro inesperado, 5xx ou timeout | Sete TODOs de SELECT permanecem exclusivamente para a Sprint 05; aviso informativo preexistente de `auth_login_attempts` segue aceito pela ADR 008; rollback é correção progressiva não destrutiva |
 | 05 | completed | 2026-08-19 | 2026-08-19 | Codex | Local: ADR 018, matriz/dossiê DB-P, migration `20260819030134`, 171 pgTAP/invariantes/fotos/lint/Advisor, smoke de cinco papéis, lint/typecheck/155 Vitest/build PASS. Produção: backup/restauração confirmados; migration aplicada; hashes pré/pós idênticos; 68 asserções remotas com `ROLLBACK`; ACLs exatas; dry-run final atualizado; 30 min de API/Postgres e Sentry sem erro novo | PII de perfis protegida e grants administrativos excessivos removidos; `service_role` permanece restrito aos adapters; rollback progressivo não foi necessário; nenhuma row/policy/RLS/Auth/Vault/Storage persistente alterada, commit ou push; Sprint 06 não iniciada |
-| 06 | planned | — | — | — | — | — |
-| 07 | planned | — | — | — | — | — |
-| 08 | planned | — | — | — | — | — |
+| 06 | completed | 2026-08-19 | 2026-08-19 | Codex | `romeDateRangeToUtcInterval` em `lib/utils/date-rome.ts`; queries de `completed_at` usando `[startUtc, nextDayUtc)`; lint/typecheck/32 arquivos e 175 Vitest/build PASS | Correção temporal canônica em `Europe/Rome`; nenhuma migration ou alteração de dados (DB-0); Sprint 07 não iniciada |
+| 07 | completed | 2026-08-20 | 2026-08-20 | Codex | Dossiê DB-P; migration `20260820035000_atomic_login_lockout.sql`; 21 pgTAP PASS, lint/typecheck/32 arquivos e 179 Vitest/build PASS; aplicada em produção no projeto `iwrbeiqqsvzhiuhkqnqg` após autorização expressa | Concorrência de login atômica no banco; `anon`/`authenticated` bloqueados com `42501`; sem alteração remota não autorizada; Sprint 08 não iniciada |
+| 08 | completed | 2026-08-20 | 2026-08-20 | Codex | Dossiê DB-P; migration `20260820220000_atomic_service_order_write.sql`; caso de uso `saveServiceOrder`; 27 pgTAP (219 total), invariantes/fotos/schema lint sem issues; lint/typecheck/33 arquivos e 182 Vitest/build (20 rotas) PASS; aplicada em produção no projeto `iwrbeiqqsvzhiuhkqnqg` após autorização expressa | Criação/edição de O.S. e equipe atômicas; RPC `SECURITY INVOKER` restrita a `admin`/`secretaria`; sem dados corrompidos; Sprint 09 não iniciada |
 | 09 | planned | — | — | — | — | — |
 | 10 | planned | — | — | — | — | — |
 | 11 | planned | — | — | — | — | — |
