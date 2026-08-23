@@ -12,6 +12,7 @@
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
+    "test:e2e": "node scripts/test-sensitive-data-smoke-local.mjs --e2e",
     "test:supabase": "node scripts/test-supabase-local.mjs",
     "test:smoke:sensitive-data": "node scripts/test-sensitive-data-smoke-local.mjs",
     "typegen:supabase": "node scripts/generate-database-types.mjs",
@@ -32,6 +33,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^22",
     "@types/react": "^19",

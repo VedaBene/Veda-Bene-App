@@ -73,3 +73,31 @@ jobs:
 
       - name: Test RLS, grants, and direct calls in disposable Supabase
         run: npm run test:supabase
+
+  critical-e2e:
+    name: Critical E2E (Disposable Supabase)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    env:
+      SUPABASE_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Build application
+        run: npm run build
+
+      - name: Run critical E2E against disposable Supabase
+        run: npm run test:e2e

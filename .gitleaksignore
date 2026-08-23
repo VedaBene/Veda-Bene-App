@@ -1,3 +1,16 @@
 # Revoked legacy Supabase service-role JWT from the documented 2026-08-07
 # incident. The credential remains disabled and must never be reactivated.
 a4b8df7922209ed8ef5d73bdbbce03205739af93:scripts/recalculate-pending-prices.mjs:jwt:4
+
+# Reviewed synthetic lockout identifiers in the pgTAP fixture. Keep these
+# suppressions fingerprint-specific so new findings in the file still fail.
+08f4f439cb7023564a2e5eeec2dd4dad4f43854d:supabase/tests/database/login_lockout_atomic.test.sql:generic-api-key:66
+08f4f439cb7023564a2e5eeec2dd4dad4f43854d:supabase/tests/database/login_lockout_atomic.test.sql:generic-api-key:67
+08f4f439cb7023564a2e5eeec2dd4dad4f43854d:supabase/tests/database/login_lockout_atomic.test.sql:generic-api-key:97
+08f4f439cb7023564a2e5eeec2dd4dad4f43854d:supabase/tests/database/login_lockout_atomic.test.sql:generic-api-key:98
+08f4f439cb7023564a2e5eeec2dd4dad4f43854d:supabase/tests/database/login_lockout_atomic.test.sql:generic-api-key:113
+08f4f439cb7023564a2e5eeec2dd4dad4f43854d:supabase/tests/database/login_lockout_atomic.test.sql:generic-api-key:114
+08f4f439cb7023564a2e5eeec2dd4dad4f43854d:supabase/tests/database/login_lockout_atomic.test.sql:generic-api-key:118
+08f4f439cb7023564a2e5eeec2dd4dad4f43854d:supabase/tests/database/login_lockout_atomic.test.sql:generic-api-key:119
+08f4f439cb7023564a2e5eeec2dd4dad4f43854d:supabase/tests/database/login_lockout_atomic.test.sql:generic-api-key:125
+08f4f439cb7023564a2e5eeec2dd4dad4f43854d:supabase/tests/database/login_lockout_atomic.test.sql:generic-api-key:222

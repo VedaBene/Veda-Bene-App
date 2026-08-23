@@ -10,8 +10,9 @@ const sourceSupabaseDir = join(repositoryRoot, 'supabase')
 const temporaryPrefix = join(tmpdir(), 'veda-bene-sensitive-smoke-')
 const supabaseEntrypoint = join(repositoryRoot, 'node_modules', 'supabase', 'dist', 'supabase.js')
 const nextEntrypoint = join(repositoryRoot, 'node_modules', 'next', 'dist', 'bin', 'next')
+const playwrightEntrypoint = join(repositoryRoot, 'node_modules', '@playwright', 'test', 'cli.js')
 const appPort = 3103
-const appOrigin = `http://127.0.0.1:${appPort}`
+const appOrigin = `http://localhost:${appPort}`
 const sensitiveMarkers = {
   avgHours: '6.75',
   basePrice: '731.25',
@@ -20,6 +21,13 @@ const sensitiveMarkers = {
   propertyName: 'Sensitive Smoke Property',
 }
 const roleNames = ['admin', 'secretaria', 'limpeza', 'consegna', 'cliente']
+const e2eMarkers = {
+  boundaryEndProperty: 'Sprint 12A Boundary End',
+  boundaryOutsideProperty: 'Sprint 12A Boundary Outside',
+  createNote: 'Sprint 12A synthetic order created through the browser',
+  editNote: 'Sprint 12A synthetic order edited through the browser',
+  foreignProperty: 'Sprint 12A Foreign Property',
+}
 
 const childEnvironment = { ...process.env, SUPABASE_TELEMETRY_DISABLED: '1' }
 for (const variable of [
@@ -139,6 +147,45 @@ function romeDateOnly(date = new Date()) {
   return `${value.year}-${value.month}-${value.day}`
 }
 
+function addDateOnlyDays(value, days) {
+  const [year, month, day] = value.split('-').map(Number)
+  const date = new Date(Date.UTC(year, month - 1, day + days))
+  return date.toISOString().slice(0, 10)
+}
+
+function romeMidnightUtc(value) {
+  const [year, month, day] = value.split('-').map(Number)
+  const target = Date.UTC(year, month - 1, day)
+  let candidate = target
+  const formatter = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/Rome',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  })
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const parts = Object.fromEntries(
+      formatter.formatToParts(new Date(candidate)).map(part => [part.type, part.value]),
+    )
+    const represented = Date.UTC(
+      Number(parts.year),
+      Number(parts.month) - 1,
+      Number(parts.day),
+      Number(parts.hour),
+      Number(parts.minute),
+      Number(parts.second),
+    )
+    candidate -= represented - target
+  }
+
+  return new Date(candidate)
+}
+
 async function createSyntheticFixtures({ apiUrl, secretKey }) {
   process.stdout.write('[Sensitive smoke] Create five synthetic Auth users\n')
   const adminClient = createClient(apiUrl, secretKey, {
@@ -147,7 +194,7 @@ async function createSyntheticFixtures({ apiUrl, secretKey }) {
   const password = `Local-${randomBytes(18).toString('base64url')}!9aA`
   const users = new Map()
 
-  for (const role of roleNames) {
+  for (const role of [...roleNames, 'lockout']) {
     const email = `${role}.${process.pid}@sensitive-smoke.example.invalid`
     const { data, error } = await adminClient.auth.admin.createUser({
       email,
@@ -161,14 +208,14 @@ async function createSyntheticFixtures({ apiUrl, secretKey }) {
   }
 
   process.stdout.write('[Sensitive smoke] Assign trusted profile roles\n')
-  for (const role of roleNames) {
+  for (const role of [...roleNames, 'lockout']) {
     const user = users.get(role)
     const compensation = role === 'limpeza'
       ? { hourly_rate: 41.25, monthly_salary: 1640.75, overtime_rate: 52.5 }
       : {}
     const { error } = await adminClient
       .from('profiles')
-      .update({ role, ...compensation })
+      .update({ role: role === 'lockout' ? 'cliente' : role, ...compensation })
       .eq('id', user.id)
     requireSuccess(error, `Assign synthetic ${role}`)
   }
@@ -178,27 +225,32 @@ async function createSyntheticFixtures({ apiUrl, secretKey }) {
   const cleaning = users.get('limpeza')
   const delivery = users.get('consegna')
   const today = romeDateOnly()
-  // Keep this inside the reporting implementation's current inclusive DATE
-  // boundary. Correcting that TIMESTAMPTZ boundary belongs to Sprint 06.
-  const completedAt = new Date(`${today}T00:00:00.000Z`)
+  const nextDay = addDateOnlyDays(today, 1)
+  const startUtc = romeMidnightUtc(today)
+  const nextDayUtc = romeMidnightUtc(nextDay)
+  const completedAt = startUtc
   const startedAt = new Date(completedAt.getTime() - 45 * 60 * 1000)
   const checkoutAt = new Date(completedAt.getTime() - 6 * 60 * 60 * 1000)
-  const ownerId = '61000000-0000-0000-0000-000000000001'
-  const propertyId = '62000000-0000-0000-0000-000000000001'
-  const orderId = '63000000-0000-0000-0000-000000000001'
+  const ownerId = '61000000-0000-4000-8000-000000000001'
+  const foreignOwnerId = '61000000-0000-4000-8000-000000000002'
+  const propertyId = '62000000-0000-4000-8000-000000000001'
+  const boundaryEndPropertyId = '62000000-0000-4000-8000-000000000002'
+  const boundaryOutsidePropertyId = '62000000-0000-4000-8000-000000000003'
+  const foreignPropertyId = '62000000-0000-4000-8000-000000000004'
+  const orderId = '63000000-0000-4000-8000-000000000001'
+  const boundaryEndOrderId = '63000000-0000-4000-8000-000000000002'
+  const boundaryOutsideOrderId = '63000000-0000-4000-8000-000000000003'
+  const foreignOrderId = '63000000-0000-4000-8000-000000000004'
+  const unassignedOrderId = '63000000-0000-4000-8000-000000000005'
 
-  let result = await adminClient.from('owners').insert({
-    id: ownerId,
-    name: 'Sensitive Smoke Owner',
-    email: client.email,
-  })
-  requireSuccess(result.error, 'Create synthetic owner')
+  let result = await adminClient.from('owners').insert([
+    { id: ownerId, name: 'Sensitive Smoke Owner', email: client.email },
+    { id: foreignOwnerId, name: 'Foreign Synthetic Owner', email: 'foreign-owner@example.invalid' },
+  ])
+  requireSuccess(result.error, 'Create synthetic owners')
 
-  result = await adminClient.from('properties').insert({
-    id: propertyId,
-    name: sensitiveMarkers.propertyName,
+  const propertyDefaults = {
     client_type: 'particular',
-    owner_id: ownerId,
     zone: 'Other areas',
     address: 'Synthetic local-only address',
     min_guests: 1,
@@ -213,15 +265,18 @@ async function createSyntheticFixtures({ apiUrl, secretKey }) {
     base_price: 731.25,
     extra_per_person: 19.75,
     avg_cleaning_hours: 6.75,
-  })
-  requireSuccess(result.error, 'Create synthetic property')
+  }
+  result = await adminClient.from('properties').insert([
+    { ...propertyDefaults, id: propertyId, name: sensitiveMarkers.propertyName, owner_id: ownerId },
+    { ...propertyDefaults, id: boundaryEndPropertyId, name: e2eMarkers.boundaryEndProperty, owner_id: ownerId },
+    { ...propertyDefaults, id: boundaryOutsidePropertyId, name: e2eMarkers.boundaryOutsideProperty, owner_id: ownerId },
+    { ...propertyDefaults, id: foreignPropertyId, name: e2eMarkers.foreignProperty, owner_id: foreignOwnerId },
+  ])
+  requireSuccess(result.error, 'Create synthetic properties')
 
-  result = await adminClient.from('service_orders').insert({
-    id: orderId,
-    property_id: propertyId,
+  const orderDefaults = {
     cleaning_staff_id: cleaning.id,
     consegna_staff_id: delivery.id,
-    cleaning_date: today,
     checkout_at: checkoutAt.toISOString(),
     checkin_at: completedAt.toISOString(),
     status: 'done',
@@ -233,24 +288,95 @@ async function createSyntheticFixtures({ apiUrl, secretKey }) {
     bathrooms: 1,
     bidets: 1,
     cribs: 0,
-    total_price: 812.5,
     pricing_mode: 'standard',
-    extra_services_description: 'Synthetic local-only extra',
-    extra_services_price: 63.25,
     consegna_fee: 10,
-    started_at: startedAt.toISOString(),
-    completed_at: completedAt.toISOString(),
-  })
-  requireSuccess(result.error, 'Create synthetic service order')
+  }
+  result = await adminClient.from('service_orders').insert([
+    {
+      ...orderDefaults,
+      id: orderId,
+      property_id: propertyId,
+      cleaning_date: today,
+      total_price: 812.5,
+      extra_services_description: 'Synthetic boundary start',
+      extra_services_price: 63.25,
+      started_at: startedAt.toISOString(),
+      completed_at: completedAt.toISOString(),
+    },
+    {
+      ...orderDefaults,
+      id: boundaryEndOrderId,
+      property_id: boundaryEndPropertyId,
+      cleaning_date: today,
+      total_price: 222.5,
+      extra_services_description: 'Synthetic boundary end',
+      extra_services_price: 12.5,
+      started_at: new Date(nextDayUtc.getTime() - 46 * 60 * 1000).toISOString(),
+      completed_at: new Date(nextDayUtc.getTime() - 1).toISOString(),
+    },
+    {
+      ...orderDefaults,
+      id: boundaryOutsideOrderId,
+      property_id: boundaryOutsidePropertyId,
+      cleaning_date: nextDay,
+      total_price: 444.75,
+      extra_services_description: 'Synthetic outside boundary',
+      extra_services_price: 14.75,
+      started_at: new Date(nextDayUtc.getTime() - 45 * 60 * 1000).toISOString(),
+      completed_at: nextDayUtc.toISOString(),
+    },
+    {
+      ...orderDefaults,
+      id: foreignOrderId,
+      property_id: foreignPropertyId,
+      cleaning_staff_id: null,
+      consegna_staff_id: null,
+      cleaning_date: today,
+      status: 'open',
+      total_price: 100,
+      extra_services_description: null,
+      extra_services_price: 0,
+      started_at: null,
+      completed_at: null,
+    },
+    {
+      ...orderDefaults,
+      id: unassignedOrderId,
+      property_id: propertyId,
+      cleaning_staff_id: null,
+      consegna_staff_id: null,
+      cleaning_date: today,
+      status: 'open',
+      total_price: 100,
+      extra_services_description: null,
+      extra_services_price: 0,
+      started_at: null,
+      completed_at: null,
+    },
+  ])
+  requireSuccess(result.error, 'Create synthetic service orders')
 
-  result = await adminClient.from('service_order_cleaning_staff').insert({
-    service_order_id: orderId,
-    profile_id: cleaning.id,
-  })
+  result = await adminClient.from('service_order_cleaning_staff').insert([
+    { service_order_id: orderId, profile_id: cleaning.id },
+    { service_order_id: boundaryEndOrderId, profile_id: cleaning.id },
+    { service_order_id: boundaryOutsideOrderId, profile_id: cleaning.id },
+  ])
   requireSuccess(result.error, 'Assign synthetic cleaning staff')
 
   process.stdout.write('[Sensitive smoke] Synthetic fixtures ready\n')
-  return { orderId, propertyId, today, users }
+  return {
+    boundaryEndOrderId,
+    boundaryEndPropertyId,
+    boundaryOutsideOrderId,
+    boundaryOutsidePropertyId,
+    foreignOrderId,
+    orderId,
+    propertyId,
+    nextDay,
+    today,
+    unassignedOrderId,
+    users,
+  }
 }
 
 function requirePermissionDenied(error, label) {
@@ -582,7 +708,93 @@ async function smokeRole(role, user, today) {
   process.stdout.write(`[Sensitive smoke] ${role}: PASS\n`)
 }
 
+async function runCriticalE2E(fixture) {
+  process.stdout.write('\n[Critical E2E] Run Playwright against the isolated application\n')
+  const fixturePayload = {
+    boundaryEndProperty: e2eMarkers.boundaryEndProperty,
+    boundaryOutsideProperty: e2eMarkers.boundaryOutsideProperty,
+    createNote: e2eMarkers.createNote,
+    editNote: e2eMarkers.editNote,
+    foreignOrderId: fixture.foreignOrderId,
+    orderId: fixture.orderId,
+    propertyId: fixture.propertyId,
+    propertyName: sensitiveMarkers.propertyName,
+    today: fixture.today,
+    unassignedOrderId: fixture.unassignedOrderId,
+    users: Object.fromEntries(
+      [...fixture.users].map(([role, user]) => [role, { email: user.email, password: user.password }]),
+    ),
+  }
+  const encodedFixture = Buffer.from(JSON.stringify(fixturePayload), 'utf8').toString('base64url')
+  const processHandle = spawn(
+    process.execPath,
+    [playwrightEntrypoint, 'test', '--config', 'playwright.config.ts'],
+    {
+      cwd: repositoryRoot,
+      env: {
+        ...childEnvironment,
+        E2E_BASE_URL: appOrigin,
+        E2E_FIXTURE_B64: encodedFixture,
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+    },
+  )
+  let bufferedOutput = ''
+  const collect = chunk => {
+    bufferedOutput = `${bufferedOutput}${chunk}`.slice(-(5 * 1024 * 1024))
+  }
+  processHandle.stdout.on('data', collect)
+  processHandle.stderr.on('data', collect)
+  const status = await new Promise((resolvePromise, rejectPromise) => {
+    processHandle.once('error', rejectPromise)
+    processHandle.once('exit', resolvePromise)
+  })
+  const output = redact(bufferedOutput).trim()
+  if (output) process.stdout.write(`${output}\n`)
+  if (status !== 0) {
+    throw new Error(`Critical E2E failed with exit code ${status ?? 'unknown'}.`)
+  }
+}
+
+async function verifyCriticalE2EEffects(localStatus, fixture) {
+  const adminClient = createClient(localStatus.apiUrl, localStatus.secretKey, {
+    auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
+  })
+
+  let result = await adminClient
+    .from('service_orders')
+    .select('id')
+    .eq('property_id', fixture.propertyId)
+    .eq('cleaning_notes', e2eMarkers.createNote)
+    .maybeSingle()
+  requireSuccess(result.error, 'Verify browser-created service order')
+  if (!result.data) throw new Error('Browser-created service order was not persisted.')
+
+  result = await adminClient
+    .from('service_orders')
+    .select('cleaning_notes')
+    .eq('id', fixture.orderId)
+    .single()
+  requireSuccess(result.error, 'Verify browser-edited service order')
+  if (result.data.cleaning_notes !== e2eMarkers.editNote) {
+    throw new Error('Browser-edited service order did not preserve the expected note.')
+  }
+
+  result = await adminClient
+    .from('auth_login_attempts')
+    .select('failed_count, locked_until')
+    .gte('failed_count', 4)
+  requireSuccess(result.error, 'Verify browser login lockout state')
+  if (result.data.length !== 1 || !result.data[0].locked_until) {
+    throw new Error('Browser login lockout did not create exactly one locked synthetic identity.')
+  }
+
+  process.stdout.write('[Critical E2E] Persisted create/edit effects and lockout state: PASS\n')
+}
+
 async function main() {
+  const runBrowserE2E = process.argv.includes('--e2e')
   await stat(join(repositoryRoot, '.next', 'BUILD_ID'))
   const { projectId, temporaryRoot: workdir } = await prepareDisposableProject()
   let stackStarted = false
@@ -617,6 +829,10 @@ async function main() {
 
     for (const role of roleNames) {
       await smokeRole(role, fixture.users.get(role), fixture.today)
+    }
+    if (runBrowserE2E) {
+      await runCriticalE2E(fixture)
+      await verifyCriticalE2EEffects(localStatus, fixture)
     }
     process.stdout.write('\nSensitive-data authenticated smoke passed for all five roles.\n')
   } catch (error) {

@@ -1,6 +1,6 @@
 # Roadmap ativo de endurecimento arquitetural
 
-**Status do programa:** Sprints 00–11 concluídas localmente; Sprints 12A e 12B planejadas e não iniciadas
+**Status do programa:** Sprints 00–12A concluídas; Sprint 12B planejada e não iniciada
 
 **Baseline da auditoria:** 2026-08-15
 
@@ -169,7 +169,7 @@ Estados permitidos: `planned`, `in_progress`, `completed`, `blocked` e
 | 09 | P1 | Escrita de propriedade/relações atômica | DB-P | 08 | completed |
 | 10 | P1 | Convite de funcionário idempotente e recuperável | DB-0 por padrão | 09 | completed |
 | 11 | P2 | Tipos, validação, erros e data access mais locais | DB-0 | 10 | completed |
-| 12A | P2 | Validação E2E, segurança e regressão em ambiente isolado | DB-L / read-only | 11 | planned |
+| 12A | P2 | Validação E2E, segurança e regressão em ambiente isolado | DB-L / read-only | 11 | completed |
 | 12B | P2 | Reauditoria final, documentação e gate de encerramento | DB-L / read-only | 12A | planned |
 
 ## 7. Sprints detalhadas
@@ -1208,6 +1208,10 @@ são rejeitadas cedo e mensagens internas não atravessam a fronteira de UI.
 
 ### Sprint 12A — Validação E2E, segurança e regressão
 
+**Status:** completed — execução local/descartável concluída em 2026-08-22;
+evidências em `docs/evolution/sprint-12a-validation-report.md`. Sprint 12B não
+iniciada.
+
 **Dependência:** Sprint 11 concluída. Esta etapa deve ser executada
 isoladamente antes da Sprint 12B e não emite o veredito final do programa.
 
@@ -1239,13 +1243,13 @@ resultados reproduzíveis, com falhas e pendências registradas para a Sprint 12
 
 **Critérios de conclusão**
 
-- [ ] E2Es críticos passam de forma determinística em ambiente isolado.
-- [ ] Matriz de papel/coluna/operação está verde ou possui cada exceção
+- [x] E2Es críticos passam de forma determinística em ambiente isolado.
+- [x] Matriz de papel/coluna/operação está verde ou possui cada exceção
   documentada.
-- [ ] Lint, typecheck, Vitest, SQL, E2E e build passam.
-- [ ] Advisor, auditoria de dependências e varredura de segredos foram
+- [x] Lint, typecheck, Vitest, SQL, E2E e build passam.
+- [x] Advisor, auditoria de dependências e varredura de segredos foram
   executados sem ocultar findings.
-- [ ] Evidências, falhas e riscos residuais estão registradas antes de iniciar
+- [x] Evidências, falhas e riscos residuais estão registradas antes de iniciar
   a Sprint 12B.
 
 ### Sprint 12B — Reauditoria final, documentação e gate de encerramento
@@ -1309,7 +1313,7 @@ Nunca cole tokens, DSNs, emails, IPs, dados pessoais ou conteúdo de `.env`.
 | 09 | completed | 2026-08-20 | 2026-08-20 | Codex | Dossiê DB-P; migration `20260820230000_atomic_property_write.sql`; caso de uso `saveProperty`; 34 pgTAP (253 total), invariantes/fotos/schema lint sem issues; lint/typecheck/34 arquivos e 188 Vitest/build (20 rotas) PASS; smoke de dados sensíveis PASS; aplicada em produção no projeto `iwrbeiqqsvzhiuhkqnqg` após autorização expressa | Criação/edição de imóvel e agência/proprietário atômicas; RPC `SECURITY INVOKER` restrita a `admin`; zero novos órfãos; Sprint 10 não iniciada |
 | 10 | completed | 2026-08-20 | 2026-08-20 | Codex | Adapter EmployeeAdminAdapter; caso de uso inviteEmployee; 12 testes Vitest de saga/idempotência/fault injection PASS; lint/typecheck/35 arquivos e 200 Vitest/build (20 rotas) PASS | Saga de convite recuperável e determinística; compensação não-destrutiva sem exclusão de usuários; nenhuma migration ou dado alterado (DB-0); Sprint 11 não iniciada |
 | 11 | completed | 2026-08-21 | 2026-08-22 | Codex | Implementação original `9f87d8b`, reconciliada no baseline `48e04da`; typegen local determinístico; lint/typecheck/36 arquivos e 218 Vitest/build PASS; 253 pgTAP, invariantes, schema lint e Advisor local PASS; smoke autenticado de cinco papéis PASS | Seleções por papel minimizadas na origem e fontes financeiras validadas com Zod; nenhuma alteração remota ou destrutiva, migration, `--linked`, commit ou push; Sprint 12A não iniciada |
-| 12A | planned | — | — | — | — | — |
+| 12A | completed | 2026-08-22 | 2026-08-22 | Codex | Playwright 4/4; cinco papéis e negativas PASS; criação/edição e lockout persistidos; datas de Roma consistentes em dashboard/CSV/PDF; lint/typecheck/36 arquivos e 218 Vitest/build PASS; 253 pgTAP, invariantes, schema lint, Advisor local, grants/RLS PASS; `npm audit --omit=dev` com 0 vulnerabilidades; Gitleaks final em 112 commits sem leaks não permitidos | Somente ambiente local/descartável e dados sintéticos; CI, Advisor e grants/RLS remotos NOT VERIFIED; relatório em `docs/evolution/sprint-12a-validation-report.md`; nenhuma operação remota/destrutiva, `--linked`, commit ou push; Sprint 12B não iniciada |
 | 12B | planned | — | — | — | — | — |
 
 ## 9. Checklist de retomada em uma nova janela
