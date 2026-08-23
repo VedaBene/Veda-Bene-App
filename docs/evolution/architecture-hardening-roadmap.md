@@ -1,10 +1,10 @@
 # Roadmap ativo de endurecimento arquitetural
 
-**Status do programa:** Sprints 00–11 concluídas localmente; Sprint 12 planejada e não iniciada
+**Status do programa:** Sprints 00–11 concluídas localmente; Sprints 12A e 12B planejadas e não iniciadas
 
 **Baseline da auditoria:** 2026-08-15
 
-**Última atualização:** 2026-08-21
+**Última atualização:** 2026-08-22
 
 **Nota técnica de referência:** 6,8/10
 
@@ -168,8 +168,9 @@ Estados permitidos: `planned`, `in_progress`, `completed`, `blocked` e
 | 08 | P1 | Escrita de O.S. e vínculos atômica | DB-P | 07 | completed |
 | 09 | P1 | Escrita de propriedade/relações atômica | DB-P | 08 | completed |
 | 10 | P1 | Convite de funcionário idempotente e recuperável | DB-0 por padrão | 09 | completed |
-| 11 | P2 | Tipos, validação, erros e data access mais locais | DB-0 | 10 | planned |
-| 12 | P2 | Regressão E2E, documentação e reauditoria final | DB-L / read-only | 11 | planned |
+| 11 | P2 | Tipos, validação, erros e data access mais locais | DB-0 | 10 | completed |
+| 12A | P2 | Validação E2E, segurança e regressão em ambiente isolado | DB-L / read-only | 11 | planned |
+| 12B | P2 | Reauditoria final, documentação e gate de encerramento | DB-L / read-only | 12A | planned |
 
 ## 7. Sprints detalhadas
 
@@ -1123,6 +1124,10 @@ sem fingir que os dois sistemas participam da mesma transação.
 
 ### Sprint 11 — Tipos, validação, erros e limites de data access
 
+**Status:** completed — implementação original em `9f87d8b`, reconciliada e
+revalidada no baseline corrente `48e04da` em 2026-08-22. A Sprint 12A não foi
+iniciada.
+
 **Objetivo:** reduzir drift e tornar mudanças futuras mais locais depois que as
 fronteiras críticas estiverem protegidas.
 
@@ -1159,6 +1164,38 @@ reestruturação geral de pastas.
 **Resultado esperado:** o compilador detecta drift de schema, entradas inválidas
 são rejeitadas cedo e mensagens internas não atravessam a fronteira de UI.
 
+**Ajustes de conclusão e evidências de 2026-08-22**
+
+- O DAL de propriedades passou a selecionar na origem somente os campos
+  permitidos a cada papel: `secretaria` recebe metadados de cliente e os demais
+  papéis não administrativos recebem apenas os campos operacionais comuns.
+- As fontes financeiras privilegiadas passaram a validar as linhas retornadas
+  pelo Supabase com schemas Zod explícitos; os dois `Record<string, any>`
+  remanescentes foram removidos e relações singulares/array são normalizadas em
+  um único helper local.
+- Os testes dos casos de uso foram reconciliados com os argumentos opcionais
+  gerados para os RPCs (`undefined`, preservando os defaults SQL) e com o mapper
+  canônico de erro genérico em italiano, sem exposição da mensagem bruta do
+  backend.
+- Arquivos ajustados na conclusão: `lib/server/data-access/properties.ts`,
+  `lib/server/data-access/sensitive-data.ts`,
+  `lib/server/properties/save-property.test.ts`,
+  `lib/server/service-orders/save-service-order.test.ts` e este roadmap.
+- `npm run typegen:supabase`: PASS em stack Docker/Supabase descartável; o
+  arquivo `lib/types/database.generated.ts` permaneceu sem diff.
+- `npm run lint`: PASS; `npm run typecheck`: PASS; `npm test`: PASS, 36 arquivos
+  e 218 testes; `npm run build`: PASS no Next.js 16.3.1, com 20 rotas.
+- `npm run test:supabase`: PASS, 7 arquivos e 253 testes pgTAP; invariantes de
+  migração, invariantes operacionais/fotos, lint de schema, Advisor de segurança
+  local e smoke isolado de migração de fotos também passaram.
+- `npm run test:smoke:sensitive-data`: PASS para `admin`, `secretaria`,
+  `limpeza`, `consegna` e `cliente`, incluindo barreiras diretas de colunas,
+  guards de rotas/exports e fontes privilegiadas, com usuários e dados
+  sintéticos removidos ao final.
+- Classificação DB-0 preservada: nenhuma migration, escrita remota, mudança de
+  RLS/grants/Auth/Storage/schema, uso de `--linked`, commit ou push foi realizado.
+  O E2E amplo e os gates adicionais permanecem exclusivamente na Sprint 12A.
+
 **Critérios de conclusão**
 
 - [x] Geração de tipos é reproduzível e não contém dados/segredos (`scripts/generate-database-types.mjs` via stack isolada e `npm run typegen:supabase`).
@@ -1169,10 +1206,13 @@ são rejeitadas cedo e mensagens internas não atravessam a fronteira de UI.
 - [x] Erros do Supabase não são retornados crus nos entrypoints tocados (`lib/server/errors.ts` e handlers).
 - [x] Toda extração nova passa no Deletion Test e melhora localidade (`getCurrentViewer` e `getApiViewer`).
 
-### Sprint 12 — E2E crítico, documentação e reauditoria
+### Sprint 12A — Validação E2E, segurança e regressão
 
-**Objetivo:** provar o sistema como um todo, fechar o programa e produzir uma
-nova baseline confiável.
+**Dependência:** Sprint 11 concluída. Esta etapa deve ser executada
+isoladamente antes da Sprint 12B e não emite o veredito final do programa.
+
+**Objetivo:** provar os fluxos críticos e as fronteiras de segurança em ambiente
+isolado, produzindo evidências para a reauditoria final.
 
 **O que implementar**
 
@@ -1180,37 +1220,74 @@ nova baseline confiável.
   e edição de O.S., relatórios no limite de datas, login lockout e negativas de
   autorização.
 - Validar CSV/PDF e dashboard contra os mesmos dados sintéticos.
-- Reexecutar CI, testes SQL, Advisor Supabase, varredura de segredos,
-  `npm audit --omit=dev` e inspeção read-only de grants/RLS.
-- Consultar Sentry de forma read-only para regressões relacionadas aos fluxos
-  alterados, sem usar ausência de evento como única prova.
-- Atualizar README, CLAUDE, ADRs, este roadmap e o registro final de riscos.
-- Recalcular a nota técnica com os mesmos critérios da auditoria inicial.
+- Reexecutar CI, testes SQL, lint, typecheck, Vitest, build e E2E.
+- Reexecutar Advisor Supabase, varredura de segredos, `npm audit --omit=dev` e
+  inspeção read-only de grants/RLS.
 
 **Arquivos/componentes prováveis**
 
 - configuração e specs E2E a definir conforme ferramenta aprovada
 - `.github/workflows/ci.yml`
 - fixtures sintéticas locais
-- documentação e este roadmap
+- este roadmap, para registrar as evidências da etapa
 
-**Impactos e implicações:** DB-L/read-only. Nenhuma escrita remota é autorizada
-por esta sprint; smoke em produção, se desejado, exige plano e autorização
-separados.
+**Impactos e implicações:** DB-L/read-only. Usar somente dados sintéticos e
+ambiente descartável; nenhuma escrita remota é autorizada por esta etapa.
 
-**Resultado esperado:** as melhorias críticas são demonstradas por testes
-executáveis, a documentação corresponde ao sistema e os riscos residuais têm
-dono/prioridade explícitos.
+**Resultado esperado:** os fluxos críticos e as barreiras de autorização têm
+resultados reproduzíveis, com falhas e pendências registradas para a Sprint 12B.
 
 **Critérios de conclusão**
 
 - [ ] E2Es críticos passam de forma determinística em ambiente isolado.
-- [ ] Matriz de papel/coluna/operação está verde.
+- [ ] Matriz de papel/coluna/operação está verde ou possui cada exceção
+  documentada.
 - [ ] Lint, typecheck, Vitest, SQL, E2E e build passam.
+- [ ] Advisor, auditoria de dependências e varredura de segredos foram
+  executados sem ocultar findings.
+- [ ] Evidências, falhas e riscos residuais estão registradas antes de iniciar
+  a Sprint 12B.
+
+### Sprint 12B — Reauditoria final, documentação e gate de encerramento
+
+**Dependência:** Sprint 12A concluída, com todas as pendências críticas
+resolvidas ou formalmente classificadas como bloqueadoras.
+
+**Objetivo:** consolidar as evidências, atualizar a documentação e emitir o
+veredito final do programa com uma nova baseline confiável.
+
+**O que implementar**
+
+- Revisar o relatório e os resultados da Sprint 12A; repetir somente testes que
+  falharam ou ficaram inconclusivos.
+- Consultar Sentry de forma read-only para regressões relacionadas aos fluxos
+  alterados, sem usar ausência de evento como única prova.
+- Atualizar README, CLAUDE, ADRs, este roadmap e o registro final de riscos.
+- Recalcular a nota técnica com os mesmos critérios da auditoria inicial.
+- Emitir o gate final como `READY`, `READY WITH WARNINGS` ou `BLOCKED`.
+
+**Arquivos/componentes prováveis**
+
+- relatório/evidências produzidos na Sprint 12A
+- documentação e ADRs relevantes
+- este roadmap e o registro final de riscos
+
+**Impactos e implicações:** DB-L/read-only. Nenhuma escrita remota é autorizada
+por esta etapa; qualquer smoke em produção exige plano e autorização separados.
+Somente esta etapa pode declarar o programa encerrado.
+
+**Resultado esperado:** a documentação corresponde à arquitetura final, os
+riscos residuais têm dono e prioridade explícitos e o programa possui uma
+decisão final de liberação baseada em evidências.
+
+**Critérios de conclusão**
+
+- [ ] Resultados da Sprint 12A revisados e pendências classificadas.
+- [ ] Reexecuções necessárias passam ou estão formalmente bloqueadas.
 - [ ] Não há finding crítico/alto novo em Advisor, audit ou Sentry relacionado
-  às mudanças.
+  às mudanças, ou o impacto está explicitamente aceito pelo responsável.
 - [ ] Documentação e ADRs refletem a arquitetura final.
-- [ ] Nota final e riscos residuais estão registrados.
+- [ ] Nota final, riscos residuais e gate de liberação estão registrados.
 
 ## 8. Registro de progresso e evidências
 
@@ -1231,8 +1308,9 @@ Nunca cole tokens, DSNs, emails, IPs, dados pessoais ou conteúdo de `.env`.
 | 08 | completed | 2026-08-20 | 2026-08-20 | Codex | Dossiê DB-P; migration `20260820220000_atomic_service_order_write.sql`; caso de uso `saveServiceOrder`; 27 pgTAP (219 total), invariantes/fotos/schema lint sem issues; lint/typecheck/33 arquivos e 182 Vitest/build (20 rotas) PASS; aplicada em produção no projeto `iwrbeiqqsvzhiuhkqnqg` após autorização expressa | Criação/edição de O.S. e equipe atômicas; RPC `SECURITY INVOKER` restrita a `admin`/`secretaria`; sem dados corrompidos; Sprint 09 não iniciada |
 | 09 | completed | 2026-08-20 | 2026-08-20 | Codex | Dossiê DB-P; migration `20260820230000_atomic_property_write.sql`; caso de uso `saveProperty`; 34 pgTAP (253 total), invariantes/fotos/schema lint sem issues; lint/typecheck/34 arquivos e 188 Vitest/build (20 rotas) PASS; smoke de dados sensíveis PASS; aplicada em produção no projeto `iwrbeiqqsvzhiuhkqnqg` após autorização expressa | Criação/edição de imóvel e agência/proprietário atômicas; RPC `SECURITY INVOKER` restrita a `admin`; zero novos órfãos; Sprint 10 não iniciada |
 | 10 | completed | 2026-08-20 | 2026-08-20 | Codex | Adapter EmployeeAdminAdapter; caso de uso inviteEmployee; 12 testes Vitest de saga/idempotência/fault injection PASS; lint/typecheck/35 arquivos e 200 Vitest/build (20 rotas) PASS | Saga de convite recuperável e determinística; compensação não-destrutiva sem exclusão de usuários; nenhuma migration ou dado alterado (DB-0); Sprint 11 não iniciada |
-| 11 | planned | — | — | — | — | — |
-| 12 | planned | — | — | — | — | — |
+| 11 | completed | 2026-08-21 | 2026-08-22 | Codex | Implementação original `9f87d8b`, reconciliada no baseline `48e04da`; typegen local determinístico; lint/typecheck/36 arquivos e 218 Vitest/build PASS; 253 pgTAP, invariantes, schema lint e Advisor local PASS; smoke autenticado de cinco papéis PASS | Seleções por papel minimizadas na origem e fontes financeiras validadas com Zod; nenhuma alteração remota ou destrutiva, migration, `--linked`, commit ou push; Sprint 12A não iniciada |
+| 12A | planned | — | — | — | — | — |
+| 12B | planned | — | — | — | — | — |
 
 ## 9. Checklist de retomada em uma nova janela
 

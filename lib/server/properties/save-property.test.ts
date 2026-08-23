@@ -30,14 +30,14 @@ describe('saveProperty use case', () => {
 
     expect(result).toEqual({ success: true, propertyId: 'prop-100' })
     expect(mockRpc).toHaveBeenCalledWith('save_property_atomic', expect.objectContaining({
-      p_property_id: null,
+      p_property_id: undefined,
       p_name: 'Appartamento Navona',
       p_client_type: 'rental',
       p_zone: 'Piazza Navona',
       p_new_agency_name: 'Luxury Rentals Roma',
       p_new_agency_email: 'info@luxuryroma.it',
-      p_agency_id: null,
-      p_owner_id: null,
+      p_agency_id: undefined,
+      p_owner_id: undefined,
       p_double_beds: 2,
       p_base_price: 120,
     }))
@@ -64,14 +64,14 @@ describe('saveProperty use case', () => {
 
     expect(result).toEqual({ success: true, propertyId: 'prop-200' })
     expect(mockRpc).toHaveBeenCalledWith('save_property_atomic', expect.objectContaining({
-      p_property_id: null,
+      p_property_id: undefined,
       p_name: 'Casa Trastevere',
       p_client_type: 'particular',
       p_zone: 'Trastevere Area',
       p_new_owner_name: 'Mario Rossi',
       p_new_owner_email: 'mario.rossi@email.com',
-      p_owner_id: null,
-      p_agency_id: null,
+      p_owner_id: undefined,
+      p_agency_id: undefined,
       p_double_beds: 1,
       p_single_beds: 1,
     }))

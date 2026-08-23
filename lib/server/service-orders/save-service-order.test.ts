@@ -39,7 +39,7 @@ describe('saveServiceOrder use case', () => {
 
     expect(result).toEqual({ success: true, orderId: 'order-123' })
     expect(mockRpc).toHaveBeenCalledWith('save_service_order_atomic', expect.objectContaining({
-      p_order_id: null,
+      p_order_id: undefined,
       p_property_id: 'prop-1',
       p_cleaning_staff_ids: ['staff-1', 'staff-2'],
       p_consegna_staff_id: 'consegna-1',
@@ -122,6 +122,10 @@ describe('saveServiceOrder use case', () => {
       cribs: 0,
     })
 
-    expect(result).toEqual({ success: false, error: 'Imóvel não encontrado.' })
+    expect(result).toEqual({
+      success: false,
+      error: "Si è verificato un errore durante l'operazione.",
+    })
+    expect(result).not.toEqual({ success: false, error: 'Imóvel não encontrado.' })
   })
 })

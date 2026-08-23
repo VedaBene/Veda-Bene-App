@@ -388,6 +388,32 @@ export type StaffCompensationSource = {
   monthly_salary: number | null
 }
 
+const financialStaffReferenceSchema = z.object({ id: z.string() })
+const payablePropertyRowSchema = z.object({
+  name: z.string().nullable().optional(),
+  avg_cleaning_hours: z.number().nullable(),
+})
+const payableOrderRowSchema = z.object({
+  id: z.string(),
+  order_number: z.number(),
+  completed_at: z.string().nullable(),
+  cleaning_staff: z.array(financialStaffReferenceSchema).nullable(),
+  property: z.union([
+    payablePropertyRowSchema,
+    z.array(payablePropertyRowSchema),
+  ]).nullable(),
+})
+const staffCompensationSourceSchema = z.object({
+  id: z.string(),
+  full_name: z.string(),
+  hourly_rate: z.number().nullable(),
+  monthly_salary: z.number().nullable(),
+})
+
+function firstRelation<T>(relation: T | T[] | null): T | null {
+  return Array.isArray(relation) ? (relation[0] ?? null) : relation
+}
+
 export async function loadPayableFinancialSource(
   filters: PayableStatementFilters,
   includePropertyName: boolean,
@@ -410,14 +436,14 @@ export async function loadPayableFinancialSource(
 
   const { data: orders, error: ordersError } = await query
   if (ordersError) throw new Error('Não foi possível carregar o extrato a pagar.', { cause: ordersError })
-  const rawOrders = (orders ?? []) as Array<Record<string, any>>
+  const rawOrders = z.array(payableOrderRowSchema).parse(orders ?? [])
   const typedOrders: PayableOrderSource[] = rawOrders.map(row => {
-    const rawProperty = Array.isArray(row.property) ? row.property[0] : row.property
+    const rawProperty = firstRelation(row.property)
     return {
       id: row.id,
       order_number: row.order_number,
-      completed_at: row.completed_at ?? null,
-      cleaning_staff: (row.cleaning_staff ?? []) as { id: string }[],
+      completed_at: row.completed_at,
+      cleaning_staff: row.cleaning_staff ?? [],
       property: rawProperty
         ? {
             name: rawProperty.name ?? null,
@@ -435,7 +461,10 @@ export async function loadPayableFinancialSource(
     .in('id', idBatchSchema.parse(staffIds))
   if (profilesError) throw new Error('Não foi possível carregar a remuneração autorizada.', { cause: profilesError })
 
-  return { orders: typedOrders, profiles: (profiles ?? []) as StaffCompensationSource[] }
+  return {
+    orders: typedOrders,
+    profiles: z.array(staffCompensationSourceSchema).parse(profiles ?? []),
+  }
 }
 
 export type ReceivableOrderSource = {
@@ -464,6 +493,46 @@ export type ReceivableOrderSource = {
   } | null
 }
 
+const receivablePartyRowSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+})
+const receivablePropertyRowSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  client_type: z.enum(['rental', 'particular']),
+  base_price: z.number().nullable(),
+  agency: z.union([
+    receivablePartyRowSchema,
+    z.array(receivablePartyRowSchema),
+  ]).nullable(),
+  owner: z.union([
+    receivablePartyRowSchema,
+    z.array(receivablePartyRowSchema),
+  ]).nullable(),
+})
+const receivableOrderRowSchema = z.object({
+  id: z.string(),
+  order_number: z.number(),
+  cleaning_date: z.string().nullable(),
+  pricing_mode: z.enum(['standard', 'ripasso', 'out_long_stay']).nullable(),
+  real_guests: z.number().nullable(),
+  double_beds: z.number().nullable(),
+  single_beds: z.number().nullable(),
+  sofa_beds: z.number().nullable(),
+  bathrooms: z.number().nullable(),
+  bidets: z.number().nullable(),
+  cribs: z.number().nullable(),
+  extra_services_description: z.string().nullable(),
+  extra_services_price: z.number().nullable(),
+  consegna_fee: z.number().nullable(),
+  total_price: z.number().nullable(),
+  property: z.union([
+    receivablePropertyRowSchema,
+    z.array(receivablePropertyRowSchema),
+  ]).nullable(),
+})
+
 const RECEIVABLE_SELECT = `
   id, order_number, cleaning_date, pricing_mode, real_guests,
   double_beds, single_beds, sofa_beds, bathrooms, bidets, cribs,
@@ -490,11 +559,11 @@ export async function loadReceivableFinancialSource(
       .order('id', { ascending: true })
       .range(from, from + MAX_ID_BATCH - 1)
     if (error) throw new Error('Não foi possível carregar o relatório a receber.', { cause: error })
-    const rawRows = (data ?? []) as Array<Record<string, any>>
+    const rawRows = z.array(receivableOrderRowSchema).parse(data ?? [])
     const page: ReceivableOrderSource[] = rawRows.map(row => {
-      const rawProperty = Array.isArray(row.property) ? row.property[0] : row.property
-      const rawAgency = rawProperty && Array.isArray(rawProperty.agency) ? rawProperty.agency[0] : rawProperty?.agency
-      const rawOwner = rawProperty && Array.isArray(rawProperty.owner) ? rawProperty.owner[0] : rawProperty?.owner
+      const rawProperty = firstRelation(row.property)
+      const rawAgency = rawProperty ? firstRelation(rawProperty.agency) : null
+      const rawOwner = rawProperty ? firstRelation(rawProperty.owner) : null
 
       return {
         id: row.id,

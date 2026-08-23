@@ -25,10 +25,32 @@ export type PropertyFormOptions = {
   owners: ClientDirectoryOption[]
 }
 
-const PROPERTY_LIST_ADMIN_SELECT = 'id, name, zone, address, client_type'
-const PROPERTY_LIST_STAFF_SELECT = 'id, name, zone, address'
+const PROPERTY_LIST_SECRETARIA_SELECT = 'id, name, zone, address, client_type'
+const PROPERTY_LIST_COMMON_SELECT = 'id, name, zone, address'
 
-const PROPERTY_DETAIL_STAFF_SELECT = `
+const PROPERTY_DETAIL_COMMON_SELECT = `
+  id,
+  name,
+  zone,
+  address,
+  zip_code,
+  sqm_interior,
+  sqm_exterior,
+  sqm_total,
+  min_guests,
+  max_guests,
+  double_beds,
+  single_beds,
+  sofa_beds,
+  armchair_beds,
+  bathrooms,
+  bidets,
+  cribs,
+  bedrooms,
+  notes
+`
+
+const PROPERTY_DETAIL_SECRETARIA_SELECT = `
   id,
   name,
   zone,
@@ -73,8 +95,8 @@ export async function getPropertyList(
 
   let query = (
     viewer.role === 'secretaria'
-      ? supabase.from('properties').select('id, name, zone, address, client_type', { count: 'exact' })
-      : supabase.from('properties').select('id, name, zone, address', { count: 'exact' })
+      ? supabase.from('properties').select(PROPERTY_LIST_SECRETARIA_SELECT, { count: 'exact' })
+      : supabase.from('properties').select(PROPERTY_LIST_COMMON_SELECT, { count: 'exact' })
   )
     .order('created_at', { ascending: false })
     .range(from, to)
@@ -103,9 +125,10 @@ export async function getPropertyDetail(
     return property ? toPropertyFormData(property, viewer.role) : null
   }
 
-  const { data } = await supabase
-    .from('properties')
-    .select(PROPERTY_DETAIL_STAFF_SELECT)
+  const query = viewer.role === 'secretaria'
+    ? supabase.from('properties').select(PROPERTY_DETAIL_SECRETARIA_SELECT)
+    : supabase.from('properties').select(PROPERTY_DETAIL_COMMON_SELECT)
+  const { data } = await query
     .eq('id', id)
     .single()
 
