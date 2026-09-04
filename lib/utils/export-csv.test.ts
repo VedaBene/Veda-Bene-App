@@ -84,10 +84,46 @@ describe('receivable CSV formatter', () => {
     const csv = formatReceivableCSV(report)
     const [header] = csv.split('\n', 1)
 
-    expect(header).toBe('Sezione,Data,Numero OS,Cliente,Immobile,PX,M,S,DL,WC,BI,CUL,Prezzo base attuale,Valore considerato,Descrizione servizio extra,Valore servizio extra,Consegna,Totale OS')
+    expect(header).toBe('Sezione,Data,Numero OS,Cliente,Immobile,Status Preço,Motivo Pendência,PX,M,S,DL,WC,BI,CUL,Prezzo base attuale,Valore considerato,Descrizione servizio extra,Valore servizio extra,Consegna,Totale OS')
     expect(csv).toContain('Standard,2026-05-10,1,Rental')
+    expect(csv).toContain('CALCULADO,,4,2,0,1,2,1,0')
     expect(csv).toContain(',110,123,')
     expect(csv).toContain(',15,10,148')
+  })
+
+  it('exports pending orders with diagnosis columns and empty calculated values', () => {
+    const pendingReport: ReceivableReport = {
+      ...report,
+      standard: {
+        ...report.standard,
+        rows: [{
+          section: 'standard',
+          orderId: 'order-2',
+          orderNumber: 2,
+          financialStatus: 'pending',
+          pendingReason: 'missing_property_base_price',
+          cleaningDate: '2026-05-12',
+          propertyName: 'Apartment Roma',
+          clientName: 'Particular Owner',
+          occupancy: { guests: 2, doubleBeds: 1, singleBeds: 0, sofaBeds: 0, bathrooms: 1, bidets: 1, cribs: 0 },
+          currentBasePrice: null,
+          consideredAmount: null,
+          extraDescription: null,
+          extraAmount: 0,
+          consegnaFee: 10,
+          totalPrice: null,
+        }],
+        orderCount: 1,
+        completeOrderCount: 0,
+        pendingCount: 1,
+      },
+      orderCount: 1,
+      completeOrderCount: 0,
+      pendingCount: 1,
+    }
+
+    const csv = formatReceivableCSV(pendingReport)
+    expect(csv).toContain('Standard,2026-05-12,2,Particular Owner,Apartment Roma,PENDENTE,Preço base do imóvel ausente')
   })
 
   it('escapes multiline descriptions and neutralizes spreadsheet formulas', () => {

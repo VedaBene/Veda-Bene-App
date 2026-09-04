@@ -1,4 +1,10 @@
-import type { PayableDetailRow, ReceivableReport } from '@/lib/types/reporting'
+import type { PayableDetailRow, ReceivablePendingReason, ReceivableReport } from '@/lib/types/reporting'
+
+const PENDING_REASON_LABEL: Record<ReceivablePendingReason, string> = {
+  missing_property_base_price: 'Preço base do imóvel ausente',
+  missing_total_price: 'Total da O.S. não calculado',
+  invalid_financial_data: 'Dados financeiros inválidos',
+}
 
 function escapeCSV(value: string | number | null | undefined): string {
   if (value == null) return ''
@@ -63,6 +69,8 @@ export function formatReceivableCSV(report: ReceivableReport): string {
     'Numero OS',
     'Cliente',
     'Immobile',
+    'Status Preço',
+    'Motivo Pendência',
     'PX',
     'M',
     'S',
@@ -91,6 +99,10 @@ export function formatReceivableCSV(report: ReceivableReport): string {
       item.orderNumber,
       item.clientName,
       item.propertyName,
+      item.financialStatus === 'pending' ? 'PENDENTE' : 'CALCULADO',
+      item.financialStatus === 'pending'
+        ? (item.pendingReason ? (PENDING_REASON_LABEL[item.pendingReason] ?? item.pendingReason) : 'Preço não calculado')
+        : '',
       item.occupancy.guests,
       item.occupancy.doubleBeds,
       item.occupancy.singleBeds,

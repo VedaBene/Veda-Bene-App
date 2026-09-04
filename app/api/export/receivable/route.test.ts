@@ -76,7 +76,7 @@ describe('GET /api/export/receivable', () => {
     expect(mocks.getReceivableReport).toHaveBeenCalledOnce()
   })
 
-  it('blocks CSV export when the filtered report has financial pendencies', async () => {
+  it('allows CSV export for reconciliation even when the filtered report has financial pendencies', async () => {
     mocks.getReceivableReport.mockResolvedValue({
       ...emptyReport,
       orderCount: 1,
@@ -84,13 +84,11 @@ describe('GET /api/export/receivable', () => {
     })
 
     const response = await GET(request())
-    const body = await response.json()
+    const body = await response.text()
 
-    expect(response.status).toBe(422)
+    expect(response.status).toBe(200)
     expect(response.headers.get('cache-control')).toBe('private, no-store')
-    expect(body).toEqual({
-      error: 'Exportação bloqueada: existem 1 O.S. com dados financeiros pendentes neste filtro.',
-      pendingCount: 1,
-    })
+    expect(response.headers.get('content-type')).toContain('text/csv')
+    expect(body).toContain('Status Preço')
   })
 })

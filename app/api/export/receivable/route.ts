@@ -27,19 +27,6 @@ export async function GET(request: NextRequest) {
   const { startDate, endDate, clientType, clientId } = parsedFilters.data
   try {
     const report = await getReceivableReport({ startDate, endDate, clientType, clientId })
-    if (report.pendingCount > 0) {
-      return NextResponse.json(
-        {
-          error: `Exportação bloqueada: existem ${report.pendingCount} O.S. com dados financeiros pendentes neste filtro.`,
-          pendingCount: report.pendingCount,
-        },
-        {
-          status: 422,
-          headers: { 'Cache-Control': 'private, no-store' },
-        },
-      )
-    }
-
     const csv = formatReceivableCSV(report)
     const filename = `extrato-a-receber_${startDate}_${endDate}.csv`
 

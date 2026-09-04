@@ -65,8 +65,8 @@ const PENDING_REASON_LABEL = {
   invalid_financial_data: 'Dados financeiros inválidos',
 } as const
 
-function exportBlockedMessage(pendingCount: number): string {
-  return `Exportação bloqueada: existem ${pendingCount} O.S. com dados financeiros pendentes neste filtro.`
+function pdfBlockedMessage(pendingCount: number): string {
+  return `Exportação de PDF bloqueada: existem ${pendingCount} O.S. com dados financeiros pendentes neste filtro.`
 }
 
 function Occupancy({ row }: { row: ReceivableOrderRow }) {
@@ -325,7 +325,7 @@ export function ReceivableStatement({
   function handlePDF() {
     requestReport(nextReport => {
       if (nextReport.pendingCount > 0) {
-        setError(exportBlockedMessage(nextReport.pendingCount))
+        setError(pdfBlockedMessage(nextReport.pendingCount))
         return
       }
       exportReceivablePDF(nextReport)
@@ -340,7 +340,8 @@ export function ReceivableStatement({
   const pendingProperties = [...new Set(pendingRows.map(row => row.propertyName))]
   const visiblePendingProperties = pendingProperties.slice(0, 5)
   const hiddenPendingPropertyCount = pendingProperties.length - visiblePendingProperties.length
-  const exportDisabled = isPending || report.pendingCount > 0
+  const pdfExportDisabled = isPending || report.pendingCount > 0
+  const csvExportDisabled = isPending || report.orderCount === 0
 
   return (
     <div className="space-y-5">
@@ -380,8 +381,8 @@ export function ReceivableStatement({
             <Button
               type="button"
               onClick={handleCSV}
-              disabled={exportDisabled}
-              title={report.pendingCount > 0 ? exportBlockedMessage(report.pendingCount) : undefined}
+              disabled={csvExportDisabled}
+              title={report.orderCount === 0 ? 'Nenhuma O.S. no período para exportar' : undefined}
               variant="ghost"
               size="sm"
               icon={<Download size={14} />}
@@ -391,8 +392,8 @@ export function ReceivableStatement({
             <Button
               type="button"
               onClick={handlePDF}
-              disabled={exportDisabled}
-              title={report.pendingCount > 0 ? exportBlockedMessage(report.pendingCount) : undefined}
+              disabled={pdfExportDisabled}
+              title={report.pendingCount > 0 ? pdfBlockedMessage(report.pendingCount) : undefined}
               variant="ghost"
               size="sm"
               icon={<FileText size={14} />}
@@ -415,7 +416,7 @@ export function ReceivableStatement({
               {report.pendingCount} {report.pendingCount === 1 ? 'O.S. pendente' : 'O.S. pendentes'} de preço
             </span>
             <span className="block">
-              O total abaixo é parcial e considera {report.completeOrderCount} de {report.orderCount} O.S. CSV e PDF ficam bloqueados até a correção.
+              O total abaixo é parcial e considera {report.completeOrderCount} de {report.orderCount} O.S. O PDF permanece bloqueado para evitar cobrança parcial, mas o CSV está liberado para conferência.
             </span>
             {visiblePendingProperties.length > 0 && (
               <span className="block text-xs text-amber-800">
