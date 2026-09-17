@@ -26,6 +26,10 @@ tela e os PDFs.
 - O filtro de Pulizia considera a relação de múltiplos responsáveis em
   `service_order_cleaning_staff`; o filtro de Consegna usa
   `service_orders.consegna_staff_id`.
+- A implementação do filtro de Pulizia aplica o critério diretamente na relação
+  `service_order_cleaning_staff` e mantém separada a relação usada para exibir a
+  equipe completa da OS. O diagnóstico, a motivação e a homologação estão no
+  [registro de manutenção do filtro por funcionário](maintenance/2026-09-16-service-order-cleaning-staff-filter.md).
 - Sem filtros, **Completati** exibe a totalidade das ordens concluídas na data corrente de Roma (Modo Diário), sem limite de paginação física no banco de dados. O indicador de contagem exibe a quantidade total de ordens concluídas encontradas (`doneTotalCount`), mantendo a perfeita simetria com as linhas exibidas e os relatórios. Com filtros ativos, a listagem da tela é paginada em lotes de 20 itens, mas o PDF de concluídas recebe a totalidade dos registros filtrados (`doneForExport`), sem paginação.
 - O perfil `cliente` não recebe a lista de funcionários usada nos filtros e
   continua sem visualizar nomes de responsáveis, conforme o contrato de
@@ -143,6 +147,9 @@ apenas por possuir uma janela de limpeza menor.
 
 - Consulta, filtros e DTOs: `lib/server/data-access/service-orders.ts` e
   `lib/server/validation/contracts.ts`.
+- Histórico da correção do filtro por funcionário: [registro de manutenção de
+  2026-09-16](maintenance/2026-09-16-service-order-cleaning-staff-filter.md),
+  com os relatórios detalhados das etapas de diagnóstico e homologação.
 - Orquestração da listagem: `components/service-orders/ServiceOrderList.tsx` (a sincronização entre props de URL e estado local é feita durante a fase de renderização, sem `useEffect`, evitando loops de navegação reentrante).
 - Tabela e cartões: `components/service-orders/ServiceOrderListTable.tsx` (textos dinâmicos são envelopados em `<span>` para proteção DOM e elementos condicionais com hooks usam delimitadores `key` por item para estabilidade do React 19).
 - Impressão/PDF: `components/service-orders/ServiceOrderActiveExport.tsx`.

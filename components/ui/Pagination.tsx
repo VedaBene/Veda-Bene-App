@@ -6,22 +6,24 @@ interface PaginationProps {
   totalPages: number
   basePath: string
   searchParams?: Record<string, string | undefined>
+  pageParam?: string
 }
 
 function buildUrl(
   basePath: string,
   params: Record<string, string | undefined>,
   page: number,
+  pageParam: string,
 ): string {
   const qs = new URLSearchParams()
   for (const [k, v] of Object.entries(params)) {
     if (v) qs.set(k, v)
   }
-  qs.set('page', String(page))
+  qs.set(pageParam, String(page))
   return `${basePath}?${qs.toString()}`
 }
 
-export function Pagination({ currentPage, totalPages, basePath, searchParams = {} }: PaginationProps) {
+export function Pagination({ currentPage, totalPages, basePath, searchParams = {}, pageParam = 'page' }: PaginationProps) {
   if (totalPages <= 1) return null
 
   const pages: (number | '...')[] = []
@@ -47,7 +49,7 @@ export function Pagination({ currentPage, totalPages, basePath, searchParams = {
       {currentPage > 1 ? (
         <Link
           key="prev-link"
-          href={buildUrl(basePath, searchParams, currentPage - 1)}
+          href={buildUrl(basePath, searchParams, currentPage - 1, pageParam)}
           className={`${base} ${normal}`}
         >
           <ChevronLeft size={16} />
@@ -66,7 +68,7 @@ export function Pagination({ currentPage, totalPages, basePath, searchParams = {
         ) : (
           <Link
             key={p}
-            href={buildUrl(basePath, searchParams, p)}
+            href={buildUrl(basePath, searchParams, p, pageParam)}
             className={`${base} ${p === currentPage ? active : normal}`}
           >
             {p}
@@ -77,7 +79,7 @@ export function Pagination({ currentPage, totalPages, basePath, searchParams = {
       {currentPage < totalPages ? (
         <Link
           key="next-link"
-          href={buildUrl(basePath, searchParams, currentPage + 1)}
+          href={buildUrl(basePath, searchParams, currentPage + 1, pageParam)}
           className={`${base} ${normal}`}
         >
           <ChevronRight size={16} />

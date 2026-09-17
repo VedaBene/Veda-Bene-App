@@ -386,6 +386,7 @@ export function ServiceOrderList({
             currentPage={donePage}
             totalPages={doneTotalPages}
             basePath="/service-orders"
+            pageParam="donePage"
             searchParams={doneSearchParams}
           />
         )}

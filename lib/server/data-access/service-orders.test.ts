@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 import { FakeSupabase } from '@/test/fake-supabase'
+import { buildServiceOrdersPdfHtml } from '@/components/service-orders/ServiceOrderActiveExport'
 import type { Role } from '@/lib/types/database'
 import type { OperationalServiceOrderVisibility } from '@/lib/service-order-visibility'
 import type { SupabaseServerClient, Viewer } from './viewer'
-import { getServiceOrderDetail, getServiceOrderList } from './service-orders'
+import { loadAuthorizedServiceOrderPropertyOptions } from './sensitive-data'
+import { getServiceOrderDetail, getServiceOrderFormOptions, getServiceOrderList } from './service-orders'
 
 vi.mock('./sensitive-data', () => ({
   loadAverageHoursForVisibleServiceOrders: vi.fn(async (ids: string[]) =>
@@ -210,5 +212,125 @@ describe('service-order operational visibility in the DAL', () => {
     expect(result.active.map(item => item.id)).toEqual(['active-today-checkin'])
     expect(result.done.map(item => item.id)).toEqual(['done-earlier'])
     expect(result.doneForExport.map(item => item.id)).toEqual(['done-earlier'])
+  })
+})
+
+describe('service-order list query failures', () => {
+  it.each([
+    [0, 'as ordens abertas'],
+    [1, 'as ordens concluídas'],
+    [2, 'as ordens para o PDF'],
+  ])('rejects a failed list query %i instead of returning an empty list', async (selectIndex, message) => {
+    const fake = new FakeSupabase({ service_orders: [] })
+    const failure = new Error('Falha simulada de consulta')
+    fake.selectErrors.set(selectIndex, failure)
+
+    await expect(getServiceOrderList(asSupabase(fake), viewer('admin'), FILTERS, VISIBILITY))
+      .rejects.toMatchObject({ message: `Falha ao carregar ${message}`, cause: failure })
+  })
+
+  it('rejects a failed property search lookup', async () => {
+    const fake = new FakeSupabase({ properties: [], service_orders: [] })
+    fake.selectErrors.set(0, new Error('Falha simulada de consulta'))
+
+    await expect(getServiceOrderList(
+      asSupabase(fake),
+      viewer('admin'),
+      { ...FILTERS, q: 'Casa' },
+      VISIBILITY,
+    )).rejects.toThrow('Falha ao carregar os imóveis correspondentes')
+  })
+
+  it('keeps a successful query with no matching assignments as an empty result', async () => {
+    const fake = new FakeSupabase({
+      service_orders: [order({ assignment_filter: [{ profile_id: 'andy-user' }] })],
+    })
+
+    const result = await getServiceOrderList(
+      asSupabase(fake),
+      viewer('admin'),
+      { ...FILTERS, cleaningStaffId: 'joe-user' },
+      VISIBILITY,
+    )
+
+    expect(result.active).toEqual([])
+    expect(result.done).toEqual([])
+    expect(result.doneForExport).toEqual([])
+    expect(result.doneTotalCount).toBe(0)
+  })
+
+  it('rejects a failed staff option query instead of hiding the filter choices', async () => {
+    vi.mocked(loadAuthorizedServiceOrderPropertyOptions).mockResolvedValue({ role: 'admin', rows: [] })
+    const fake = new FakeSupabase({ profiles: [] })
+    fake.selectErrors.set(0, new Error('Falha simulada de consulta'))
+
+    await expect(getServiceOrderFormOptions(asSupabase(fake), viewer('admin')))
+      .rejects.toThrow('Falha ao carregar os funcionários')
+  })
+})
+
+describe('service-order cleaning staff filter', () => {
+  it('filters all three lists by assignment while preserving the full team and done pagination', async () => {
+    const joe = { id: 'joe-user', full_name: 'Joe' }
+    const andy = { id: 'andy-user', full_name: 'Andy' }
+    const fake = new FakeSupabase({
+      service_orders: [
+        order({
+          id: 'active-shared',
+          order_number: 1001,
+          cleaning_staff: [joe, andy],
+          assignment_filter: [{ profile_id: joe.id }, { profile_id: andy.id }],
+        }),
+        order({
+          id: 'active-andy',
+          order_number: 1002,
+          cleaning_staff: [andy],
+          assignment_filter: [{ profile_id: andy.id }],
+        }),
+        order({
+          id: 'done-joe-1',
+          order_number: 1003,
+          status: 'done',
+          cleaning_staff: [joe],
+          assignment_filter: [{ profile_id: joe.id }],
+        }),
+        order({
+          id: 'done-joe-2',
+          order_number: 1004,
+          status: 'done',
+          cleaning_staff: [joe],
+          assignment_filter: [{ profile_id: joe.id }],
+        }),
+      ],
+    })
+
+    const result = await getServiceOrderList(
+      asSupabase(fake),
+      viewer('admin'),
+      { ...FILTERS, cleaningStaffId: joe.id, donePageSize: 1 },
+      VISIBILITY,
+    )
+
+    expect(result.active.map(item => item.id)).toEqual(['active-shared'])
+    expect(result.active[0].cleaning_staff_ids).toEqual(['andy-user', 'joe-user'])
+    expect(result.done.map(item => item.id)).toEqual(['done-joe-1'])
+    expect(result.doneForExport.map(item => item.id)).toEqual(['done-joe-1', 'done-joe-2'])
+    expect(result.doneTotalCount).toBe(2)
+    expect(result.doneTotalPages).toBe(2)
+    expect(fake.selectCalls).toHaveLength(3)
+    expect(fake.selectCalls.every(call => call.table === 'service_orders')).toBe(true)
+    expect(fake.selectCalls.every(call =>
+      call.columns.includes('cleaning_staff:profiles!service_order_cleaning_staff(id, full_name)') &&
+      call.columns.includes('assignment_filter:service_order_cleaning_staff!inner(profile_id)'),
+    )).toBe(true)
+
+    const openPdf = buildServiceOrdersPdfHtml(result.active, VISIBILITY.today, 'open')
+    const donePdf = buildServiceOrdersPdfHtml(result.doneForExport, VISIBILITY.today, 'done')
+    expect(openPdf).toContain('#1001')
+    expect(openPdf).toContain('Andy, Joe')
+    expect(openPdf).not.toContain('#1002')
+    expect(donePdf).toContain('Completati: 2')
+    expect(donePdf).toContain('#1003')
+    expect(donePdf).toContain('#1004')
   })
 })

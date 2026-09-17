@@ -59,8 +59,7 @@ const SERVICE_ORDER_LIST_SELECT = `
   cleaning_notes,
   property:properties(id, name),
   cleaning_staff:profiles!service_order_cleaning_staff(id, full_name),
-  consegna_staff:profiles!consegna_staff_id(id, full_name)
-`
+  consegna_staff:profiles!consegna_staff_id(id, full_name)`
 
 const SERVICE_ORDER_DETAIL_SELECT = `
   id,
@@ -89,18 +88,27 @@ const SERVICE_ORDER_DETAIL_SELECT = `
   cleaning_notes
 `
 
+function requireQueryRows<T>(data: T[] | null, error: unknown, context: string): T[] {
+  if (error || data === null) {
+    throw new Error(`Falha ao carregar ${context}`, { cause: error })
+  }
+  return data
+}
+
 async function getMatchingPropertyIds(
   supabase: SupabaseServerClient,
   q?: string,
 ): Promise<string[] | null> {
   if (!q) return null
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('properties')
     .select('id')
     .ilike('name', `%${q}%`)
 
-  return (data ?? []).map((property: { id: string }) => property.id)
+  return requireQueryRows(data, error, 'os imóveis correspondentes').map(
+    (property: { id: string }) => property.id,
+  )
 }
 
 export async function getServiceOrderList(
@@ -121,38 +129,33 @@ export async function getServiceOrderList(
     checkinUtcInterval = romeDateRangeToUtcInterval(filters.checkinDate, filters.checkinDate)
   }
 
-  let cleaningOrderIds: string[] | null = null
-  if (filters.cleaningStaffId) {
-    const { data } = await supabase
-      .from('service_order_cleaning_staff')
-      .select('service_order_id')
-      .eq('profile_id', filters.cleaningStaffId)
-    cleaningOrderIds = (data ?? []).map((row: { service_order_id: string }) => row.service_order_id)
-  }
-
   const matchingPropertyIds = filters.q
     ? await getMatchingPropertyIds(supabase, filters.q)
     : null
   const noMatchesId = '00000000-0000-0000-0000-000000000000'
+  // The filter adds an embed; the selected order fields remain the base list shape.
+  const listSelect = filters.cleaningStaffId
+    ? `${SERVICE_ORDER_LIST_SELECT}, assignment_filter:service_order_cleaning_staff!inner(profile_id)` as typeof SERVICE_ORDER_LIST_SELECT
+    : SERVICE_ORDER_LIST_SELECT
 
   const orderColumn = checkinUtcInterval ? 'checkin_at' : 'cleaning_date'
   const orderAscending = !!checkinUtcInterval
 
   let activeQuery = supabase
     .from('service_orders')
-    .select(SERVICE_ORDER_LIST_SELECT)
+    .select(listSelect)
     .in('status', ['open', 'in_progress'])
     .order(orderColumn, { ascending: orderAscending, nullsFirst: false })
 
   let doneQuery = supabase
     .from('service_orders')
-    .select(SERVICE_ORDER_LIST_SELECT, { count: 'exact' })
+    .select(listSelect, { count: 'exact' })
     .eq('status', 'done')
     .order(orderColumn, { ascending: orderAscending, nullsFirst: false })
 
   let doneExportQuery = supabase
     .from('service_orders')
-    .select(SERVICE_ORDER_LIST_SELECT)
+    .select(listSelect)
     .eq('status', 'done')
     .order(orderColumn, { ascending: orderAscending, nullsFirst: false })
 
@@ -161,9 +164,7 @@ export async function getServiceOrderList(
     if (isOperationalStaff) query = query.lte('cleaning_date', operationalVisibility.maxVisibleDate)
     if (filters.propertyId) query = query.eq('property_id', filters.propertyId)
     if (filters.consegnaStaffId) query = query.eq('consegna_staff_id', filters.consegnaStaffId)
-    if (filters.cleaningStaffId) {
-      query = query.in('id', cleaningOrderIds?.length ? cleaningOrderIds : [noMatchesId])
-    }
+    if (filters.cleaningStaffId) query = query.eq('assignment_filter.profile_id', filters.cleaningStaffId)
     if (filters.q) {
       query = query.in('property_id', matchingPropertyIds?.length ? matchingPropertyIds : [noMatchesId])
     }
@@ -193,13 +194,20 @@ export async function getServiceOrderList(
     doneExportQuery = doneExportQuery.eq('cleaning_date', todayStr)
   }
 
-  const [{ data: activeOrders }, { data: doneOrders, count: doneCount }, { data: doneExportOrders }] = await Promise.all([
+  const [activeResult, doneResult, doneExportResult] = await Promise.all([
     activeQuery,
     doneQuery,
     doneExportQuery,
   ])
+  const activeOrders = requireQueryRows(activeResult.data, activeResult.error, 'as ordens abertas')
+  const doneOrders = requireQueryRows(doneResult.data, doneResult.error, 'as ordens concluídas')
+  const doneExportOrders = requireQueryRows(doneExportResult.data, doneExportResult.error, 'as ordens para o PDF')
+  if (doneResult.count === null) {
+    throw new Error('Falha ao contar as ordens concluídas')
+  }
+  const doneCount = doneResult.count
 
-  const allOrders = [...(activeOrders ?? []), ...(doneOrders ?? []), ...(doneExportOrders ?? [])]
+  const allOrders = [...activeOrders, ...doneOrders, ...doneExportOrders]
   const propertyIds = allOrders.flatMap(order => {
     const property = (order as { property?: { id?: string } | null }).property
     return property?.id ? [property.id] : []
@@ -218,21 +226,21 @@ export async function getServiceOrderList(
   })
 
   const doneTotalPages = isFilterActive
-    ? Math.ceil((doneCount ?? 0) / filters.donePageSize)
+    ? Math.ceil(doneCount / filters.donePageSize)
     : 1
 
   return {
-    active: (withAuthorizedHours(activeOrders ?? []) as ServiceOrderListItem[]).map(order =>
+    active: (withAuthorizedHours(activeOrders) as ServiceOrderListItem[]).map(order =>
       toServiceOrderListItem(order, viewer.role),
     ),
-    done: (withAuthorizedHours(doneOrders ?? []) as ServiceOrderListItem[]).map(order =>
+    done: (withAuthorizedHours(doneOrders) as ServiceOrderListItem[]).map(order =>
       toServiceOrderListItem(order, viewer.role),
     ),
-    doneForExport: (withAuthorizedHours(doneExportOrders ?? []) as ServiceOrderListItem[]).map(order =>
+    doneForExport: (withAuthorizedHours(doneExportOrders) as ServiceOrderListItem[]).map(order =>
       toServiceOrderListItem(order, viewer.role),
     ),
     doneTotalPages,
-    doneTotalCount: doneCount ?? 0,
+    doneTotalCount: doneCount,
   }
 }
 
@@ -282,7 +290,7 @@ export async function getServiceOrderFormOptions(
   supabase: SupabaseServerClient,
   viewer: Viewer,
 ): Promise<ServiceOrderFormOptions> {
-  const [{ role, rows: properties }, { data: staff }] = await Promise.all([
+  const [{ role, rows: properties }, { data: staff, error: staffError }] = await Promise.all([
     loadAuthorizedServiceOrderPropertyOptions(),
     supabase
       .from('profiles')
@@ -295,6 +303,6 @@ export async function getServiceOrderFormOptions(
 
   return {
     properties,
-    staff: (staff ?? []) as StaffOption[],
+    staff: requireQueryRows(staff, staffError, 'os funcionários') as StaffOption[],
   }
 }

@@ -17,6 +17,7 @@ export type SupabaseSelectCall = {
 
 export class FakeSupabase {
   readonly selectCalls: SupabaseSelectCall[] = []
+  readonly selectErrors = new Map<number, Error>()
   readonly updates: { table: string; values: Row; filters: QueryFilter[] }[] = []
   readonly rpcCalls: { fn: string; args?: Record<string, unknown> }[] = []
 
@@ -36,12 +37,15 @@ export class FakeSupabase {
   }
 }
 
-export class FakeQuery implements PromiseLike<{ data: Row[] | Row | null; count: number | null; error: null }> {
+type FakeQueryResult = { data: Row[] | Row | null; count: number | null; error: Error | null }
+
+export class FakeQuery implements PromiseLike<FakeQueryResult> {
   private filters: QueryFilter[] = []
   private orderBy: { column: string; ascending: boolean } | null = null
   private rangeBounds: { from: number; to: number } | null = null
   private singleResult = false
   private updatedValues: Row | null = null
+  private selectError: Error | null = null
 
   constructor(
     private readonly client: FakeSupabase,
@@ -50,6 +54,7 @@ export class FakeQuery implements PromiseLike<{ data: Row[] | Row | null; count:
   ) {}
 
   select(columns: string, options?: unknown): this {
+    this.selectError = this.client.selectErrors.get(this.client.selectCalls.length) ?? null
     this.client.selectCalls.push({ table: this.table, columns, options })
     return this
   }
@@ -123,14 +128,17 @@ export class FakeQuery implements PromiseLike<{ data: Row[] | Row | null; count:
     return this
   }
 
-  then<TResult1 = { data: Row[] | Row | null; count: number | null; error: null }, TResult2 = never>(
-    onfulfilled?: ((value: { data: Row[] | Row | null; count: number | null; error: null }) => TResult1 | PromiseLike<TResult1>) | null,
+  then<TResult1 = FakeQueryResult, TResult2 = never>(
+    onfulfilled?: ((value: FakeQueryResult) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
   ): PromiseLike<TResult1 | TResult2> {
     return Promise.resolve(this.execute()).then(onfulfilled, onrejected)
   }
 
-  private execute(): { data: Row[] | Row | null; count: number | null; error: null } {
+  private execute(): FakeQueryResult {
+    if (this.selectError) {
+      return { data: null, count: null, error: this.selectError }
+    }
     if (this.updatedValues) {
       this.client.updates.push({ table: this.table, values: this.updatedValues, filters: this.filters })
       return { data: null, count: null, error: null }
@@ -159,7 +167,7 @@ export class FakeQuery implements PromiseLike<{ data: Row[] | Row | null; count:
 function matchesFilter(row: Row, filter: QueryFilter): boolean {
   switch (filter.kind) {
     case 'eq':
-      return row[filter.column] === filter.value
+      return valuesAtPath(row, filter.column.split('.')).some(value => value === filter.value)
     case 'gte':
       return row[filter.column] != null && String(row[filter.column]) >= String(filter.value)
     case 'gt':
@@ -173,6 +181,13 @@ function matchesFilter(row: Row, filter: QueryFilter): boolean {
     case 'or':
       return filter.clauses.some(clause => row[clause.column] === clause.value)
   }
+}
+
+function valuesAtPath(value: unknown, path: string[]): unknown[] {
+  if (path.length === 0) return [value]
+  if (Array.isArray(value)) return value.flatMap(item => valuesAtPath(item, path))
+  if (!value || typeof value !== 'object') return []
+  return valuesAtPath((value as Row)[path[0]], path.slice(1))
 }
 
 function compareValues(left: unknown, right: unknown, ascending: boolean): number {
