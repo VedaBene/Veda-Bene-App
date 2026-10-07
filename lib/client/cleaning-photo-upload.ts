@@ -1,4 +1,5 @@
 import type { ProcessedCleaningPhoto } from './image-processing'
+import type { PhotoProgress } from '@/lib/observability/photo-telemetry'
 import type {
   AbortCleaningPhotoResult, FinalizeCleaningPhotoResult, ReservedCleaningPhotoUpload,
 } from '@/lib/types/service-order-photos'
@@ -33,12 +34,18 @@ type Dependencies = {
   createId(): string
   sleep(ms: number): Promise<void>
   onReservation(id: string): void
+  onProgress?(progress: PhotoProgress): void
+}
+
+function report(deps: Dependencies, progress: PhotoProgress) {
+  try { deps.onProgress?.(progress) } catch { /* Telemetry cannot affect the workflow. */ }
 }
 
 // No timeout races: every request settles before another upload/cleanup starts.
 // Repeated PUTs never overwrite; ambiguous writes are verified by finalization.
-async function uploadVariant(deps: Dependencies, variant: { path: string; token: string }, blob: Blob) {
+async function uploadVariant(deps: Dependencies, variant: { path: string; token: string }, blob: Blob, cycle: 1 | 2, name: 'display' | 'thumbnail') {
   for (let attempt = 0; attempt < 2; attempt++) {
+    report(deps, { stage: 'upload', attempt: cycle, uploadAttempt: (attempt + 1) as 1 | 2, variant: name, retryResult: attempt ? 'retrying' : 'not_needed', recovered: false })
     let error: unknown
     try { error = (await deps.upload(variant, blob)).error } catch (reason) { error = reason }
     if (!error) return
@@ -50,6 +57,7 @@ async function uploadVariant(deps: Dependencies, variant: { path: string; token:
     if (kind === 'definitive') {
       throw new CleaningPhotoWorkflowError('Caricamento non autorizzato o foto non valida. Controlla la sessione e seleziona nuovamente la foto.', 'photo_upload_rejected', 'upload')
     }
+    report(deps, { stage: 'upload', attempt: cycle, uploadAttempt: (attempt + 1) as 1 | 2, variant: name, retryResult: 'verified', recovered: false })
     return // Ambiguous/exhausted transient response: verify both objects server-side.
   }
 }
@@ -69,12 +77,13 @@ async function abortOrFail(deps: Dependencies, id: string) {
   }
 }
 
-export async function uploadPreparedCleaningPhoto(
+async function performUpload(
   processed: ProcessedCleaningPhoto,
   deps: Dependencies,
   previousPhotoId?: string,
 ): Promise<string> {
   if (previousPhotoId) {
+    report(deps, { stage: 'finalization', attempt: 1, retryResult: 'reconciled', recovered: false })
     const previous = await abortOrFail(deps, previousPhotoId)
     if (previous.status === 'ready') return previous.photoId
   }
@@ -84,6 +93,8 @@ export async function uploadPreparedCleaningPhoto(
 
   const usedIds = new Set(previousPhotoId ? [previousPhotoId] : [])
   for (let cycle = 0; cycle < 2; cycle++) {
+    const attempt = (cycle + 1) as 1 | 2
+    report(deps, { stage: 'reservation', attempt, retryResult: cycle ? 'retrying' : 'not_needed', recovered: false })
     const id = deps.createId()
     if (usedIds.has(id)) throw new CleaningPhotoWorkflowError('Seleziona nuovamente la foto e riprova.', 'photo_duplicate_reservation', 'reservation')
     usedIds.add(id)
@@ -101,9 +112,10 @@ export async function uploadPreparedCleaningPhoto(
         throw new CleaningPhotoWorkflowError('La prenotazione non corrisponde alla foto.', 'photo_reservation_mismatch', stage)
       }
       stage = 'upload'
-      await uploadVariant(deps, reserved.upload.display, processed.display)
-      await uploadVariant(deps, reserved.upload.thumbnail, processed.thumbnail)
+      await uploadVariant(deps, reserved.upload.display, processed.display, attempt, 'display')
+      await uploadVariant(deps, reserved.upload.thumbnail, processed.thumbnail, attempt, 'thumbnail')
       stage = 'finalization'
+      report(deps, { stage, attempt, retryResult: 'not_needed', recovered: false })
       const finalized = await deps.finalize(id)
       if (finalized.success) {
         if (finalized.photoId !== id) throw new Error('Unexpected finalized photo')
@@ -117,6 +129,7 @@ export async function uploadPreparedCleaningPhoto(
     if (reservationRejected) throw failure
 
     // Also reconciles a lost finalization response: ready is preserved and reused.
+    report(deps, { stage: 'finalization', attempt, retryResult: 'reconciled', recovered: false })
     const cleanup = await abortOrFail(deps, id)
     if (cleanup.status === 'ready' && stage !== 'reservation') return cleanup.photoId
     if (failure instanceof CleaningPhotoWorkflowError && failure.code === 'photo_variant_missing' && cycle === 0) {
@@ -129,4 +142,24 @@ export async function uploadPreparedCleaningPhoto(
     )
   }
   throw new Error('Unreachable photo retry state')
+}
+
+export async function uploadPreparedCleaningPhoto(
+  processed: ProcessedCleaningPhoto, deps: Dependencies, previousPhotoId?: string,
+): Promise<string> {
+  let last: PhotoProgress = { stage: 'reservation', attempt: 1, retryResult: 'not_needed', recovered: false }
+  let neededRecovery = false
+  const observed = { ...deps, onProgress(progress: PhotoProgress) {
+    last = progress
+    neededRecovery ||= progress.retryResult !== 'not_needed'
+    report(deps, progress)
+  } }
+  try {
+    const id = await performUpload(processed, observed, previousPhotoId)
+    report(deps, { stage: 'finalization', attempt: last.attempt, retryResult: neededRecovery ? 'recovered' : 'not_needed', recovered: neededRecovery })
+    return id
+  } catch (error) {
+    report(deps, { ...last, stage: error instanceof CleaningPhotoWorkflowError ? error.stage : last.stage, retryResult: 'failed', recovered: false })
+    throw error
+  }
 }

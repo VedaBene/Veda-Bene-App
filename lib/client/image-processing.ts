@@ -2,6 +2,7 @@ import 'client-only'
 
 import { addBreadcrumb } from '@sentry/nextjs'
 import type { CleaningPhotoContentType } from '@/lib/types/service-order-photos'
+import type { PhotoDecoder } from '@/lib/observability/photo-telemetry'
 
 export { MAX_CLEANING_PHOTOS } from '@/lib/types/service-order-photos'
 
@@ -20,6 +21,7 @@ export type ProcessedCleaningPhoto = {
   contentType: CleaningPhotoContentType
   width: number
   height: number
+  decoder?: PhotoDecoder
 }
 
 export type PhotoProcessingFailureCode =
@@ -66,6 +68,8 @@ type DecodedImage = {
   width: number
   height: number
   dispose(): void
+  decoder?: PhotoDecoder
+  decoderAttempts?: number
 }
 
 async function decodeBitmap(file: File, oriented: boolean): Promise<DecodedImage> {
@@ -126,6 +130,8 @@ async function decodeSourceImage(file: File): Promise<DecodedImage> {
         !Number.isFinite(image.height) || image.height <= 0
       ) continue
       accepted = true
+      image.decoder = decoder.code
+      image.decoderAttempts = index + 1
       return image
     } catch {
       // A decoder failure is recoverable; never retain its potentially private error.
@@ -139,6 +145,9 @@ async function decodeSourceImage(file: File): Promise<DecodedImage> {
             decoder: decoder.code,
             attempt: index + 1,
             result: accepted ? 'decoded' : 'decode_failed',
+            stage: 'processing',
+            recovered: accepted && index > 0,
+            retry_result: accepted ? (index > 0 ? 'recovered' : 'not_needed') : index < decoders.length - 1 ? 'retrying' : 'failed',
           },
         })
       } catch {
@@ -337,7 +346,15 @@ export async function processCleaningPhoto(file: File): Promise<ProcessedCleanin
       contentType,
       width: variants.display.width,
       height: variants.display.height,
+      decoder: image.decoder,
     }
+  } catch (error) {
+    if (error instanceof PhotoProcessingError) {
+      throw new PhotoProcessingError(error.message, error.code, {
+        ...error.details, decoder: image.decoder ?? 'unknown', decoderAttempts: image.decoderAttempts ?? 1,
+      })
+    }
+    throw error
   } finally {
     image.dispose()
   }

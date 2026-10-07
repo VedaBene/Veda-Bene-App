@@ -214,9 +214,9 @@ describe('cleaning image decoder fallback', () => {
     expect(drawImage).not.toHaveBeenCalled()
     expectImageReleased()
     expect(vi.mocked(addBreadcrumb).mock.calls.map(([event]) => event.data)).toEqual([
-      { decoder: 'bitmap_oriented', attempt: 1, result: 'decode_failed' },
-      { decoder: 'bitmap_default', attempt: 2, result: 'decode_failed' },
-      { decoder: 'html_image', attempt: 3, result: 'decode_failed' },
+      { decoder: 'bitmap_oriented', attempt: 1, result: 'decode_failed', stage: 'processing', recovered: false, retry_result: 'retrying' },
+      { decoder: 'bitmap_default', attempt: 2, result: 'decode_failed', stage: 'processing', recovered: false, retry_result: 'retrying' },
+      { decoder: 'html_image', attempt: 3, result: 'decode_failed', stage: 'processing', recovered: false, retry_result: 'failed' },
     ])
   })
 
@@ -359,12 +359,15 @@ describe('cleaning image decoder fallback', () => {
     expect(vi.mocked(addBreadcrumb).mock.calls.map(([event]) => event)).toEqual([
       { category: 'cleaning-photo.decoder', level: 'info', data: {
         decoder: 'bitmap_oriented', attempt: 1, result: 'decode_failed',
+        stage: 'processing', recovered: false, retry_result: 'retrying',
       } },
       { category: 'cleaning-photo.decoder', level: 'info', data: {
         decoder: 'bitmap_default', attempt: 2, result: 'decode_failed',
+        stage: 'processing', recovered: false, retry_result: 'retrying',
       } },
       { category: 'cleaning-photo.decoder', level: 'info', data: {
         decoder: 'html_image', attempt: 3, result: 'decoded',
+        stage: 'processing', recovered: true, retry_result: 'recovered',
       } },
     ])
   })

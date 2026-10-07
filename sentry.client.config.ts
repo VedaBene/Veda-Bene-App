@@ -1,4 +1,5 @@
 import * as Sentry from '@sentry/nextjs'
+import { privateSentryDataCollection, sanitizeSentryEvent } from '@/lib/observability/sentry-privacy'
 
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
@@ -6,19 +7,7 @@ Sentry.init({
   enabled: Boolean(process.env.NEXT_PUBLIC_SENTRY_DSN),
   tracesSampleRate: 0,
   normalizeDepth: 3,
-  ignoreErrors: [
-    /NotFoundError/i,
-    /The object can not be found here/i,
-    /Failed to execute 'removeChild'/i,
-    /Failed to execute 'insertBefore'/i,
-    /The node to be removed is not a child of this node/i,
-    /Failed to fetch/i,
-    /Load failed/i,
-  ],
-  beforeSend(event) {
-    if (event.exception?.values?.some(v => v.type === 'RangeError' && v.value?.includes('stack size'))) {
-      return null
-    }
-    return event
-  },
+  release: process.env.NEXT_PUBLIC_SENTRY_RELEASE || undefined,
+  dataCollection: privateSentryDataCollection,
+  beforeSend: sanitizeSentryEvent,
 })

@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useRole } from '@/lib/hooks/useRole'
 import { clearSessionActivity } from '@/lib/session-timeout'
+import { clearSentrySession } from '@/lib/client/sentry-session'
 import { createClient } from '@/utils/supabase/client'
 import {
   LayoutDashboard,
@@ -46,6 +47,7 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
   const { role } = useRole()
 
   async function handleSignOut() {
+    clearSentrySession()
     clearSessionActivity()
     const supabase = createClient()
     await supabase.auth.signOut({ scope: 'local' })

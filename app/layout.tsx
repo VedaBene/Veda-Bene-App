@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { SentrySessionProvider } from '@/components/auth/SentrySessionProvider';
 
 export const metadata: Metadata = {
   title: "Veda Bene",
@@ -13,7 +14,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="it" className="h-full">
-      <body className="min-h-full">{children}</body>
+      <body className="min-h-full"><SentrySessionProvider>{children}</SentrySessionProvider></body>
     </html>
   );
 }

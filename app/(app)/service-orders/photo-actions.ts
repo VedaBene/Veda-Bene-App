@@ -1,6 +1,8 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import * as Sentry from '@sentry/nextjs'
+import { pseudonymousSentryUser } from '@/lib/observability/sentry-privacy'
 import { getCurrentViewer } from '@/lib/server/data-access/viewer'
 import { isCleaningPhotosEnabled } from '@/lib/server/features'
 import { withLogging } from '@/lib/server/logger'
@@ -22,6 +24,20 @@ function assertEnabled() {
   if (!isCleaningPhotosEnabled()) throw new Error('La funzione foto non è attiva.')
 }
 
+async function getPhotoViewer() {
+  const result = await getCurrentViewer()
+  Sentry.setUser(pseudonymousSentryUser(result.viewer.userId))
+  return result
+}
+
+function withPhotoLogging<T>(name: string, fn: () => Promise<T>) {
+  return Sentry.withIsolationScope(scope => {
+    scope.setUser(null)
+    scope.setTag('area', 'cleaning-photo')
+    return withLogging(name, fn)
+  })
+}
+
 async function reserveImpl(
   serviceOrderId: string,
   phase: CleaningPhotoPhase,
@@ -29,7 +45,7 @@ async function reserveImpl(
   contentType: CleaningPhotoContentType,
 ) {
   assertEnabled()
-  const { supabase, viewer } = await getCurrentViewer()
+  const { supabase, viewer } = await getPhotoViewer()
   try {
     const upload = await reserveCleaningPhotoUpload(supabase, viewer, {
       serviceOrderId,
@@ -52,20 +68,20 @@ async function reserveImpl(
 
 async function finalizeImpl(photoId: string) {
   assertEnabled()
-  const { supabase, viewer } = await getCurrentViewer()
+  const { supabase, viewer } = await getPhotoViewer()
   return finalizeCleaningPhotoUpload(supabase, viewer, { photoId })
 }
 
 async function cancelImpl(photoId: string) {
   assertEnabled()
-  const { supabase, viewer } = await getCurrentViewer()
+  const { supabase, viewer } = await getPhotoViewer()
   await cancelCleaningPhotoUpload(supabase, viewer, photoId)
   return { success: true as const }
 }
 
 async function deleteImpl(photoId: string) {
   assertEnabled()
-  const { viewer } = await getCurrentViewer()
+  const { viewer } = await getPhotoViewer()
   await deleteCleaningPhoto(viewer, photoId)
   revalidatePath('/service-orders')
   return { success: true as const }
@@ -77,27 +93,27 @@ export async function reserveCleaningPhoto(
   clientUploadId: string,
   contentType: CleaningPhotoContentType,
 ) {
-  return withLogging('reserveCleaningPhoto', () =>
+  return withPhotoLogging('reserveCleaningPhoto', () =>
     reserveImpl(serviceOrderId, phase, clientUploadId, contentType),
   )
 }
 
 export async function finalizeCleaningPhoto(photoId: string) {
-  return withLogging('finalizeCleaningPhoto', () => finalizeImpl(photoId))
+  return withPhotoLogging('finalizeCleaningPhoto', () => finalizeImpl(photoId))
 }
 
 export async function cancelCleaningPhoto(photoId: string) {
-  return withLogging('cancelCleaningPhoto', () => cancelImpl(photoId))
+  return withPhotoLogging('cancelCleaningPhoto', () => cancelImpl(photoId))
 }
 
 export async function abortCleaningPhoto(photoId: string) {
-  return withLogging('abortCleaningPhoto', async () => {
+  return withPhotoLogging('abortCleaningPhoto', async () => {
     assertEnabled()
-    const { viewer } = await getCurrentViewer()
+    const { viewer } = await getPhotoViewer()
     return abortCleaningPhotoUpload(viewer, photoId)
   })
 }
 
 export async function deleteServiceOrderPhoto(photoId: string) {
-  return withLogging('deleteServiceOrderPhoto', () => deleteImpl(photoId))
+  return withPhotoLogging('deleteServiceOrderPhoto', () => deleteImpl(photoId))
 }

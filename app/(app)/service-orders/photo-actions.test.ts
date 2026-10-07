@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import * as Sentry from '@sentry/nextjs'
 import {
   CLEANING_PHOTO_LIMIT_CODE,
   CLEANING_PHOTO_LIMIT_MESSAGE,
@@ -37,6 +38,7 @@ vi.mock('@/lib/server/service-order-photos', () => ({
 }))
 
 describe('cleaning photo server actions', () => {
+  beforeAll(() => { Sentry.init({ enabled: false, defaultIntegrations: [] }) })
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.isCleaningPhotosEnabled.mockReturnValue(true)
@@ -93,5 +95,37 @@ describe('cleaning photo server actions', () => {
     await expect(finalizeCleaningPhoto('synthetic-id')).rejects.toThrow('non è attiva')
     expect(mocks.abortCleaningPhotoUpload).not.toHaveBeenCalled()
     expect(mocks.finalizeCleaningPhotoUpload).not.toHaveBeenCalled()
+  })
+
+  it('correlates server failures with the authenticated UUID and restores the outside scope', async () => {
+    const id = '12345678-1234-4123-8123-123456789abc'
+    const outside = Sentry.getIsolationScope().getUser()
+    mocks.getCurrentViewer.mockResolvedValue({ supabase: {}, viewer: { userId: id, role: 'limpeza' } })
+    mocks.reserveCleaningPhotoUpload.mockImplementationOnce(async () => {
+      expect(Sentry.getIsolationScope().getUser()).toEqual({ id })
+      expect(Sentry.getIsolationScope().getScopeData().tags.area).toBe('cleaning-photo')
+      throw new Error('synthetic failure')
+    })
+    await expect(reserveCleaningPhoto('order', 'before', 'photo', 'image/jpeg')).rejects.toThrow('synthetic failure')
+    expect(Sentry.getIsolationScope().getUser()).toEqual(outside)
+  })
+
+  it('keeps different users isolated across concurrent server requests', async () => {
+    const ids = ['12345678-1234-4123-8123-123456789abc', 'abcdef12-1234-4123-8123-123456789abc']
+    mocks.getCurrentViewer.mockResolvedValueOnce({ supabase: {}, viewer: { userId: ids[0], role: 'limpeza' } })
+      .mockResolvedValueOnce({ supabase: {}, viewer: { userId: ids[1], role: 'limpeza' } })
+    let finish!: () => void
+    mocks.finalizeCleaningPhotoUpload.mockImplementationOnce(async () => {
+      await new Promise<void>(resolve => { finish = resolve })
+      expect(Sentry.getIsolationScope().getUser()).toEqual({ id: ids[0] })
+      return { success: true, photoId: 'first' }
+    }).mockImplementationOnce(async () => {
+      expect(Sentry.getIsolationScope().getUser()).toEqual({ id: ids[1] })
+      finish()
+      return { success: true, photoId: 'second' }
+    })
+    await Promise.all([finalizeCleaningPhoto('first'), finalizeCleaningPhoto('second')])
+    expect(Sentry.getIsolationScope().getUser()).not.toEqual({ id: ids[0] })
+    expect(Sentry.getIsolationScope().getUser()).not.toEqual({ id: ids[1] })
   })
 })

@@ -1,6 +1,5 @@
 'use client'
 
-import * as Sentry from '@sentry/nextjs'
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import {
   cancelCleaningPhoto,
@@ -11,7 +10,6 @@ import {
 import { createClient } from '@/utils/supabase/client'
 import {
   MAX_CLEANING_PHOTOS,
-  PhotoProcessingError,
   processCleaningPhoto,
   validateSourceImage,
 } from '@/lib/client/image-processing'
@@ -22,6 +20,7 @@ import {
 } from '@/lib/client/cleaning-photo-queue'
 import { CleaningPhotoWorkflowError, uploadPreparedCleaningPhoto } from '@/lib/client/cleaning-photo-upload'
 import type { CleaningPhotoPhase } from '@/lib/types/service-order-photos'
+import { capturePhotoFailure, recordPhotoProgress, type PhotoProgress } from '@/lib/observability/photo-telemetry'
 
 export type { CleaningPhotoQueueItem } from '@/lib/client/cleaning-photo-queue'
 
@@ -29,42 +28,6 @@ const runPhotoPreparation = createSequentialPhotoPreparation()
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : 'Errore durante il caricamento della foto.'
-}
-
-function sourceSizeBucket(bytes: number) {
-  if (bytes <= 2 * 1024 * 1024) return 'lte_2mb'
-  if (bytes <= 8 * 1024 * 1024) return '2mb_to_8mb'
-  return 'gt_8mb'
-}
-
-function sourceContentTypeTag(contentType: string) {
-  if (contentType === 'image/jpeg' || contentType === 'image/png' || contentType === 'image/webp') {
-    return contentType
-  }
-  return contentType ? 'other' : 'unknown'
-}
-
-function capturePhotoFailure(
-  error: unknown,
-  source: CleaningPhotoQueueItem['source'],
-  phase: CleaningPhotoPhase,
-  stage: 'processing' | 'reservation' | 'upload' | 'finalization',
-) {
-  const exception = error instanceof Error ? error : new Error(String(error))
-  const processingError = error instanceof PhotoProcessingError ? error : null
-  const workflowError = error instanceof CleaningPhotoWorkflowError ? error : null
-  Sentry.captureException(exception, {
-    level: processingError || workflowError ? 'warning' : 'error',
-    tags: {
-      area: 'cleaning-photo',
-      phase,
-      stage,
-      failure_code: processingError?.code ?? workflowError?.code ?? 'workflow_error',
-      source_content_type: sourceContentTypeTag(source.type),
-      source_size_bucket: sourceSizeBucket(source.size),
-    },
-    extra: processingError?.details,
-  })
 }
 
 export function useCleaningPhotoWorkflow(
@@ -157,6 +120,7 @@ export function useCleaningPhotoWorkflow(
           continue
         }
 
+        let progress: PhotoProgress | undefined
         try {
           const processed = item.processed!
           updateItem(item.localId, { status: 'uploading', error: undefined })
@@ -172,12 +136,16 @@ export function useCleaningPhotoWorkflow(
             createId: () => crypto.randomUUID(),
             sleep: ms => new Promise(resolve => window.setTimeout(resolve, ms)),
             onReservation: id => updateItem(item.localId, { photoId: id }),
+            onProgress: value => {
+              progress = value
+              recordPhotoProgress(value, phase, processed.decoder)
+            },
           }, item.photoId)
           updateItem(item.localId, { status: 'ready', photoId, error: undefined })
           uploadedIds.push(photoId)
         } catch (error) {
           const workflowError = error instanceof CleaningPhotoWorkflowError ? error : null
-          capturePhotoFailure(error, item.source, phase, workflowError?.stage ?? 'reservation')
+          capturePhotoFailure(error, item.source, phase, workflowError?.stage ?? 'reservation', progress, item.processed?.decoder)
           updateItem(item.localId, {
             status: 'error', photoId: workflowError?.pendingPhotoId, error: errorMessage(error),
             cleanupRequiresSupport: workflowError?.code === 'photo_cleanup_manual_attention',

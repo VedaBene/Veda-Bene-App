@@ -10,6 +10,7 @@ import {
   recordSessionActivity,
 } from '@/lib/session-timeout'
 import { createClient } from '@/utils/supabase/client'
+import { clearSentrySession } from '@/lib/client/sentry-session'
 
 const ACTIVITY_THROTTLE_MS = 15 * 1000
 
@@ -32,6 +33,7 @@ export function SessionTimeoutProvider({ children }: { children: React.ReactNode
     if (isLoggingOutRef.current) return
 
     isLoggingOutRef.current = true
+    clearSentrySession()
     clearLogoutTimer()
     clearSessionActivity()
 

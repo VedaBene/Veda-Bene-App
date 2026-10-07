@@ -8,7 +8,7 @@ const hooks = vi.hoisted(() => ({
 }))
 const mocks = vi.hoisted(() => ({
   process: vi.fn(), reserve: vi.fn(), finalize: vi.fn(), cancel: vi.fn(), abort: vi.fn(),
-  upload: vi.fn(), capture: vi.fn(),
+  upload: vi.fn(), capture: vi.fn(), breadcrumb: vi.fn(),
 }))
 vi.mock('react', () => ({
   useState(initial: unknown) {
@@ -24,7 +24,7 @@ vi.mock('react', () => ({
   useSyncExternalStore: (_subscribe: unknown, snapshot: () => unknown) => snapshot(),
   useEffect: (effect: () => () => void) => { hooks.cleanup = effect() },
 }))
-vi.mock('@sentry/nextjs', () => ({ captureException: mocks.capture }))
+vi.mock('@sentry/nextjs', () => ({ captureException: mocks.capture, addBreadcrumb: mocks.breadcrumb }))
 vi.mock('@/lib/client/image-processing', async importOriginal => ({
   ...await importOriginal<typeof import('@/lib/client/image-processing')>(),
   processCleaningPhoto: mocks.process,
@@ -255,5 +255,51 @@ describe('prepared photo workflow', () => {
     expect(render().selectionError).toContain('massimo 8')
     await prepare()
     expect(mocks.process).toHaveBeenCalledTimes(8)
+  })
+
+  it('records a recovered complete retry as info breadcrumbs with decoder/cycle, without exceptions or paths', async () => {
+    mocks.process.mockResolvedValue({ ...processed, decoder: 'html_image' })
+    render().addFiles(select(photo()))
+    await prepare()
+    mocks.finalize.mockResolvedValueOnce({ success: false, code: 'photo_variant_missing', error: 'Variante assente' })
+    const uploading = render().uploadAll()
+    await vi.runAllTimersAsync()
+    await uploading
+    expect(mocks.capture).not.toHaveBeenCalled()
+    expect(mocks.breadcrumb).toHaveBeenLastCalledWith(expect.objectContaining({
+      level: 'info', data: expect.objectContaining({ decoder: 'html_image', attempt: '2', retry_result: 'recovered', recovered: 'true' }),
+    }))
+    const payload = JSON.stringify(mocks.breadcrumb.mock.calls)
+    expect(payload).not.toContain('private-name')
+    expect(payload).not.toContain('synthetic')
+    expect(payload).not.toContain('token')
+    expect(mocks.reserve).toHaveBeenCalledTimes(2)
+  })
+
+  it('captures a final failure once with bounded tags after two failed cycles', async () => {
+    mocks.process.mockResolvedValue({ ...processed, decoder: 'bitmap_default' })
+    render().addFiles(select(photo()))
+    await prepare()
+    mocks.finalize.mockResolvedValue({ success: false, code: 'photo_variant_missing', error: 'Variante assente' })
+    const failure = expect(render().uploadAll()).rejects.toThrow('Variante assente')
+    await vi.runAllTimersAsync()
+    await failure
+    expect(mocks.capture).toHaveBeenCalledTimes(1)
+    expect(mocks.capture.mock.calls[0][1].tags).toMatchObject({
+      stage: 'finalization', attempt: '2', decoder: 'bitmap_default', retry_result: 'failed', recovered: 'false', failure_code: 'photo_variant_missing',
+    })
+  })
+
+  it('recovers a transient PUT once and keeps telemetry failure from affecting the upload', async () => {
+    render().addFiles(select(photo()))
+    await prepare()
+    mocks.upload.mockResolvedValueOnce({ error: { status: 503 } })
+    mocks.breadcrumb.mockImplementationOnce(() => { throw new Error('telemetry unavailable') })
+    const uploading = render().uploadAll()
+    await vi.runAllTimersAsync()
+    await uploading
+    expect(mocks.upload).toHaveBeenCalledTimes(3)
+    expect(mocks.capture).not.toHaveBeenCalled()
+    expect(mocks.breadcrumb).toHaveBeenLastCalledWith(expect.objectContaining({ data: expect.objectContaining({ attempt: '1', recovered: 'true' }) }))
   })
 })
