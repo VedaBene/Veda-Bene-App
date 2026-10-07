@@ -105,6 +105,7 @@ export function TimeSummaryPanel({
 export function StartCleaningModal({
   propertyName,
   isLoading,
+  confirmDisabled = false,
   onCancel,
   onConfirm,
   details,
@@ -113,6 +114,7 @@ export function StartCleaningModal({
 }: {
   propertyName: string | null | undefined
   isLoading: boolean
+  confirmDisabled?: boolean
   onCancel: () => void
   onConfirm: () => void
   details?: ReactNode
@@ -155,7 +157,7 @@ export function StartCleaningModal({
           <Button type="button" variant="ghost" disabled={isLoading} onClick={onCancel} className="flex-1">
             <span className="notranslate" translate="no">Annulla</span>
           </Button>
-          <Button type="button" variant="accent" isLoading={isLoading} onClick={onConfirm} className="flex-1">
+          <Button type="button" variant="accent" isLoading={isLoading} disabled={confirmDisabled} onClick={onConfirm} className="flex-1">
             <span className="notranslate" translate="no">Conferma</span>
           </Button>
         </div>
@@ -168,6 +170,7 @@ export function FinishCleaningModal({
   propertyName,
   notes,
   isLoading,
+  confirmDisabled = false,
   onNotesChange,
   onCancel,
   onConfirm,
@@ -179,6 +182,7 @@ export function FinishCleaningModal({
   propertyName: string | null | undefined
   notes: string
   isLoading: boolean
+  confirmDisabled?: boolean
   onNotesChange: (notes: string) => void
   onCancel: () => void
   onConfirm: () => void
@@ -224,7 +228,7 @@ export function FinishCleaningModal({
           <Button type="button" variant="ghost" disabled={isLoading} onClick={onCancel} className="flex-1">
             <span className="notranslate" translate="no">Annulla</span>
           </Button>
-          <Button type="button" variant="accent" isLoading={isLoading} onClick={onConfirm} className="flex-1">
+          <Button type="button" variant="accent" isLoading={isLoading} disabled={confirmDisabled} onClick={onConfirm} className="flex-1">
             <span className="notranslate" translate="no">Conferma</span>
           </Button>
         </div>

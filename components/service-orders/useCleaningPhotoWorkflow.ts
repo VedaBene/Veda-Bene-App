@@ -1,9 +1,10 @@
 'use client'
 
 import * as Sentry from '@sentry/nextjs'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import {
   cancelCleaningPhoto,
+  abortCleaningPhoto,
   finalizeCleaningPhoto,
   reserveCleaningPhoto,
 } from '@/app/(app)/service-orders/photo-actions'
@@ -14,30 +15,20 @@ import {
   processCleaningPhoto,
   validateSourceImage,
 } from '@/lib/client/image-processing'
-import { appendWithinLimit } from '@/lib/client/cleaning-photo-queue'
-import type { CleaningPhotoContentType, CleaningPhotoPhase } from '@/lib/types/service-order-photos'
+import {
+  createCleaningPhotoPreparationQueue,
+  createSequentialPhotoPreparation,
+  type CleaningPhotoQueueItem,
+} from '@/lib/client/cleaning-photo-queue'
+import { CleaningPhotoWorkflowError, uploadPreparedCleaningPhoto } from '@/lib/client/cleaning-photo-upload'
+import type { CleaningPhotoPhase } from '@/lib/types/service-order-photos'
 
-export type CleaningPhotoQueueItem = {
-  localId: string
-  file: File
-  previewUrl: string
-  status: 'idle' | 'processing' | 'uploading' | 'ready' | 'error'
-  error?: string
-  photoId?: string
-}
+export type { CleaningPhotoQueueItem } from '@/lib/client/cleaning-photo-queue'
+
+const runPhotoPreparation = createSequentialPhotoPreparation()
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : 'Errore durante il caricamento della foto.'
-}
-
-class CleaningPhotoWorkflowError extends Error {
-  constructor(
-    message: string,
-    readonly code: string,
-  ) {
-    super(message)
-    this.name = 'CleaningPhotoWorkflowError'
-  }
 }
 
 function sourceSizeBucket(bytes: number) {
@@ -55,7 +46,7 @@ function sourceContentTypeTag(contentType: string) {
 
 function capturePhotoFailure(
   error: unknown,
-  file: File,
+  source: CleaningPhotoQueueItem['source'],
   phase: CleaningPhotoPhase,
   stage: 'processing' | 'reservation' | 'upload' | 'finalization',
 ) {
@@ -69,35 +60,11 @@ function capturePhotoFailure(
       phase,
       stage,
       failure_code: processingError?.code ?? workflowError?.code ?? 'workflow_error',
-      source_content_type: sourceContentTypeTag(file.type),
-      source_size_bucket: sourceSizeBucket(file.size),
+      source_content_type: sourceContentTypeTag(source.type),
+      source_size_bucket: sourceSizeBucket(source.size),
     },
     extra: processingError?.details,
   })
-}
-
-async function uploadVariant(
-  path: string,
-  token: string,
-  blob: Blob,
-  contentType: CleaningPhotoContentType,
-) {
-  if (blob.type !== contentType) throw new Error('Il formato elaborato non corrisponde alla prenotazione.')
-  const supabase = createClient()
-  let lastError: Error | null = null
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    const { error } = await supabase.storage
-      .from('service-order-photos')
-      .uploadToSignedUrl(path, token, blob, {
-        contentType,
-        cacheControl: '31536000',
-        upsert: false,
-      })
-    if (!error) return
-    lastError = new Error(error.message)
-    await new Promise(resolve => window.setTimeout(resolve, 400 * (attempt + 1)))
-  }
-  throw lastError ?? new Error('Caricamento non riuscito.')
 }
 
 export function useCleaningPhotoWorkflow(
@@ -105,18 +72,28 @@ export function useCleaningPhotoWorkflow(
   phase: CleaningPhotoPhase,
   enabled: boolean,
 ) {
-  const [items, setItems] = useState<CleaningPhotoQueueItem[]>([])
   const [selectionError, setSelectionError] = useState<string | null>(null)
   const [isUploading, setIsUploading] = useState(false)
-  const itemsRef = useRef(items)
-  itemsRef.current = items
+  const uploadLock = useRef(false)
+  const [queue] = useState(() => createCleaningPhotoPreparationQueue({
+    process: processCleaningPhoto,
+    createPreview: thumbnail => URL.createObjectURL(thumbnail),
+    revokePreview: url => URL.revokeObjectURL(url),
+    createId: () => crypto.randomUUID(),
+    yieldToBrowser: () => new Promise(resolve => window.setTimeout(resolve, 0)),
+    runExclusive: runPhotoPreparation,
+    onFailure: (error, source) => capturePhotoFailure(error, source, phase, 'processing'),
+  }))
+  const items = useSyncExternalStore(queue.subscribe, queue.getSnapshot, queue.getSnapshot)
+  const isPreparing = items.some(item => item.status === 'queued' || item.status === 'processing')
+  const canUpload = !isPreparing && items.every(item => !item.cleanupRequiresSupport && (item.status === 'ready' || !!item.processed))
 
   useEffect(() => () => {
-    itemsRef.current.forEach(item => URL.revokeObjectURL(item.previewUrl))
-  }, [])
+    queue.clear()
+  }, [queue])
 
   function addFiles(files: FileList | null) {
-    if (!enabled || !files) return
+    if (!enabled || !files || uploadLock.current) return
     setSelectionError(null)
     const selected = Array.from(files)
     const valid: File[] = []
@@ -129,44 +106,47 @@ export function useCleaningPhotoWorkflow(
       valid.push(file)
     }
 
-    const result = appendWithinLimit(
-      itemsRef.current,
-      valid,
-      MAX_CLEANING_PHOTOS,
-      file => ({
-        localId: crypto.randomUUID(),
-        file,
-        previewUrl: URL.createObjectURL(file),
-        status: 'idle' as const,
-      }),
-    )
-    itemsRef.current = result.items
-    setItems(result.items)
-    if (result.rejectedCount > 0) {
+    if (queue.add(valid, MAX_CLEANING_PHOTOS) > 0) {
       setSelectionError(`Puoi aggiungere al massimo ${MAX_CLEANING_PHOTOS} foto.`)
     }
   }
 
   async function removeItem(localId: string) {
-    const item = items.find(candidate => candidate.localId === localId)
-    if (!item || isUploading) return
+    const item = queue.getSnapshot().find(candidate => candidate.localId === localId)
+    if (!item || uploadLock.current) return
+    if (!item.photoId) {
+      queue.remove(localId)
+      return
+    }
+    uploadLock.current = true
     setIsUploading(true)
     try {
       if (item.photoId) await cancelCleaningPhoto(item.photoId)
-      URL.revokeObjectURL(item.previewUrl)
-      setItems(current => current.filter(candidate => candidate.localId !== localId))
+      queue.remove(localId)
     } finally {
+      uploadLock.current = false
       setIsUploading(false)
     }
   }
 
   function updateItem(localId: string, update: Partial<CleaningPhotoQueueItem>) {
-    setItems(current => current.map(item => item.localId === localId ? { ...item, ...update } : item))
+    queue.update(localId, update)
   }
 
   async function uploadAll(): Promise<string[]> {
-    const queuedItems = itemsRef.current
+    const queuedItems = queue.getSnapshot()
     if (!enabled || queuedItems.length === 0) return []
+    if (uploadLock.current) throw new Error('Caricamento delle foto già in corso.')
+    const blockedCleanup = queuedItems.find(item => item.cleanupRequiresSupport)
+    if (blockedCleanup) throw new Error(blockedCleanup.error)
+    if (queuedItems.some(item => item.status === 'queued' || item.status === 'processing')) {
+      throw new Error('Attendi la preparazione delle foto prima di confermare.')
+    }
+    const failedPreparation = queuedItems.find(item => item.status !== 'ready' && !item.processed)
+    if (failedPreparation) {
+      throw new Error(failedPreparation.error ?? 'Rimuovi la foto non leggibile e selezionala nuovamente.')
+    }
+    uploadLock.current = true
     setIsUploading(true)
     const uploadedIds: string[] = []
 
@@ -177,80 +157,58 @@ export function useCleaningPhotoWorkflow(
           continue
         }
 
-        let photoId = item.localId
-        let failureStage: 'processing' | 'reservation' | 'upload' | 'finalization' = 'processing'
         try {
-          updateItem(item.localId, { status: 'processing', error: undefined })
-          const processed = await processCleaningPhoto(item.file)
-          failureStage = 'reservation'
-          const reserved = await reserveCleaningPhoto(
-            serviceOrderId,
-            phase,
-            photoId,
-            processed.contentType,
-          )
-          if (!reserved.success) {
-            throw new CleaningPhotoWorkflowError(reserved.error, reserved.code)
-          }
-          photoId = reserved.upload.photoId
-          if (reserved.upload.contentType !== processed.contentType) {
-            throw new Error('Il formato prenotato non corrisponde alla foto elaborata.')
-          }
-          updateItem(item.localId, { status: 'uploading', photoId })
-
-          failureStage = 'upload'
-          const uploads = await Promise.allSettled([
-            uploadVariant(
-              reserved.upload.display.path,
-              reserved.upload.display.token,
-              processed.display,
-              processed.contentType,
-            ),
-            uploadVariant(
-              reserved.upload.thumbnail.path,
-              reserved.upload.thumbnail.token,
-              processed.thumbnail,
-              processed.contentType,
-            ),
-          ])
-
-          // Finalization is authoritative. It also handles an ambiguous network
-          // response where Storage accepted the bytes but the browser saw an error.
-          failureStage = 'finalization'
-          const finalized = await finalizeCleaningPhoto(photoId)
-          if (!finalized.success || uploads.some(result => result.status === 'rejected')) {
-            // A successful finalization proves both files arrived, so rejected
-            // upload promises caused by lost responses can be ignored.
-          }
+          const processed = item.processed!
+          updateItem(item.localId, { status: 'uploading', error: undefined })
+          const supabase = createClient()
+          const photoId = await uploadPreparedCleaningPhoto(processed, {
+            reserve: id => reserveCleaningPhoto(serviceOrderId, phase, id, processed.contentType),
+            upload: (variant, blob) => supabase.storage.from('service-order-photos')
+              .uploadToSignedUrl(variant.path, variant.token, blob, {
+                contentType: processed.contentType, cacheControl: '31536000', upsert: false,
+              }),
+            finalize: finalizeCleaningPhoto,
+            abort: abortCleaningPhoto,
+            createId: () => crypto.randomUUID(),
+            sleep: ms => new Promise(resolve => window.setTimeout(resolve, ms)),
+            onReservation: id => updateItem(item.localId, { photoId: id }),
+          }, item.photoId)
           updateItem(item.localId, { status: 'ready', photoId, error: undefined })
           uploadedIds.push(photoId)
         } catch (error) {
-          capturePhotoFailure(error, item.file, phase, failureStage)
-          await cancelCleaningPhoto(photoId).catch(() => undefined)
-          updateItem(item.localId, { status: 'error', photoId: undefined, error: errorMessage(error) })
+          const workflowError = error instanceof CleaningPhotoWorkflowError ? error : null
+          capturePhotoFailure(error, item.source, phase, workflowError?.stage ?? 'reservation')
+          updateItem(item.localId, {
+            status: 'error', photoId: workflowError?.pendingPhotoId, error: errorMessage(error),
+            cleanupRequiresSupport: workflowError?.code === 'photo_cleanup_manual_attention',
+          })
           throw error
         }
       }
       return uploadedIds
     } finally {
+      uploadLock.current = false
       setIsUploading(false)
     }
   }
 
   function reset() {
-    items.forEach(item => URL.revokeObjectURL(item.previewUrl))
-    setItems([])
+    queue.clear()
     setSelectionError(null)
   }
 
   async function discardAll() {
+    if (uploadLock.current) return
+    uploadLock.current = true
     setIsUploading(true)
+    const discarded = queue.getSnapshot()
+    reset()
     try {
       await Promise.allSettled(
-        items.filter(item => item.photoId).map(item => cancelCleaningPhoto(item.photoId!)),
+        discarded.filter(item => item.photoId).map(item => cancelCleaningPhoto(item.photoId!)),
       )
-      reset()
     } finally {
+      uploadLock.current = false
       setIsUploading(false)
     }
   }
@@ -259,6 +217,8 @@ export function useCleaningPhotoWorkflow(
     items,
     selectionError,
     isUploading,
+    isPreparing,
+    canUpload,
     addFiles,
     removeItem,
     uploadAll,

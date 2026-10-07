@@ -63,9 +63,16 @@ export function CleaningPhotoUploader({
         <div className="grid grid-cols-4 gap-2">
           {items.map(item => (
             <div key={item.localId} className="relative aspect-square overflow-hidden rounded-lg border border-border bg-muted">
-              {/* blob URLs are local previews and do not benefit from next/image optimization. */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={item.previewUrl} alt="Anteprima foto pulizia" className="h-full w-full object-cover" />
+              {item.previewUrl && (
+                // Compressed local thumbnails do not need next/image optimization.
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={item.previewUrl} alt="Anteprima foto pulizia" className="h-full w-full object-cover" />
+              )}
+              {!item.previewUrl && (
+                <div role="status" className="flex h-full items-center justify-center p-1 text-center text-[10px] text-muted-foreground">
+                  <span>{item.status === 'error' ? 'Foto non disponibile' : 'Preparazione…'}</span>
+                </div>
+              )}
               <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-black/55 px-1 py-0.5 text-white">
                 {item.status === 'ready' ? <Check size={12} /> :
                   item.status === 'error' ? <RotateCcw size={12} /> :
@@ -85,11 +92,12 @@ export function CleaningPhotoUploader({
         </div>
       )}
 
-      {(error || items.some(item => item.error)) && (
-        <p className="text-[11px] text-danger">
-          {error ?? items.find(item => item.error)?.error}
+      {error && <p className="text-[11px] text-danger"><span>{error}</span></p>}
+      {items.map((item, index) => item.error && (
+        <p key={item.localId} className="text-[11px] text-danger">
+          <span>Foto {index + 1}: {item.error}</span>
         </p>
-      )}
+      ))}
     </div>
   )
 }

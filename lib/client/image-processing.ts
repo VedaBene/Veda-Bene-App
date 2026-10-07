@@ -1,5 +1,6 @@
 import 'client-only'
 
+import { addBreadcrumb } from '@sentry/nextjs'
 import type { CleaningPhotoContentType } from '@/lib/types/service-order-photos'
 
 export { MAX_CLEANING_PHOTOS } from '@/lib/types/service-order-photos'
@@ -58,6 +59,99 @@ export function containedDimensions(width: number, height: number, maxDimension:
     width: Math.max(1, Math.round(width * scale)),
     height: Math.max(1, Math.round(height * scale)),
   }
+}
+
+type DecodedImage = {
+  source: ImageBitmap | HTMLImageElement
+  width: number
+  height: number
+  dispose(): void
+}
+
+async function decodeBitmap(file: File, oriented: boolean): Promise<DecodedImage> {
+  const bitmap = oriented
+    ? await createImageBitmap(file, { imageOrientation: 'from-image' })
+    : await createImageBitmap(file)
+  // Both bitmap paths use native EXIF orientation (from-image is the default).
+  return {
+    source: bitmap,
+    width: bitmap.width,
+    height: bitmap.height,
+    dispose: () => bitmap.close(),
+  }
+}
+
+async function decodeImageElement(file: File): Promise<DecodedImage> {
+  const image = document.createElement('img')
+  const url = URL.createObjectURL(file)
+  const dispose = () => {
+    try {
+      image.removeAttribute('src')
+    } finally {
+      URL.revokeObjectURL(url)
+    }
+  }
+  let decoded = false
+  try {
+    image.src = url
+    await image.decode()
+    // Use the native oriented dimensions, never layout width/height or a second rotation.
+    const result = {
+      source: image,
+      width: image.naturalWidth,
+      height: image.naturalHeight,
+      dispose,
+    }
+    decoded = true
+    return result
+  } finally {
+    if (!decoded) dispose()
+  }
+}
+
+async function decodeSourceImage(file: File): Promise<DecodedImage> {
+  const decoders = [
+    { code: 'bitmap_oriented', decode: () => decodeBitmap(file, true) },
+    { code: 'bitmap_default', decode: () => decodeBitmap(file, false) },
+    { code: 'html_image', decode: () => decodeImageElement(file) },
+  ] as const
+
+  for (const [index, decoder] of decoders.entries()) {
+    let image: DecodedImage | undefined
+    let accepted = false
+    try {
+      image = await decoder.decode()
+      if (
+        !Number.isFinite(image.width) || image.width <= 0 ||
+        !Number.isFinite(image.height) || image.height <= 0
+      ) continue
+      accepted = true
+      return image
+    } catch {
+      // A decoder failure is recoverable; never retain its potentially private error.
+    } finally {
+      if (!accepted) image?.dispose()
+      try {
+        addBreadcrumb({
+          category: 'cleaning-photo.decoder',
+          level: 'info',
+          data: {
+            decoder: decoder.code,
+            attempt: index + 1,
+            result: accepted ? 'decoded' : 'decode_failed',
+          },
+        })
+      } catch {
+        // Telemetry must not prevent decoding or disposal.
+      }
+    }
+  }
+
+  throw new PhotoProcessingError(
+    'La foto non può essere letta. Prova a selezionarla nuovamente.',
+    'decode_failed',
+    { decoderAttempts: decoders.length },
+  )
 }
 
 type CanvasEncoder = Pick<HTMLCanvasElement, 'toBlob'>
@@ -129,7 +223,7 @@ function supportsWebpEncoding() {
 }
 
 async function encodeVariant(
-  source: ImageBitmap,
+  source: DecodedImage,
   maxDimension: number,
   maxBytes: number,
   qualities: number[],
@@ -153,7 +247,7 @@ async function encodeVariant(
         )
       }
       try {
-        context.drawImage(source, 0, 0, dimensions.width, dimensions.height)
+        context.drawImage(source.source, 0, 0, dimensions.width, dimensions.height)
       } catch {
         throw new PhotoProcessingError(
           'Il dispositivo non è riuscito a ridimensionare la foto.',
@@ -181,7 +275,7 @@ async function encodeVariant(
 }
 
 async function encodePhotoVariants(
-  image: ImageBitmap,
+  image: DecodedImage,
   contentType: CleaningPhotoContentType,
 ) {
   const display = await encodeVariant(
@@ -207,15 +301,7 @@ export async function processCleaningPhoto(file: File): Promise<ProcessedCleanin
   const validationError = validateSourceImage(file)
   if (validationError) throw new Error(validationError)
 
-  let image: ImageBitmap
-  try {
-    image = await createImageBitmap(file, { imageOrientation: 'from-image' })
-  } catch {
-    throw new PhotoProcessingError(
-      'La foto non può essere letta. Prova a selezionarla nuovamente.',
-      'decode_failed',
-    )
-  }
+  const image = await decodeSourceImage(file)
 
   try {
     const sourcePixels = image.width * image.height
@@ -253,6 +339,6 @@ export async function processCleaningPhoto(file: File): Promise<ProcessedCleanin
       height: variants.display.height,
     }
   } finally {
-    image.close()
+    image.dispose()
   }
 }

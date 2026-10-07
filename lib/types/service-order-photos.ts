@@ -33,6 +33,14 @@ export type ReservedCleaningPhotoUpload = {
   thumbnail: { path: string; token: string }
 }
 
+export type FinalizeCleaningPhotoResult =
+  | { success: true; photoId: string }
+  | { success: false; code: 'photo_variant_missing' | 'photo_content_invalid' | 'photo_storage_unavailable'; error: string }
+
+export type AbortCleaningPhotoResult =
+  | { success: true; status: 'removed' | 'ready'; photoId: string }
+  | { success: false; code: 'photo_cleanup_failed' | 'photo_cleanup_manual_attention'; error: string }
+
 export type CleaningPhotoGalleryItem = {
   id: string
   cycleNo: number

@@ -281,6 +281,7 @@ export function ServiceOrderForm({
         <StartCleaningModal
           propertyName={selectedProperty?.name}
           isLoading={isTrackingAction || beforePhotos.isUploading}
+          confirmDisabled={!beforePhotos.canUpload}
           onCancel={async () => { await beforePhotos.discardAll(); setShowStartModal(false) }}
           onConfirm={handleStartCleaning}
           cleaningNotes={cleaningNotes}
@@ -302,6 +303,7 @@ export function ServiceOrderForm({
           propertyName={selectedProperty?.name}
           notes={finishNotes}
           isLoading={isTrackingAction || afterPhotos.isUploading}
+          confirmDisabled={!afterPhotos.canUpload}
           onNotesChange={setFinishNotes}
           onCancel={async () => { await afterPhotos.discardAll(); setShowFinishModal(false); setFinishNotes('') }}
           onConfirm={handleFinishCleaning}

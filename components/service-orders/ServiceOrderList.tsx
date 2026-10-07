@@ -397,6 +397,7 @@ export function ServiceOrderList({
           key={`start-modal-${startModalOrder.id}`}
           propertyName={startModalOrder.property?.name}
           isLoading={isTrackingAction || beforePhotos.isUploading}
+          confirmDisabled={!beforePhotos.canUpload}
           onCancel={async () => { await beforePhotos.discardAll(); setStartModalOrder(null) }}
           onConfirm={handleStartCleaning}
           details={<StartOrderDetails order={startModalOrder} />}
@@ -420,6 +421,7 @@ export function ServiceOrderList({
           propertyName={finishModalOrder.property?.name}
           notes={finishNotes}
           isLoading={isTrackingAction || afterPhotos.isUploading}
+          confirmDisabled={!afterPhotos.canUpload}
           onNotesChange={setFinishNotes}
           onCancel={closeFinishModal}
           onConfirm={handleFinishCleaning}

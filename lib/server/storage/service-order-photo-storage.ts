@@ -13,6 +13,29 @@ export const MAX_DISPLAY_BYTES = 2 * 1024 * 1024
 export const MAX_THUMBNAIL_BYTES = 512 * 1024
 const MAX_DECODE_PIXELS = 1920 * 1920
 
+export class PhotoInspectionError extends Error {
+  constructor(
+    readonly code: 'photo_variant_missing' | 'photo_content_invalid' | 'photo_storage_unavailable',
+    message: string,
+  ) {
+    super(message)
+    this.name = 'PhotoInspectionError'
+  }
+}
+
+export class PhotoCleanupError extends Error {
+  constructor(readonly code: 'photo_cleanup_failed' | 'photo_cleanup_manual_attention', message: string) {
+    super(message)
+    this.name = 'PhotoCleanupError'
+  }
+}
+
+function isMissingObject(error: unknown) {
+  if (!error || typeof error !== 'object') return false
+  const value = error as { status?: number; statusCode?: string }
+  return value.status === 404 || value.statusCode === '404' || value.statusCode === 'NoSuchKey'
+}
+
 const CONTENT_TYPE_CONFIG: Record<CleaningPhotoContentType, { extension: string; sharpFormat: string }> = {
   'image/webp': { extension: 'webp', sharpFormat: 'webp' },
   'image/jpeg': { extension: 'jpg', sharpFormat: 'jpeg' },
@@ -172,7 +195,7 @@ export async function inspectImageBytes(
     if (!info.width || !info.height) throw new Error('Missing decoded dimensions')
     return { width: info.width, height: info.height }
   } catch {
-    throw new Error('O conteúdo da imagem é inválido.')
+    throw new PhotoInspectionError('photo_content_invalid', 'O conteúdo da imagem é inválido.')
   }
 }
 
@@ -189,7 +212,14 @@ export async function inspectImageObject(
   ])
 
   if (infoError || !info || downloadError || !blob) {
-    throw new Error('O arquivo enviado não foi encontrado.')
+    // Only an explicit not-found response proves absence. A 403/5xx or
+    // missing payload must never trigger a new reservation as if it were 404.
+    const errors = [infoError, downloadError].filter(Boolean)
+    const missing = errors.length > 0 && errors.every(isMissingObject)
+    throw new PhotoInspectionError(
+      missing ? 'photo_variant_missing' : 'photo_storage_unavailable',
+      missing ? 'Una variante della foto non è arrivata. Riprova il caricamento.' : 'Non è possibile verificare la foto. Controlla la connessione e riprova.',
+    )
   }
 
   const expectedExtension = `.${CONTENT_TYPE_CONFIG[expectedContentType].extension}`
@@ -198,17 +228,17 @@ export async function inspectImageObject(
     info.contentType !== expectedContentType ||
     blob.type !== expectedContentType
   ) {
-    throw new Error('Formato de imagem inválido.')
+    throw new PhotoInspectionError('photo_content_invalid', 'Formato de imagem inválido.')
   }
 
   const size = info.size ?? blob.size
   if (size <= 0 || size > limits.maxBytes) {
-    throw new Error('La foto supera il limite di dimensione consentito.')
+    throw new PhotoInspectionError('photo_content_invalid', 'La foto supera il limite di dimensione consentito.')
   }
   const bytes = new Uint8Array(await blob.arrayBuffer())
   const dimensions = await inspectImageBytes(bytes, expectedContentType)
   if (dimensions.width > limits.maxDimension || dimensions.height > limits.maxDimension) {
-    throw new Error('La risoluzione della foto supera il limite consentito.')
+    throw new PhotoInspectionError('photo_content_invalid', 'La risoluzione della foto supera il limite consentito.')
   }
 
   return {
@@ -257,6 +287,49 @@ export async function deletePhotoRecordAndObjects(record: ServiceOrderPhotoRecor
     .delete()
     .eq('id', record.id)
   if (rowError) throw new Error('Não foi possível excluir o registro da foto.')
+}
+
+export async function deletePendingPhotoRecordAndObjects(record: ServiceOrderPhotoRecord): Promise<'removed' | 'ready'> {
+  const admin = createStorageAdminClient()
+  // Claim only a pending row atomically BEFORE removing objects. A concurrent
+  // finalization that already won keeps both its row and its immutable files.
+  let data: ServiceOrderPhotoRecord | null
+  try {
+    const result = await admin.from('service_order_photos')
+      .delete().eq('id', record.id).eq('status', 'pending').select('*').maybeSingle()
+    if (result.error) throw result.error
+    data = result.data as ServiceOrderPhotoRecord | null
+  } catch {
+    // A lost DELETE response may hide a completed claim. Do not start another
+    // cycle without knowing whether the original objects were also cleaned.
+    throw new PhotoCleanupError('photo_cleanup_manual_attention', 'Non è stato possibile annullare il caricamento con certezza. Contatta l’assistenza.')
+  }
+  if (!data) {
+    const current = await findPhotoById(record.id)
+    if (current?.status === 'pending') throw new PhotoCleanupError('photo_cleanup_failed', 'La foto è ancora in preparazione. Riprova.')
+    if (current?.status === 'ready') return 'ready'
+    // Only the caller that claimed the row can confirm its Storage removal.
+    // A missing row may mean another removal is active or its response was lost.
+    throw new PhotoCleanupError('photo_cleanup_manual_attention', 'Pulizia della foto non confermata. Contatta l’assistenza prima di riprovare.')
+  }
+
+  const claimed = data
+  try {
+    const { error: storageError } = await admin.storage.from(CLEANING_PHOTO_BUCKET)
+      .remove([claimed.display_path, claimed.thumbnail_path])
+    if (storageError) throw storageError
+  } catch {
+    // Keep the original metadata/paths discoverable for another cleanup instead
+    // of losing the only references to incompletely removed objects. No upsert.
+    try {
+      const { error: restoreError } = await admin.from('service_order_photos').insert(claimed)
+      if (restoreError) throw restoreError
+    } catch {
+      throw new PhotoCleanupError('photo_cleanup_manual_attention', 'Pulizia della foto non confermata. Contatta l’assistenza prima di riprovare.')
+    }
+    throw new PhotoCleanupError('photo_cleanup_failed', 'Pulizia della foto non completata. Controlla la connessione e riprova.')
+  }
+  return 'removed'
 }
 
 export async function deletePhotoObjects(records: ServiceOrderPhotoRecord[]) {

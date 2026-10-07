@@ -6,6 +6,7 @@ import { isCleaningPhotosEnabled } from '@/lib/server/features'
 import { withLogging } from '@/lib/server/logger'
 import {
   cancelCleaningPhotoUpload,
+  abortCleaningPhotoUpload,
   deleteCleaningPhoto,
   finalizeCleaningPhotoUpload,
   reserveCleaningPhotoUpload,
@@ -52,8 +53,7 @@ async function reserveImpl(
 async function finalizeImpl(photoId: string) {
   assertEnabled()
   const { supabase, viewer } = await getCurrentViewer()
-  const result = await finalizeCleaningPhotoUpload(supabase, viewer, { photoId })
-  return { success: true as const, ...result }
+  return finalizeCleaningPhotoUpload(supabase, viewer, { photoId })
 }
 
 async function cancelImpl(photoId: string) {
@@ -88,6 +88,14 @@ export async function finalizeCleaningPhoto(photoId: string) {
 
 export async function cancelCleaningPhoto(photoId: string) {
   return withLogging('cancelCleaningPhoto', () => cancelImpl(photoId))
+}
+
+export async function abortCleaningPhoto(photoId: string) {
+  return withLogging('abortCleaningPhoto', async () => {
+    assertEnabled()
+    const { viewer } = await getCurrentViewer()
+    return abortCleaningPhotoUpload(viewer, photoId)
+  })
 }
 
 export async function deleteServiceOrderPhoto(photoId: string) {

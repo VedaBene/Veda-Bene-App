@@ -10,6 +10,7 @@ import {
 import {
   createPhotoUploadTokens,
   deletePhotoRecordAndObjects,
+  deletePendingPhotoRecordAndObjects,
   findPhotoById,
   findPhotosByIds,
   inspectImageObject,
@@ -17,12 +18,16 @@ import {
   markPhotoReady,
   MAX_DISPLAY_BYTES,
   MAX_THUMBNAIL_BYTES,
+  PhotoInspectionError,
+  PhotoCleanupError,
   reservePhotoRecord,
 } from '@/lib/server/storage/service-order-photo-storage'
 import type {
   CleaningPhotoPhase,
   ReservedCleaningPhotoUpload,
   ServiceOrderPhotoRecord,
+  FinalizeCleaningPhotoResult,
+  AbortCleaningPhotoResult,
 } from '@/lib/types/service-order-photos'
 import {
   CLEANING_PHOTO_LIMIT_MESSAGE,
@@ -142,7 +147,7 @@ export async function finalizeCleaningPhotoUpload(
   supabase: SupabaseServerClient,
   viewer: Viewer,
   input: unknown,
-) {
+): Promise<FinalizeCleaningPhotoResult> {
   const parsed = finalizeCleaningPhotoSchema.safeParse(input)
   if (!parsed.success) throw new Error(validationMessage(parsed.error))
   if (!PHOTO_OPERATOR_ROLES.has(viewer.role)) throw new Error('Sem permissão')
@@ -151,7 +156,7 @@ export async function finalizeCleaningPhotoUpload(
   if (!record || record.uploaded_by !== viewer.userId) {
     throw new Error('Foto non trovata o non autorizzata.')
   }
-  if (record.status === 'ready') return { photoId: record.id }
+  if (record.status === 'ready') return { success: true, photoId: record.id }
 
   const { data: order } = await supabase
     .from('service_orders')
@@ -178,9 +183,37 @@ export async function finalizeCleaningPhotoUpload(
       displaySizeBytes: display.size,
       thumbnailSizeBytes: thumbnail.size,
     })
-    return { photoId: record.id }
+    return { success: true, photoId: record.id }
   } catch (error) {
-    await deletePhotoRecordAndObjects(record).catch(() => undefined)
+    if (error instanceof PhotoInspectionError) {
+      return { success: false, code: error.code, error: error.message }
+    }
+    // A failed response from markPhotoReady may hide a successful write.
+    // Never delete here: the caller must reconcile through the pending-only abort.
+    throw error
+  }
+}
+
+export async function abortCleaningPhotoUpload(
+  viewer: Viewer,
+  photoId: unknown,
+): Promise<AbortCleaningPhotoResult> {
+  const parsed = finalizeCleaningPhotoSchema.safeParse({ photoId })
+  if (!parsed.success) throw new Error(validationMessage(parsed.error))
+  const record = await findPhotoById(parsed.data.photoId)
+  // Another cleanup may have claimed the row while its Storage removal is
+  // still active. Missing metadata cannot confirm removal of either object.
+  if (!record) return {
+    success: false,
+    code: 'photo_cleanup_manual_attention',
+    error: 'Pulizia della foto non confermata. Contatta l’assistenza prima di riprovare.',
+  }
+  if (record.uploaded_by !== viewer.userId && viewer.role !== 'admin') throw new Error('Sem permissão')
+  try {
+    const status = record.status === 'ready' ? 'ready' : await deletePendingPhotoRecordAndObjects(record)
+    return { success: true, status, photoId: record.id }
+  } catch (error) {
+    if (error instanceof PhotoCleanupError) return { success: false, code: error.code, error: error.message }
     throw error
   }
 }

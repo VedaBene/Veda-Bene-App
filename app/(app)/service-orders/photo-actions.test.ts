@@ -3,12 +3,14 @@ import {
   CLEANING_PHOTO_LIMIT_CODE,
   CLEANING_PHOTO_LIMIT_MESSAGE,
 } from '@/lib/types/service-order-photos'
-import { reserveCleaningPhoto } from './photo-actions'
+import { abortCleaningPhoto, finalizeCleaningPhoto, reserveCleaningPhoto } from './photo-actions'
 
 const mocks = vi.hoisted(() => ({
   getCurrentViewer: vi.fn(),
   isCleaningPhotosEnabled: vi.fn(),
   reserveCleaningPhotoUpload: vi.fn(),
+  finalizeCleaningPhotoUpload: vi.fn(),
+  abortCleaningPhotoUpload: vi.fn(),
   withLogging: vi.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
 }))
 
@@ -28,7 +30,8 @@ vi.mock('@/lib/server/logger', () => ({
 
 vi.mock('@/lib/server/service-order-photos', () => ({
   reserveCleaningPhotoUpload: mocks.reserveCleaningPhotoUpload,
-  finalizeCleaningPhotoUpload: vi.fn(),
+  finalizeCleaningPhotoUpload: mocks.finalizeCleaningPhotoUpload,
+  abortCleaningPhotoUpload: mocks.abortCleaningPhotoUpload,
   cancelCleaningPhotoUpload: vi.fn(),
   deleteCleaningPhoto: vi.fn(),
 }))
@@ -67,5 +70,28 @@ describe('cleaning photo server actions', () => {
       '57dc7877-faf0-42f9-8091-fc966b4a7744',
       'image/jpeg',
     )).rejects.toThrow('unexpected storage failure')
+  })
+
+  it('preserves the typed finalization result over the server-action boundary', async () => {
+    const failure = { success: false, code: 'photo_variant_missing', error: 'Variante assente' }
+    mocks.finalizeCleaningPhotoUpload.mockResolvedValue(failure)
+    await expect(finalizeCleaningPhoto('synthetic-id')).resolves.toEqual(failure)
+    expect(mocks.finalizeCleaningPhotoUpload).toHaveBeenCalledWith(
+      { id: 'server-client' }, { userId: 'viewer-id', role: 'limpeza' }, { photoId: 'synthetic-id' },
+    )
+  })
+
+  it('passes session-derived identity to pending-only cleanup', async () => {
+    mocks.abortCleaningPhotoUpload.mockResolvedValue({ success: true, status: 'ready', photoId: 'synthetic-id' })
+    await expect(abortCleaningPhoto('synthetic-id')).resolves.toMatchObject({ status: 'ready' })
+    expect(mocks.abortCleaningPhotoUpload).toHaveBeenCalledWith({ userId: 'viewer-id', role: 'limpeza' }, 'synthetic-id')
+  })
+
+  it('does not clean or finalize when the feature is disabled', async () => {
+    mocks.isCleaningPhotosEnabled.mockReturnValue(false)
+    await expect(abortCleaningPhoto('synthetic-id')).rejects.toThrow('non è attiva')
+    await expect(finalizeCleaningPhoto('synthetic-id')).rejects.toThrow('non è attiva')
+    expect(mocks.abortCleaningPhotoUpload).not.toHaveBeenCalled()
+    expect(mocks.finalizeCleaningPhotoUpload).not.toHaveBeenCalled()
   })
 })
