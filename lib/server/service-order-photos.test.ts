@@ -1,8 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SupabaseServerClient, Viewer } from './data-access/viewer'
+import { CLEANING_PHOTO_LIMIT_CODE, CLEANING_PHOTO_LIMIT_MESSAGE, MAX_CLEANING_PHOTOS } from '@/lib/types/service-order-photos'
+import { CleaningPhotoLimitError } from '@/lib/types/cleaning-photo-errors'
 
 const mocks = vi.hoisted(() => ({
   find: vi.fn(), inspect: vi.fn(), ready: vi.fn(), remove: vi.fn(), removePending: vi.fn(),
+  list: vi.fn(), reserve: vi.fn(), tokens: vi.fn(),
   InspectionError: class extends Error {
     constructor(readonly code: string, message: string) { super(message) }
   },
@@ -15,8 +18,9 @@ vi.mock('@/lib/server/storage/service-order-photo-storage', () => ({
   deletePhotoRecordAndObjects: mocks.remove, deletePendingPhotoRecordAndObjects: mocks.removePending,
   PhotoInspectionError: mocks.InspectionError, MAX_DISPLAY_BYTES: 2097152, MAX_THUMBNAIL_BYTES: 524288,
   PhotoCleanupError: mocks.CleanupError,
+  listPhotoRecords: mocks.list, reservePhotoRecord: mocks.reserve, createPhotoUploadTokens: mocks.tokens,
 }))
-import { abortCleaningPhotoUpload, cancelCleaningPhotoUpload, finalizeCleaningPhotoUpload } from './service-order-photos'
+import { abortCleaningPhotoUpload, cancelCleaningPhotoUpload, finalizeCleaningPhotoUpload, reserveCleaningPhotoUpload } from './service-order-photos'
 
 const id = '22222222-2222-4222-8222-222222222222'
 const viewer = { userId: 'synthetic-owner', role: 'limpeza' } as Viewer
@@ -33,6 +37,41 @@ beforeEach(() => {
   mocks.inspect.mockResolvedValue({ width: 16, height: 8, size: 100 })
   mocks.ready.mockResolvedValue(undefined)
   mocks.removePending.mockResolvedValue('removed')
+})
+
+describe('server photo limit enforcement', () => {
+  const input = { serviceOrderId: id, phase: 'before', clientUploadId: id, contentType: 'image/webp' }
+  const readyPhotos = Array.from({ length: MAX_CLEANING_PHOTOS }, (_, sort_order) => ({
+    ...record, status: 'ready', sort_order,
+  }))
+
+  it('rejects a ninth photo by domain code without creating a reservation, tokens or deleting ready photos', async () => {
+    mocks.find.mockResolvedValue(null)
+    mocks.list.mockResolvedValue(readyPhotos)
+    const failure = reserveCleaningPhotoUpload(supabase, viewer, input)
+    await expect(failure).rejects.toBeInstanceOf(CleaningPhotoLimitError)
+    await expect(failure).rejects.toMatchObject({ code: CLEANING_PHOTO_LIMIT_CODE, message: CLEANING_PHOTO_LIMIT_MESSAGE })
+    expect(mocks.reserve).not.toHaveBeenCalled()
+    expect(mocks.tokens).not.toHaveBeenCalled()
+    expect(mocks.remove).not.toHaveBeenCalled()
+  })
+
+  it('still permits the eighth photo using the last available slot', async () => {
+    mocks.find.mockResolvedValue(null)
+    mocks.list.mockResolvedValue(readyPhotos.slice(0, MAX_CLEANING_PHOTOS - 1))
+    mocks.reserve.mockResolvedValue(record)
+    mocks.tokens.mockResolvedValue({ photoId: id })
+    await expect(reserveCleaningPhotoUpload(supabase, viewer, input)).resolves.toEqual({ photoId: id })
+    expect(mocks.reserve).toHaveBeenCalledWith(expect.objectContaining({ sortOrder: MAX_CLEANING_PHOTOS - 1 }))
+    expect(mocks.tokens).toHaveBeenCalledExactlyOnceWith(record)
+  })
+
+  it('checks authorization before querying slots even when all eight are occupied', async () => {
+    mocks.list.mockResolvedValue(readyPhotos)
+    await expect(reserveCleaningPhotoUpload(supabase, { ...viewer, role: 'cliente' }, input)).rejects.toThrow('Sem permissão')
+    expect(mocks.list).not.toHaveBeenCalled()
+    expect(mocks.reserve).not.toHaveBeenCalled()
+  })
 })
 
 describe('authoritative photo finalization and pending-only abort', () => {

@@ -1,5 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as Sentry from '@sentry/nextjs'
+import { CleaningPhotoLimitError } from '@/lib/types/cleaning-photo-errors'
 import {
   CLEANING_PHOTO_LIMIT_CODE,
   CLEANING_PHOTO_LIMIT_MESSAGE,
@@ -12,7 +13,6 @@ const mocks = vi.hoisted(() => ({
   reserveCleaningPhotoUpload: vi.fn(),
   finalizeCleaningPhotoUpload: vi.fn(),
   abortCleaningPhotoUpload: vi.fn(),
-  withLogging: vi.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
 }))
 
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
@@ -25,9 +25,18 @@ vi.mock('@/lib/server/features', () => ({
   isCleaningPhotosEnabled: mocks.isCleaningPhotosEnabled,
 }))
 
-vi.mock('@/lib/server/logger', () => ({
-  withLogging: mocks.withLogging,
-}))
+// Exercise the real action logger: expected returns must not capture, while
+// unexpected thrown failures must still be monitored exactly once.
+vi.mock('@sentry/nextjs', async importOriginal => {
+  const actual = await importOriginal<typeof import('@sentry/nextjs')>()
+  return {
+    init: actual.init,
+    withIsolationScope: actual.withIsolationScope,
+    getIsolationScope: actual.getIsolationScope,
+    setUser: actual.setUser,
+    captureException: vi.fn(),
+  }
+})
 
 vi.mock('@/lib/server/service-order-photos', () => ({
   reserveCleaningPhotoUpload: mocks.reserveCleaningPhotoUpload,
@@ -49,7 +58,7 @@ describe('cleaning photo server actions', () => {
   })
 
   it('returns the photo limit as an expected, user-facing failure', async () => {
-    mocks.reserveCleaningPhotoUpload.mockRejectedValue(new Error(CLEANING_PHOTO_LIMIT_MESSAGE))
+    mocks.reserveCleaningPhotoUpload.mockRejectedValue(new CleaningPhotoLimitError())
 
     await expect(reserveCleaningPhoto(
       '86f05f4c-cbdd-47ad-b91d-f4a47c957ae7',
@@ -61,6 +70,7 @@ describe('cleaning photo server actions', () => {
       code: CLEANING_PHOTO_LIMIT_CODE,
       error: CLEANING_PHOTO_LIMIT_MESSAGE,
     })
+    expect(Sentry.captureException).not.toHaveBeenCalled()
   })
 
   it('keeps unexpected failures as exceptions for internal monitoring', async () => {
@@ -72,6 +82,25 @@ describe('cleaning photo server actions', () => {
       '57dc7877-faf0-42f9-8091-fc966b4a7744',
       'image/jpeg',
     )).rejects.toThrow('unexpected storage failure')
+    expect(Sentry.captureException).toHaveBeenCalledOnce()
+  })
+
+  it.each([
+    new Error(CLEANING_PHOTO_LIMIT_MESSAGE),
+    Object.assign(new Error(CLEANING_PHOTO_LIMIT_MESSAGE), { code: 'unknown_code' }),
+    Object.assign(new Error('Sem permissão'), { code: 'unauthorized' }),
+  ])('does not suppress an uncoded, unknown or authorization failure (%s)', async error => {
+    mocks.reserveCleaningPhotoUpload.mockRejectedValueOnce(error)
+    await expect(reserveCleaningPhoto('order', 'before', 'photo', 'image/jpeg')).rejects.toBe(error)
+    expect(Sentry.captureException).toHaveBeenCalledExactlyOnceWith(error, expect.any(Object))
+  })
+
+  it('never converts an authentication failure into a limit response', async () => {
+    const error = new Error('Sessione scaduta')
+    mocks.getCurrentViewer.mockRejectedValueOnce(error)
+    await expect(reserveCleaningPhoto('order', 'before', 'photo', 'image/jpeg')).rejects.toBe(error)
+    expect(mocks.reserveCleaningPhotoUpload).not.toHaveBeenCalled()
+    expect(Sentry.captureException).toHaveBeenCalledExactlyOnceWith(error, expect.any(Object))
   })
 
   it('preserves the typed finalization result over the server-action boundary', async () => {

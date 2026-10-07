@@ -1,5 +1,6 @@
 import * as Sentry from '@sentry/nextjs'
 import type { CleaningPhotoPhase } from '@/lib/types/service-order-photos'
+import { isExpectedCleaningPhotoFailure } from '@/lib/types/cleaning-photo-errors'
 
 export type PhotoDecoder = 'bitmap_oriented' | 'bitmap_default' | 'html_image'
 export type PhotoProgress = {
@@ -16,7 +17,6 @@ const failureCodes = new Set([
   'photo_content_invalid', 'photo_storage_unavailable', 'photo_cleanup_failed',
   'photo_cleanup_manual_attention', 'photo_cleanup_unconfirmed', 'photo_upload_rejected',
   'photo_duplicate_reservation', 'photo_reservation_mismatch', 'photo_workflow_failed',
-  'photo_limit_reached',
 ])
 function decoderTag(decoder?: string) {
   return decoder === 'bitmap_oriented' || decoder === 'bitmap_default' || decoder === 'html_image'
@@ -46,6 +46,7 @@ export function capturePhotoFailure(
   progress?: PhotoProgress,
   decoder?: PhotoDecoder,
 ) {
+  if (isExpectedCleaningPhotoFailure(error)) return
   const coded = error as { code?: string; details?: Record<string, unknown> } | null
   const code = coded?.code && failureCodes.has(coded.code) ? coded.code : 'workflow_error'
   // Never send arbitrary backend/decoder messages, file names or error objects.

@@ -29,10 +29,8 @@ import type {
   FinalizeCleaningPhotoResult,
   AbortCleaningPhotoResult,
 } from '@/lib/types/service-order-photos'
-import {
-  CLEANING_PHOTO_LIMIT_MESSAGE,
-  MAX_CLEANING_PHOTOS,
-} from '@/lib/types/service-order-photos'
+import { MAX_CLEANING_PHOTOS } from '@/lib/types/service-order-photos'
+import { CleaningPhotoLimitError } from '@/lib/types/cleaning-photo-errors'
 import { validationMessage } from '@/lib/server/validation/contracts'
 
 const PHOTO_OPERATOR_ROLES = new Set(['admin', 'secretaria', 'limpeza'])
@@ -123,7 +121,7 @@ export async function reserveCleaningPhotoUpload(
   const usedSlots = new Set(records.map(record => record.sort_order))
   const sortOrder = Array.from({ length: MAX_CLEANING_PHOTOS }, (_, index) => index)
     .find(index => !usedSlots.has(index))
-  if (sortOrder === undefined) throw new Error(CLEANING_PHOTO_LIMIT_MESSAGE)
+  if (sortOrder === undefined) throw new CleaningPhotoLimitError()
 
   const record = await reservePhotoRecord({
     id: clientUploadId,

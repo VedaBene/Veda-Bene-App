@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ProcessedCleaningPhoto } from '@/lib/client/image-processing'
+import { CLEANING_PHOTO_LIMIT_CODE, CLEANING_PHOTO_LIMIT_MESSAGE } from '@/lib/types/service-order-photos'
 
 // Node-only harness for the hook's event handlers; queue/scheduler are real.
 // React rendering is covered separately through the modal/uploader markup.
@@ -115,10 +116,39 @@ describe('prepared photo workflow', () => {
     await prepare()
     mocks.reserve.mockResolvedValueOnce({ success: false, code: 'reservation_failed', error: 'Riprova' })
     await expect(render().uploadAll()).rejects.toThrow('Riprova')
+    expect(mocks.capture).toHaveBeenCalledTimes(1)
     expect(render().items[0]).toMatchObject({ status: 'error', processed })
     expect(render().canUpload).toBe(true)
     await render().uploadAll()
     expect(mocks.process).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows the server limit without capturing, preserves ready photos and releases the queue for removal/resubmission', async () => {
+    render().addFiles(select(photo(), photo()))
+    await prepare()
+    mocks.reserve.mockImplementationOnce(async (_order, _phase, photoId, contentType) => ({
+      success: true,
+      upload: { photoId, contentType, display: { path: 'display', token: 'synthetic' }, thumbnail: { path: 'thumbnail', token: 'synthetic' } },
+    })).mockResolvedValueOnce({ success: false, code: CLEANING_PHOTO_LIMIT_CODE, error: CLEANING_PHOTO_LIMIT_MESSAGE })
+    await expect(render().uploadAll()).rejects.toMatchObject({ code: CLEANING_PHOTO_LIMIT_CODE, message: CLEANING_PHOTO_LIMIT_MESSAGE })
+    const [ready, rejected] = render().items
+    expect(ready).toMatchObject({ status: 'ready' })
+    expect(ready.photoId).toBeDefined()
+    expect(rejected).toMatchObject({ status: 'error', processed, error: CLEANING_PHOTO_LIMIT_MESSAGE, photoId: undefined, cleanupRequiresSupport: false })
+    expect(render().isUploading).toBe(false)
+    expect(render().canUpload).toBe(true)
+    expect(mocks.capture).not.toHaveBeenCalled()
+    expect(mocks.reserve).toHaveBeenCalledTimes(2)
+    expect(mocks.upload).toHaveBeenCalledTimes(2)
+    expect(mocks.abort).not.toHaveBeenCalled()
+    expect(mocks.finalize).toHaveBeenCalledTimes(1)
+    expect(mocks.process).toHaveBeenCalledTimes(2)
+    await render().removeItem(rejected.localId)
+    expect(URL.revokeObjectURL).toHaveBeenCalledTimes(1)
+    expect(mocks.cancel).not.toHaveBeenCalled()
+    expect(await render().uploadAll()).toEqual([ready.photoId])
+    expect(mocks.reserve).toHaveBeenCalledTimes(2)
+    expect(mocks.capture).not.toHaveBeenCalled()
   })
 
   it('recovers a missing variant with a new reservation without reprocessing or duplicating IDs', async () => {
@@ -255,6 +285,7 @@ describe('prepared photo workflow', () => {
     expect(render().selectionError).toContain('massimo 8')
     await prepare()
     expect(mocks.process).toHaveBeenCalledTimes(8)
+    expect(mocks.capture).not.toHaveBeenCalled()
   })
 
   it('records a recovered complete retry as info breadcrumbs with decoder/cycle, without exceptions or paths', async () => {

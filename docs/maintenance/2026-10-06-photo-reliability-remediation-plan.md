@@ -74,12 +74,12 @@ Estados permitidos: `planned`, `in_progress`, `completed`, `blocked`.
 | 2 | Menor pressão de memória e previews comprimidos | 1 | `completed` |
 | 3 | Upload resiliente e recuperação automática limitada | 1–2 | `completed` |
 | 4 | Observabilidade correlacionável e sem PII | 1–3 | `completed` |
-| 5 | Validações esperadas fora do Sentry | 4 | `planned` |
+| 5 | Validações esperadas fora do Sentry | 4 | `completed` |
 | 6 | Regressão automatizada e matriz móvel | 1–5 | `planned` |
 | 7 | Auditoria independente final | 1–6 | `planned` |
 
-**Resumo de continuidade:** concluídas `1–4`; próxima `5` (não iniciada);
-bloqueio `nenhum`; última atualização `2026-10-06`.
+**Resumo de continuidade:** concluídas `1–5`; próxima `6` (não iniciada);
+bloqueio `nenhum`; última atualização `2026-10-07`.
 
 ## 5. Registro compacto de conclusão
 
@@ -95,6 +95,7 @@ Registros:
 - Etapa 2 | 2026-10-06 | cleaning-photo-queue, useCleaningPhotoWorkflow, uploader/modais e testes | 60 testes, lint/typecheck OK; Chrome/React: concorrência 1 entre filas, 4 URLs revogadas, upload sem reprocessar | memória em celulares reais NOT VERIFIED; rollback: reverter somente o diff da etapa 2
 - Etapa 3 | 2026-10-06 | cleaning-photo-upload, workflow, photo-actions, service-order-photos/storage e testes | 132 testes, lint/typecheck OK; regressão concorrente falha antes/passa após correção | limpeza sem confirmação bloqueia reenvio e pode exigir assistência; rede móvel real NOT VERIFIED; rollback: só o diff da etapa 3
 - Etapa 4 | 2026-10-06 | Sentry configs, observability, sessão, decoder/upload e testes | 382 testes, lint/typecheck/build OK; evento SDK em memória correlaciona UUID/SHA/retry; bundle sem segredos locais | deploy exige SHA no build; produção NOT VERIFIED; rollback: só o diff da etapa 4
+- Etapa 5 | 2026-10-07 | cleaning-photo-errors, photo-actions, service-order-photos, photo-telemetry e testes | 86 testes focados, lint/typecheck OK; limite mantém feedback/fila e zero capturas; falhas técnicas/desconhecidas capturadas | eficácia em produção NOT VERIFIED; rollback: só o diff da etapa 5
 
 ## 6. Etapas de implementação
 

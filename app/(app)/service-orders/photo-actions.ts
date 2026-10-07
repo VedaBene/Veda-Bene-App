@@ -6,6 +6,7 @@ import { pseudonymousSentryUser } from '@/lib/observability/sentry-privacy'
 import { getCurrentViewer } from '@/lib/server/data-access/viewer'
 import { isCleaningPhotosEnabled } from '@/lib/server/features'
 import { withLogging } from '@/lib/server/logger'
+import { isExpectedCleaningPhotoFailure } from '@/lib/types/cleaning-photo-errors'
 import {
   cancelCleaningPhotoUpload,
   abortCleaningPhotoUpload,
@@ -55,7 +56,7 @@ async function reserveImpl(
     })
     return { success: true as const, upload }
   } catch (error) {
-    if (error instanceof Error && error.message === CLEANING_PHOTO_LIMIT_MESSAGE) {
+    if (isExpectedCleaningPhotoFailure(error)) {
       return {
         success: false as const,
         code: CLEANING_PHOTO_LIMIT_CODE,
