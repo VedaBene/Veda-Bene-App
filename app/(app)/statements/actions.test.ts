@@ -42,6 +42,9 @@ describe('receivable statement server actions', () => {
 
     expect(mocks.getAuthorizedClient).toHaveBeenCalledWith(['admin'])
     expect(mocks.getReceivableReport).toHaveBeenCalledOnce()
+    expect(mocks.getReceivableReport).toHaveBeenCalledWith({
+      startDate: '2026-05-01', endDate: '2026-05-31',
+    })
   })
 
   it('requires admin before returning agency and owner filter options', async () => {

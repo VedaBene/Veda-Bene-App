@@ -42,6 +42,9 @@ type ReceivableOrderBase = {
     cribs: number
   }
   currentBasePrice: number | null
+  // Included only when the CSV route requests notes.
+  cleaningNotes?: string | null
+  completionNotes?: string | null
   extraDescription: string | null
 }
 

@@ -314,6 +314,43 @@ describe('receivable report producer', () => {
 
     const select = fake.selectCalls.find(call => call.table === 'service_orders')?.columns ?? ''
     expect(select).toBe('')
-    expect(sensitiveDataMocks.loadReceivableFinancialSource).toHaveBeenCalledWith(filters)
+    expect(sensitiveDataMocks.loadReceivableFinancialSource).toHaveBeenCalledWith(filters, {})
+  })
+
+  it('includes current notes only for CSV without changing report calculations or filters', async () => {
+    sensitiveDataMocks.loadReceivableFinancialSource.mockResolvedValue([
+      order({ cleaning_notes: 'Attenzione, vetro fragile', completion_notes: 'Tutto OK' }),
+      order({ id: 'pending', total_price: null, cleaning_notes: null, completion_notes: 'Problema segnalato' }),
+      order({ id: 'ripasso', pricing_mode: 'ripasso', cleaning_notes: 'Ripasso', completion_notes: null }),
+      order({ id: 'out', pricing_mode: 'out_long_stay', cleaning_notes: 'Long stay', completion_notes: 'Finito' }),
+      order({ id: 'excluded', property: { ...order().property, client_type: 'particular', agency: null } }),
+    ])
+    const input = { ...filters, clientType: 'rental' as const }
+    const defaultReport = await getAuthorizedReceivableReport(input)
+    const csvReport = await getAuthorizedReceivableReport(input, { includeNotes: true })
+
+    expect(csvReport.standard.rows[0]).toMatchObject({
+      cleaningNotes: 'Attenzione, vetro fragile', completionNotes: 'Tutto OK',
+    })
+    expect(csvReport.standard.rows[1]).toMatchObject({
+      financialStatus: 'pending', cleaningNotes: null, completionNotes: 'Problema segnalato',
+    })
+    expect(csvReport.ripasso.rows[0]).toMatchObject({ cleaningNotes: 'Ripasso', completionNotes: null })
+    expect(csvReport.outLongStay.rows[0]).toMatchObject({ cleaningNotes: 'Long stay', completionNotes: 'Finito' })
+    for (const section of ['standard', 'ripasso', 'outLongStay'] as const) {
+      expect({
+        ...csvReport[section],
+        rows: csvReport[section].rows.map(({ cleaningNotes, completionNotes, ...row }) => {
+          expect(row).not.toHaveProperty('cleaningNotes')
+          expect(row).not.toHaveProperty('completionNotes')
+          expect(cleaningNotes === null || typeof cleaningNotes === 'string').toBe(true)
+          expect(completionNotes === null || typeof completionNotes === 'string').toBe(true)
+          return row
+        }),
+      }).toEqual(defaultReport[section])
+    }
+    expect(csvReport.grandTotal).toBe(defaultReport.grandTotal)
+    expect(csvReport.orderCount).toBe(4)
+    expect(sensitiveDataMocks.loadReceivableFinancialSource).toHaveBeenLastCalledWith(input, { includeNotes: true })
   })
 })

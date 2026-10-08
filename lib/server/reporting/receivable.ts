@@ -54,6 +54,7 @@ function isPricingMode(value: PricingMode | null): value is PricingMode {
 function toRow(
   order: ReceivableOrderRecord,
   filters: ReceivableStatementFilters,
+  includeNotes: boolean,
 ): ReceivableOrderRow | null {
   const property = order.property
   if (!property || !matchesFilters(property, filters)) return null
@@ -95,6 +96,9 @@ function toRow(
       cribs: order.cribs,
     },
     currentBasePrice,
+    ...(includeNotes
+      ? { cleaningNotes: order.cleaning_notes ?? null, completionNotes: order.completion_notes ?? null }
+      : {}),
     extraDescription,
   }
 
@@ -193,16 +197,17 @@ function buildSection(
 
 export async function getReceivableReport(
   filters: ReceivableStatementFilters,
+  options: { includeNotes?: boolean } = {},
 ): Promise<ReceivableReport> {
   let orders: ReceivableOrderRecord[]
   try {
-    orders = await loadReceivableFinancialSource(filters)
+    orders = await loadReceivableFinancialSource(filters, options)
   } catch (error) {
     captureQueryError('receivable', 'service_orders', error)
     throw error
   }
   const rows = orders.flatMap(order => {
-    const row = toRow(order, filters)
+    const row = toRow(order, filters, options.includeNotes === true)
     return row ? [row] : []
   })
 

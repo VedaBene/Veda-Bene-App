@@ -74,6 +74,12 @@ describe('GET /api/export/receivable', () => {
     expect(response.headers.get('cache-control')).toBe('private, no-store')
     expect(body).toContain('Sezione,Data,Numero OS')
     expect(mocks.getReceivableReport).toHaveBeenCalledOnce()
+    expect(mocks.getReceivableReport).toHaveBeenCalledWith(
+      { startDate: '2026-05-01', endDate: '2026-05-31', clientType: undefined, clientId: undefined },
+      { includeNotes: true },
+    )
+    expect(body).toContain('Valore considerato,Note sulla pulizia,Note di completamento,Descrizione servizio extra')
+    expect(response.headers.get('content-disposition')).toBe('attachment; filename="extrato-a-receber_2026-05-01_2026-05-31.csv"')
   })
 
   it('allows CSV export for reconciliation even when the filtered report has financial pendencies', async () => {

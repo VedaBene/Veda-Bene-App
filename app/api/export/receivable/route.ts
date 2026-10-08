@@ -26,7 +26,10 @@ export async function GET(request: NextRequest) {
 
   const { startDate, endDate, clientType, clientId } = parsedFilters.data
   try {
-    const report = await getReceivableReport({ startDate, endDate, clientType, clientId })
+    const report = await getReceivableReport(
+      { startDate, endDate, clientType, clientId },
+      { includeNotes: true },
+    )
     const csv = formatReceivableCSV(report)
     const filename = `extrato-a-receber_${startDate}_${endDate}.csv`
 

@@ -77,6 +77,20 @@ describe('payable PDF formatter', () => {
 })
 
 describe('receivable PDF formatter', () => {
+  it('keeps PDF output identical even when CSV notes are present', () => {
+    const reportWithNotes: ReceivableReport = {
+      ...report,
+      standard: {
+        ...report.standard,
+        rows: report.standard.rows.map(row => ({
+          ...row, cleaningNotes: 'CSV cleaning note', completionNotes: 'CSV completion note',
+        })),
+      },
+    }
+
+    expect(buildReceivablePrintBody(reportWithNotes)).toBe(buildReceivablePrintBody(report))
+  })
+
   it('renders exactly the three pricing sections and the approved columns', () => {
     const html = buildReceivablePrintBody(report)
 

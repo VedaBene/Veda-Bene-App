@@ -17,6 +17,7 @@ import {
   loadEmployeeListForAdministration,
   loadPayableFinancialSource,
   loadPropertyListForAdministration,
+  loadReceivableFinancialSource,
   persistAuthorizedServiceOrderTotalPrice,
 } from './sensitive-data'
 
@@ -26,6 +27,33 @@ function authorize(role: Role, scoped: FakeSupabase, privileged: FakeSupabase) {
     viewer: { userId: '00000000-0000-4000-8000-000000000001', role },
   })
   mocks.createClient.mockReturnValue(privileged)
+}
+
+function receivableOrder(index: number) {
+  return {
+    id: `order-${String(index).padStart(4, '0')}`,
+    order_number: index + 1,
+    status: 'done',
+    cleaning_date: '2026-05-10',
+    pricing_mode: 'standard',
+    real_guests: 2,
+    double_beds: 1,
+    single_beds: 0,
+    sofa_beds: 0,
+    bathrooms: 1,
+    bidets: 1,
+    cribs: 0,
+    cleaning_notes: index === 0 ? null : `Nota iniziale ${index}`,
+    completion_notes: `Nota finale ${index}`,
+    extra_services_description: null,
+    extra_services_price: 0,
+    consegna_fee: 10,
+    total_price: index === 0 ? null : 120,
+    property: {
+      id: 'property-1', name: 'Campo', client_type: 'rental', base_price: 110,
+      agency: { id: 'agency-1', name: 'Rental' }, owner: null,
+    },
+  }
 }
 
 describe('authorized sensitive-data adapter', () => {
@@ -40,6 +68,53 @@ describe('authorized sensitive-data adapter', () => {
 
     await expect(loadEmployeeListForAdministration()).rejects.toThrow('Sem permissão')
     expect(mocks.createClient).not.toHaveBeenCalled()
+  })
+
+  it('rejects non-admin CSV notes requests before creating a privileged client', async () => {
+    authorize('secretaria', new FakeSupabase({}), new FakeSupabase({}))
+
+    await expect(loadReceivableFinancialSource(
+      { startDate: '2026-05-01', endDate: '2026-05-31' }, { includeNotes: true },
+    )).rejects.toThrow('Sem permissão')
+    expect(mocks.createClient).not.toHaveBeenCalled()
+  })
+
+  it('selects notes only on demand while preserving completed-date filtering and pagination', async () => {
+    const orders = Array.from({ length: 1001 }, (_, index) => receivableOrder(index))
+    const privileged = new FakeSupabase({ service_orders: [
+      ...orders,
+      { ...receivableOrder(1001), status: 'open' },
+      { ...receivableOrder(1002), cleaning_date: '2026-04-30' },
+      { ...receivableOrder(1003), cleaning_date: '2026-06-01' },
+    ] })
+    authorize('admin', new FakeSupabase({}), privileged)
+    const filters = { startDate: '2026-05-01', endDate: '2026-05-31' }
+
+    const defaultRows = await loadReceivableFinancialSource(filters)
+    expect(defaultRows).toHaveLength(1001)
+    expect(defaultRows.every(row => !('cleaning_notes' in row) && !('completion_notes' in row))).toBe(true)
+    expect(privileged.selectCalls).toHaveLength(2)
+    for (const call of privileged.selectCalls) {
+      expect(call.columns).not.toContain('cleaning_notes')
+      expect(call.columns).not.toContain('completion_notes')
+    }
+
+    const csvRows = await loadReceivableFinancialSource(filters, { includeNotes: true })
+    expect(csvRows).toHaveLength(1001)
+    expect(csvRows[0]).toMatchObject({ cleaning_notes: null, completion_notes: 'Nota finale 0', total_price: null })
+    expect(csvRows[1000]).toMatchObject({ cleaning_notes: 'Nota iniziale 1000', completion_notes: 'Nota finale 1000' })
+    expect(privileged.selectCalls).toHaveLength(4)
+    for (const call of privileged.selectCalls.slice(2)) {
+      expect(call.columns).toContain('cleaning_notes')
+      expect(call.columns).toContain('completion_notes')
+      expect(call.columns).not.toContain('*')
+    }
+    expect(csvRows.map(({ cleaning_notes, completion_notes, ...row }) => {
+      expect(cleaning_notes === null || typeof cleaning_notes === 'string').toBe(true)
+      expect(typeof completion_notes).toBe('string')
+      return row
+    })).toEqual(defaultRows)
+    expect(privileged.updates).toEqual([])
   })
 
   it('returns the minimal administrative property-list DTO after authorization', async () => {

@@ -479,6 +479,8 @@ export type ReceivableOrderSource = {
   bathrooms: number
   bidets: number
   cribs: number
+  cleaning_notes?: string | null
+  completion_notes?: string | null
   extra_services_description: string | null
   extra_services_price: number | null
   consegna_fee: number | null
@@ -542,15 +544,24 @@ const RECEIVABLE_SELECT = `
 
 export async function loadReceivableFinancialSource(
   filters: ReceivableStatementFilters,
+  options: { includeNotes?: boolean } = {},
 ): Promise<ReceivableOrderSource[]> {
   const parsed = receivableStatementFiltersSchema.parse(filters)
   const { privilegedClient } = await authorizeBeforePrivilege(['admin'])
+  const select: string = options.includeNotes
+    ? `cleaning_notes, completion_notes, ${RECEIVABLE_SELECT}`
+    : RECEIVABLE_SELECT
+  const noteSchema = z.string().nullable()
+  const rowSchema = receivableOrderRowSchema.extend({
+    cleaning_notes: options.includeNotes ? noteSchema : noteSchema.optional(),
+    completion_notes: options.includeNotes ? noteSchema : noteSchema.optional(),
+  })
   const rows: ReceivableOrderSource[] = []
 
   for (let from = 0; ; from += MAX_ID_BATCH) {
     const { data, error } = await privilegedClient
       .from('service_orders')
-      .select(RECEIVABLE_SELECT)
+      .select(select)
       .eq('status', 'done')
       .gte('cleaning_date', parsed.startDate)
       .lte('cleaning_date', parsed.endDate)
@@ -559,7 +570,7 @@ export async function loadReceivableFinancialSource(
       .order('id', { ascending: true })
       .range(from, from + MAX_ID_BATCH - 1)
     if (error) throw new Error('Não foi possível carregar o relatório a receber.', { cause: error })
-    const rawRows = z.array(receivableOrderRowSchema).parse(data ?? [])
+    const rawRows = z.array(rowSchema).parse(data ?? [])
     const page: ReceivableOrderSource[] = rawRows.map(row => {
       const rawProperty = firstRelation(row.property)
       const rawAgency = rawProperty ? firstRelation(rawProperty.agency) : null
@@ -577,6 +588,9 @@ export async function loadReceivableFinancialSource(
         bathrooms: row.bathrooms ?? 0,
         bidets: row.bidets ?? 0,
         cribs: row.cribs ?? 0,
+        ...(options.includeNotes
+          ? { cleaning_notes: row.cleaning_notes ?? null, completion_notes: row.completion_notes ?? null }
+          : {}),
         extra_services_description: row.extra_services_description ?? null,
         extra_services_price: row.extra_services_price ?? null,
         consegna_fee: row.consegna_fee ?? null,
