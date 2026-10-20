@@ -110,10 +110,11 @@ apenas por possuir uma janela de limpeza menor.
   - `LETTI MATRIMONIALI` → `M`
   - `LETTI SINGOLI` → `S`
   - `DIVANI LETTO` → `DL`
+  - `POLTRONE LETTO` → `PL`
   - `BAGNI` → `WC`
   - `BIDET` → `BID`
 - O PDF de ordens ativas segue a ordem canônica **O.L. | Immobile | Check-in |
-  Check-out | Utente | Consegna | PX | M | S | DL | WC | BID | Culle | Note
+  Check-out | Utente | Consegna | PX | M | S | DL | PL | WC | BID | Culle | Note
   Pulizia**. O PDF de concluídas conserva **Conclusione / Tempo** depois de
   Check-out e aplica a mesma sequência às demais colunas.
 - O responsável pela limpeza é apresentado sob o título **Utente**. Quando ao
@@ -139,6 +140,11 @@ apenas por possuir uma janela de limpeza menor.
   recebem o destaque histórico de urgência, em conformidade com a listagem.
 - Os totais de ocupação com valor maior que zero são exibidos em uma tabela
   horizontal centralizada, com cabeçalhos e valores alinhados.
+- Nos PDFs de abertas, em andamento, concluídas e check-in, `PL` exibe
+  exclusivamente `armchair_beds` de cada ordem e sua soma no rodapé, sem
+  incorporar poltronas-cama a `S`, `DL` ou `PX`. A coluna permanece na tabela
+  principal com `—` quando o valor é zero ou ausente; o total `PL` só aparece
+  quando sua soma é maior que zero, seguindo a regra dos demais campos.
 - Os nomes usados no PDF são os mesmos do `ServiceOrderListItem`. O perfil
   `cliente` continua sem recebê-los no DTO e, consequentemente, não exibe essas
   colunas.

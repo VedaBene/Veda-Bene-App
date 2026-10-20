@@ -40,6 +40,83 @@ function order(overrides: Partial<ServiceOrderListItem> = {}): ServiceOrderListI
   }
 }
 
+function readPdfTables(html: string) {
+  return [...html.matchAll(/<table(?:\s[^>]*)?>([\s\S]*?)<\/table>/g)].map(([, table]) => {
+    const headers = [...table.matchAll(/<th(?:\s[^>]*)?>([\s\S]*?)<\/th>/g)]
+      .map(([, value]) => value.trim())
+    const body = table.match(/<tbody>([\s\S]*?)<\/tbody>/)?.[1] ?? ''
+    const rows = [...body.matchAll(/<tr>([\s\S]*?)<\/tr>/g)].map(([, row]) =>
+      [...row.matchAll(/<td(?:\s[^>]*)?>([\s\S]*?)<\/td>/g)].map(([, value]) => value.trim()),
+    )
+    return { headers, rows }
+  })
+}
+
+const occupancyReports: {
+  name: string
+  build: (orders: ServiceOrderListItem[]) => string
+}[] = [
+  ...(['open', 'in_progress', 'done'] as const).map(status => ({
+    name: status,
+    build: (orders: ServiceOrderListItem[]) => buildServiceOrdersPdfHtml(
+      orders.map(item => ({ ...item, status })), '2026-08-05', status,
+    ),
+  })),
+  { name: 'check-in', build: orders => buildCheckinReportPdfHtml(orders, '2026-08-05') },
+]
+
+describe.each(occupancyReports)('$name PDF armchair-bed occupancy', ({ build }) => {
+  it('places PL after DL and totals armchair beds independently of other occupancy', () => {
+    const [main, totals] = readPdfTables(build([
+      order({ single_beds: 3, sofa_beds: 4, armchair_beds: 5 }),
+      order({ id: 'order-2', order_number: 102, single_beds: 7, sofa_beds: 11, armchair_beds: 13 }),
+    ]))
+
+    const plIndex = main.headers.indexOf('PL')
+    expect(plIndex).toBe(main.headers.indexOf('DL') + 1)
+    expect(main.headers[plIndex + 1]).toBe('WC')
+    expect(Object.fromEntries(main.rows.map(row => [row[0], row[plIndex]])))
+      .toEqual({ '#101': '5', '#102': '13' })
+    expect(main.rows.every(row => row.length === main.headers.length)).toBe(true)
+    expect(totals.headers).toEqual(['PX', 'M', 'S', 'DL', 'PL', 'WC', 'BID'])
+    expect(totals.rows).toEqual([['8', '4', '10', '15', '18', '4', '2']])
+  })
+
+  it('keeps the PL column but omits its total when no armchair beds are used', () => {
+    const [main, totals] = readPdfTables(build([order({ armchair_beds: 0 })]))
+
+    expect(main.headers).toContain('PL')
+    expect(main.rows[0][main.headers.indexOf('PL')]).toBe('—')
+    expect(totals.headers).not.toContain('PL')
+  })
+
+  it('renders the occupancy summary when armchair beds are the only positive field', () => {
+    const [main, totals] = readPdfTables(build([order({
+      real_guests: null,
+      double_beds: 0,
+      single_beds: 0,
+      sofa_beds: 0,
+      armchair_beds: 2,
+      bathrooms: 0,
+      bidets: 0,
+      cribs: 0,
+    })]))
+
+    expect(main.rows[0][main.headers.indexOf('PL')]).toBe('2')
+    expect(totals.headers).toEqual(['PL'])
+    expect(totals.rows).toEqual([['2']])
+  })
+
+  it('spans all columns including PL when the report is empty', () => {
+    const html = build([])
+    const [main] = readPdfTables(html)
+
+    expect(main.headers).toContain('PL')
+    expect(html).toContain(`<td colspan="${main.headers.length}"`)
+    expect(html).not.toContain('<section class="totals-section">')
+  })
+})
+
 describe('service-order PDF staff columns', () => {
   it('uses the canonical Utente, Consegna and occupancy column order', () => {
     const html = buildServiceOrdersPdfHtml([order()], '2026-08-05', 'open')

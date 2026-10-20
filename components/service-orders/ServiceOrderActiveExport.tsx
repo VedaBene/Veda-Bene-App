@@ -15,6 +15,7 @@ const OCCUPANCY_FIELDS: { key: keyof ServiceOrderListItem; label: string }[] = [
   { key: 'double_beds', label: 'M' },
   { key: 'single_beds', label: 'S' },
   { key: 'sofa_beds', label: 'DL' },
+  { key: 'armchair_beds', label: 'PL' },
   { key: 'bathrooms', label: 'WC' },
   { key: 'bidets', label: 'BID' },
   { key: 'cribs', label: 'Culle' },
@@ -153,7 +154,7 @@ export function buildServiceOrdersPdfHtml(
     .map(({ key }) => `<td class="highlight">${totals[key as string]}</td>`)
     .join('')
 
-  const columnCount = 12
+  const columnCount = 5 + OCCUPANCY_FIELDS.length
     + (status === 'done' ? 1 : 0)
     + (showConsegnaStaff ? 1 : 0)
     + (showCleaningStaff ? 1 : 0)
@@ -297,7 +298,7 @@ export function buildCheckinReportPdfHtml(
     .map(({ key }) => `<td class="highlight">${totals[key as string]}</td>`)
     .join('')
 
-  const columnCount = 13
+  const columnCount = 6 + OCCUPANCY_FIELDS.length
     + (showConsegnaStaff ? 1 : 0)
     + (showCleaningStaff ? 1 : 0)
 
