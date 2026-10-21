@@ -23,7 +23,8 @@ export default defineConfig({
   use: {
     ...devices['Desktop Chrome'],
     baseURL,
-    trace: 'retain-on-failure',
+    // Auth traces can retain passwords, JWTs and signed Storage URLs.
+    trace: 'off',
     screenshot: 'only-on-failure',
     video: 'off',
   },

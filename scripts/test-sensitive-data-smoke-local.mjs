@@ -1,9 +1,10 @@
 import { randomBytes } from 'node:crypto'
-import { cp, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import { spawn, spawnSync } from 'node:child_process'
 import { createClient } from '@supabase/supabase-js'
+import { startLocalPhotoMobile } from './local-photo-mobile.mjs'
 
 const repositoryRoot = resolve(import.meta.dirname, '..')
 const sourceSupabaseDir = join(repositoryRoot, 'supabase')
@@ -13,6 +14,7 @@ const nextEntrypoint = join(repositoryRoot, 'node_modules', 'next', 'dist', 'bin
 const playwrightEntrypoint = join(repositoryRoot, 'node_modules', '@playwright', 'test', 'cli.js')
 const appPort = 3103
 const appOrigin = `http://localhost:${appPort}`
+const appNode = process.env.PHOTO_TEST_APP_NODE ?? process.execPath
 const sensitiveMarkers = {
   avgHours: '6.75',
   basePrice: '731.25',
@@ -27,6 +29,7 @@ const e2eMarkers = {
   createNote: 'Sprint 12A synthetic order created through the browser',
   editNote: 'Sprint 12A synthetic order edited through the browser',
   foreignProperty: 'Sprint 12A Foreign Property',
+  photoProperty: 'Photo reliability local test',
 }
 
 const childEnvironment = { ...process.env, SUPABASE_TELEMETRY_DISABLED: '1' }
@@ -242,6 +245,8 @@ async function createSyntheticFixtures({ apiUrl, secretKey }) {
   const boundaryOutsideOrderId = '63000000-0000-4000-8000-000000000003'
   const foreignOrderId = '63000000-0000-4000-8000-000000000004'
   const unassignedOrderId = '63000000-0000-4000-8000-000000000005'
+  const photoOrderId = '63000000-0000-4000-8000-000000000006'
+  const photoPropertyId = '62000000-0000-4000-8000-000000000005'
 
   let result = await adminClient.from('owners').insert([
     { id: ownerId, name: 'Sensitive Smoke Owner', email: client.email },
@@ -271,6 +276,7 @@ async function createSyntheticFixtures({ apiUrl, secretKey }) {
     { ...propertyDefaults, id: boundaryEndPropertyId, name: e2eMarkers.boundaryEndProperty, owner_id: ownerId },
     { ...propertyDefaults, id: boundaryOutsidePropertyId, name: e2eMarkers.boundaryOutsideProperty, owner_id: ownerId },
     { ...propertyDefaults, id: foreignPropertyId, name: e2eMarkers.foreignProperty, owner_id: foreignOwnerId },
+    { ...propertyDefaults, id: photoPropertyId, name: e2eMarkers.photoProperty, owner_id: ownerId },
   ])
   requireSuccess(result.error, 'Create synthetic properties')
 
@@ -363,6 +369,17 @@ async function createSyntheticFixtures({ apiUrl, secretKey }) {
   ])
   requireSuccess(result.error, 'Assign synthetic cleaning staff')
 
+  result = await adminClient.from('service_orders').insert({
+    ...orderDefaults, id: photoOrderId, property_id: photoPropertyId,
+    cleaning_date: today, status: 'open', total_price: 100,
+    started_at: null, completed_at: null,
+  })
+  requireSuccess(result.error, 'Create isolated photo service order')
+  result = await adminClient.from('service_order_cleaning_staff').insert({
+    service_order_id: photoOrderId, profile_id: cleaning.id,
+  })
+  requireSuccess(result.error, 'Assign isolated photo service order')
+
   process.stdout.write('[Sensitive smoke] Synthetic fixtures ready\n')
   return {
     boundaryEndOrderId,
@@ -372,6 +389,7 @@ async function createSyntheticFixtures({ apiUrl, secretKey }) {
     foreignOrderId,
     orderId,
     propertyId,
+    photoOrderId,
     nextDay,
     today,
     unassignedOrderId,
@@ -534,12 +552,12 @@ async function waitForApp(processHandle) {
   throw new Error('Next.js smoke server did not become ready in time.')
 }
 
-function startApp(localStatus) {
+function appEnvironment(localStatus, publicApiUrl = localStatus.apiUrl) {
   const appEnvironment = {
     ...childEnvironment,
     HOSTNAME: '127.0.0.1',
     PORT: String(appPort),
-    NEXT_PUBLIC_SUPABASE_URL: localStatus.apiUrl,
+    NEXT_PUBLIC_SUPABASE_URL: publicApiUrl,
     NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: localStatus.publishableKey,
     SUPABASE_SECRET_KEY: localStatus.secretKey,
     SUPABASE_SERVICE_ROLE_KEY: localStatus.secretKey,
@@ -548,10 +566,36 @@ function startApp(localStatus) {
     SENTRY_DSN: '',
     NEXT_PUBLIC_SENTRY_DSN: '',
     SENTRY_ENVIRONMENT: 'local-sensitive-smoke',
+    SENTRY_AUTH_TOKEN: '',
+    SENTRY_RELEASE: '',
+    SOURCE_COMMIT: spawnSync('git', ['rev-parse', 'HEAD'], { cwd: repositoryRoot, encoding: 'utf8', windowsHide: true }).stdout.trim(),
+    GITHUB_SHA: '',
+    VERCEL_GIT_COMMIT_SHA: '',
+    NODE_EXTRA_CA_CERTS: process.env.PHOTO_TEST_CA ?? '',
   }
-  const processHandle = spawn(process.execPath, [nextEntrypoint, 'dev', '-p', String(appPort)], {
+  return appEnvironment
+}
+
+async function buildIsolatedApp(environment) {
+  process.stdout.write('[Sensitive smoke] Build production application with local endpoints only\n')
+  const child = spawn(appNode, [nextEntrypoint, 'build'], {
+    cwd: repositoryRoot, env: environment, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true,
+  })
+  let output = ''
+  const collect = chunk => { output = `${output}${chunk}`.slice(-40_000) }
+  child.stdout.on('data', collect)
+  child.stderr.on('data', collect)
+  const status = await new Promise((yes, no) => { child.once('error', no); child.once('exit', yes) })
+  if (output) process.stdout.write(`${redact(output)}\n`)
+  if (status !== 0) throw new Error('Isolated production build failed.')
+  await cp(join(repositoryRoot, '.next', 'static'), join(repositoryRoot, '.next', 'standalone', '.next', 'static'), { recursive: true })
+  await cp(join(repositoryRoot, 'public'), join(repositoryRoot, '.next', 'standalone', 'public'), { recursive: true })
+}
+
+function startApp(environment) {
+  const processHandle = spawn(appNode, [join(repositoryRoot, '.next', 'standalone', 'server.js')], {
     cwd: repositoryRoot,
-    env: appEnvironment,
+    env: environment,
     stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: true,
   })
@@ -708,7 +752,7 @@ async function smokeRole(role, user, today) {
   process.stdout.write(`[Sensitive smoke] ${role}: PASS\n`)
 }
 
-async function runCriticalE2E(fixture) {
+async function runCriticalE2E(fixture, localStatus) {
   process.stdout.write('\n[Critical E2E] Run Playwright against the isolated application\n')
   const fixturePayload = {
     boundaryEndProperty: e2eMarkers.boundaryEndProperty,
@@ -719,6 +763,8 @@ async function runCriticalE2E(fixture) {
     orderId: fixture.orderId,
     propertyId: fixture.propertyId,
     propertyName: sensitiveMarkers.propertyName,
+    photoOrderId: fixture.photoOrderId,
+    photoProperty: e2eMarkers.photoProperty,
     today: fixture.today,
     unassignedOrderId: fixture.unassignedOrderId,
     users: Object.fromEntries(
@@ -735,6 +781,8 @@ async function runCriticalE2E(fixture) {
         ...childEnvironment,
         E2E_BASE_URL: appOrigin,
         E2E_FIXTURE_B64: encodedFixture,
+        E2E_SUPABASE_URL: localStatus.apiUrl,
+        E2E_SUPABASE_PUBLISHABLE_KEY: localStatus.publishableKey,
       },
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
@@ -791,14 +839,38 @@ async function verifyCriticalE2EEffects(localStatus, fixture) {
   }
 
   process.stdout.write('[Critical E2E] Persisted create/edit effects and lockout state: PASS\n')
+
+  const photos = await adminClient.from('service_order_photos')
+    .select('id, phase, status, display_path, thumbnail_path')
+  requireSuccess(photos.error, 'Inspect isolated photo lifecycle effects')
+  if (photos.data.length !== 9 || photos.data.some(photo => photo.status !== 'ready')) {
+    throw new Error('Photo E2E left unexpected metadata or a pending reservation.')
+  }
+  for (const phase of ['before', 'after']) {
+    const prefix = `${fixture.photoOrderId}/cycle-1/${phase}`
+    const folders = await adminClient.storage.from('service-order-photos').list(prefix)
+    requireSuccess(folders.error, 'Inspect isolated phase objects')
+    const expected = photos.data.filter(photo => photo.phase === phase)
+    if (folders.data.length !== expected.length) throw new Error('Photo E2E left an orphaned object folder.')
+    for (const photo of expected) {
+      const objects = await adminClient.storage.from('service-order-photos').list(`${prefix}/${photo.id}`)
+      requireSuccess(objects.error, 'Inspect isolated photo variants')
+      const names = objects.data.map(object => object.name).sort()
+      const expectedNames = [basename(photo.display_path), basename(photo.thumbnail_path)].sort()
+      if (JSON.stringify(names) !== JSON.stringify(expectedNames)) throw new Error('Photo E2E left missing or extra variants.')
+    }
+  }
+  process.stdout.write('[Photo E2E] Nine ready photos, exact variant pairs, no pending rows or orphan folders: PASS\n')
 }
 
 async function main() {
   const runBrowserE2E = process.argv.includes('--e2e')
-  await stat(join(repositoryRoot, '.next', 'BUILD_ID'))
+  const mobile = process.argv.includes('--mobile-photos')
+  if (mobile && runBrowserE2E) throw new Error('Run automated E2E and interactive mobile tests separately.')
   const { projectId, temporaryRoot: workdir } = await prepareDisposableProject()
   let stackStarted = false
   let appProcess = null
+  let mobileGateway = null
 
   try {
     executeCli('Start isolated local stack', [
@@ -824,14 +896,31 @@ async function main() {
     const fixture = await createSyntheticFixtures(localStatus)
     await verifyLocalAuthPrerequisites(localStatus, fixture)
     await verifyDirectDataApiColumnBarrier(localStatus, fixture)
-    appProcess = startApp(localStatus)
+    let stopMobile
+    const mobileStopped = new Promise(resolvePromise => { stopMobile = resolvePromise })
+    if (mobile) {
+      mobileGateway = await startLocalPhotoMobile({
+        host: process.env.PHOTO_TEST_HOST, localStatus, fixture, appPort, onStop: stopMobile,
+      })
+    }
+    const environment = appEnvironment(localStatus, mobileGateway?.publicApiUrl)
+    await buildIsolatedApp(environment)
+    appProcess = startApp(environment)
     await waitForApp(appProcess)
+
+    if (mobile) {
+      process.stdout.write('[Photo mobile] READY: local application and disposable database are running.\n')
+      process.once('SIGINT', stopMobile)
+      process.once('SIGTERM', stopMobile)
+      await mobileStopped
+      return
+    }
 
     for (const role of roleNames) {
       await smokeRole(role, fixture.users.get(role), fixture.today)
     }
     if (runBrowserE2E) {
-      await runCriticalE2E(fixture)
+      await runCriticalE2E(fixture, localStatus)
       await verifyCriticalE2EEffects(localStatus, fixture)
     }
     process.stdout.write('\nSensitive-data authenticated smoke passed for all five roles.\n')
@@ -839,6 +928,7 @@ async function main() {
     if (appProcess?.safeOutput) process.stderr.write(`${appProcess.safeOutput()}\n`)
     throw error
   } finally {
+    if (mobileGateway) await mobileGateway.close()
     if (appProcess && appProcess.exitCode === null) {
       appProcess.kill('SIGTERM')
       await new Promise(resolvePromise => appProcess.once('exit', resolvePromise))

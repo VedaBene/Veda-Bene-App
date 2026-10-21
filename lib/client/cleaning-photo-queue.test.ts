@@ -56,7 +56,7 @@ function setup() {
   let maximumActive = 0
   let id = 0
   let url = 0
-  const process = vi.fn(async () => {
+  const process = vi.fn<(file: File) => Promise<ProcessedCleaningPhoto>>(async () => {
     active += 1
     maximumActive = Math.max(maximumActive, active)
     const decode = deferred<ProcessedCleaningPhoto>()
@@ -161,7 +161,7 @@ describe('sequential photo preparation and preview ownership', () => {
     expect(queue.getSnapshot()).toHaveLength(8)
     await flush()
     expect(deps.process).toHaveBeenCalledTimes(1)
-    expect(deps.process).not.toHaveBeenCalledWith(files[8])
+    expect(deps.process.mock.calls.every(([file]) => file !== files[8])).toBe(true)
     queue.clear()
   })
 

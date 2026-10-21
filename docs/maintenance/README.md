@@ -15,6 +15,7 @@ acompanhamento. Quando ambos existirem, mantenha links entre eles.
 
 | Data | Registro | Estado |
 |---|---|---|
+| 2026-10-06 | [Plano sequencial de confiabilidade do envio de fotos](2026-10-06-photo-reliability-remediation-plan.md) | Etapas 1–6 concluídas; automação e matriz Android/Safari aprovadas; próxima: auditoria da etapa 7 |
 | 2026-09-16 | [Filtro de funcionário nas Ordens de Serviço](2026-09-16-service-order-cleaning-staff-filter.md) | Implementado e homologado localmente; não publicado |
 | 2026-08-07 | [Remediação de chave Supabase legada exposta](2026-08-07-supabase-legacy-key-exposure.md) | Remediado; legado desabilitado |
 | 2026-08-04 | [Consistência entre CSV e PDF do extrato A Pagar](2026-08-04-payable-csv-pdf-consistency.md) | Implementado localmente; não implantado |

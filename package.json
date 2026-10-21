@@ -13,6 +13,7 @@
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "node scripts/test-sensitive-data-smoke-local.mjs --e2e",
+    "test:photos:mobile": "node scripts/test-sensitive-data-smoke-local.mjs --mobile-photos",
     "test:supabase": "node scripts/test-supabase-local.mjs",
     "test:smoke:sensitive-data": "node scripts/test-sensitive-data-smoke-local.mjs",
     "typegen:supabase": "node scripts/generate-database-types.mjs",

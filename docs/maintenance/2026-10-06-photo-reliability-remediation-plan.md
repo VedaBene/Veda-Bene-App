@@ -5,8 +5,8 @@
 **Branch no diagnóstico:** `codex/joe-service-order-filter`  
 **Impacto de banco previsto:** `DB-0` — nenhuma migration, alteração de dados,
 RLS, grants, bucket ou configuração remota  
-**Estado do programa:** `planned`  
-**Próxima etapa:** `1`
+**Estado do programa:** `in_progress`
+**Próxima etapa:** `7`
 
 ## 1. Finalidade
 
@@ -75,11 +75,12 @@ Estados permitidos: `planned`, `in_progress`, `completed`, `blocked`.
 | 3 | Upload resiliente e recuperação automática limitada | 1–2 | `completed` |
 | 4 | Observabilidade correlacionável e sem PII | 1–3 | `completed` |
 | 5 | Validações esperadas fora do Sentry | 4 | `completed` |
-| 6 | Regressão automatizada e matriz móvel | 1–5 | `planned` |
+| 6 | Regressão automatizada e matriz móvel | 1–5 | `completed` |
 | 7 | Auditoria independente final | 1–6 | `planned` |
 
-**Resumo de continuidade:** concluídas `1–5`; próxima `6` (não iniciada);
-bloqueio `nenhum`; última atualização `2026-10-07`.
+**Resumo de continuidade:** concluídas `1–6`; próxima `7` (não iniciada);
+bloqueio `nenhum`; gate Node 22 e matriz Android/Chrome 7/7 + iPhone/Safari 7/7 aprovados;
+última atualização `2026-10-21` (Europe/Rome).
 
 ## 5. Registro compacto de conclusão
 
@@ -96,6 +97,7 @@ Registros:
 - Etapa 3 | 2026-10-06 | cleaning-photo-upload, workflow, photo-actions, service-order-photos/storage e testes | 132 testes, lint/typecheck OK; regressão concorrente falha antes/passa após correção | limpeza sem confirmação bloqueia reenvio e pode exigir assistência; rede móvel real NOT VERIFIED; rollback: só o diff da etapa 3
 - Etapa 4 | 2026-10-06 | Sentry configs, observability, sessão, decoder/upload e testes | 382 testes, lint/typecheck/build OK; evento SDK em memória correlaciona UUID/SHA/retry; bundle sem segredos locais | deploy exige SHA no build; produção NOT VERIFIED; rollback: só o diff da etapa 4
 - Etapa 5 | 2026-10-07 | cleaning-photo-errors, photo-actions, service-order-photos, photo-telemetry e testes | 86 testes focados, lint/typecheck OK; limite mantém feedback/fila e zero capturas; falhas técnicas/desconhecidas capturadas | eficácia em produção NOT VERIFIED; rollback: só o diff da etapa 5
+- Etapa 6 | 2026-10-21 | e2e/photo-reliability, runners local/móvel e testes | 434 testes; 253 pgTAP; 5 E2E; lint/typecheck/build Node 22 OK; Android 7/7 e Safari 7/7 reais, contexto seguro; artifacts/photo-stage-6 | causas específicas do Sentry não reproduzidas; nenhuma mudança remota; ambientes descartados
 
 ## 6. Etapas de implementação
 

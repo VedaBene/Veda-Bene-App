@@ -1,0 +1,16 @@
+{
+  "recordedAt": "2026-10-21T02:47:21.570Z",
+  "timeZone": "Europe/Rome",
+  "browser": "155.0.0.0",
+  "android": "10",
+  "secureContext": true,
+  "results": {
+    "camera": "pass",
+    "gallery": "pass",
+    "orientation": "pass",
+    "eight": "pass",
+    "phases": "pass",
+    "reconnection": "pass",
+    "saved": "pass"
+  }
+}
